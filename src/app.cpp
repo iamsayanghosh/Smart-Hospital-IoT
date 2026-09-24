@@ -3,11 +3,9 @@
 #include "display.h"
 #include "esp_task_wdt.h"
 
+#include "sensors.h"
+
 // Forward declare tasks from main.cpp that will be moved in later phases
-extern void vitalTask(void *parameter);
-extern void ecgTask(void *parameter);
-extern void temperatureTask(void *parameter);
-extern void motionTask(void *parameter);
 extern void mqttTask(void *parameter);
 extern void alertTask(void *parameter);
 
