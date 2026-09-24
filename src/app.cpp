@@ -1,4 +1,5 @@
 #include "app.h"
+#include "watchdog.h"
 #include "esp_task_wdt.h"
 
 // Forward declare tasks from main.cpp that will be moved in later phases
@@ -60,32 +61,7 @@ const char *taskNameFromId(MonitoredTaskId taskId)
     }
 }
 
-void reportTaskHeartbeat(MonitoredTaskId taskId)
-{
-    if (taskId < TASK_TEMP || taskId >= TASK_MONITORED_COUNT) {
-        return;
-    }
 
-    uint32_t now = millis();
-    if (heartbeatMutex != NULL && xSemaphoreTake(heartbeatMutex, pdMS_TO_TICKS(HEARTBEAT_MUTEX_WAIT_MS)) == pdTRUE) {
-        taskHeartbeats[taskId].lastHeartbeatMs = now;
-        if (!taskHeartbeats[taskId].active) {
-            taskHeartbeats[taskId].active = true;
-            Serial.print("[WATCHDOG] First heartbeat: ");
-            Serial.println(taskNameFromId(taskId));
-        }
-        xSemaphoreGive(heartbeatMutex);
-    }
-
-    // TWDT reset is the enforcement point. The heartbeat monitor is only diagnostic logging.
-    esp_err_t resetResult = esp_task_wdt_reset();
-    if (resetResult != ESP_OK && resetResult != ESP_ERR_INVALID_STATE) {
-        Serial.print("[WATCHDOG] TWDT feed failed for ");
-        Serial.print(taskNameFromId(taskId));
-        Serial.print(": ");
-        Serial.println(esp_err_to_name(resetResult));
-    }
-}
 
 void failSetup(const char *message)
 {
@@ -128,10 +104,7 @@ void appInit()
     if (heartbeatMutex == NULL) {
         failSetup("[SETUP] Heartbeat mutex creation failed");
     }
-    for (int i = 0; i < TASK_MONITORED_COUNT; ++i) {
-        taskHeartbeats[i].lastHeartbeatMs = millis();
-        taskHeartbeats[i].active = false;
-    }
+    watchdogInit();
     Serial.println("[SETUP] Queue, display mutex, alert semaphore, and heartbeat mutex created");
 
     // Initialize thresholds, simulation state, telemetry, and summary windows.

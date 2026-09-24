@@ -16,7 +16,7 @@ portMUX_TYPE telemetryMux = portMUX_INITIALIZER_UNLOCKED;
 
 TaskHandle_t monitoredHandles[TASK_MONITORED_COUNT] = {nullptr};
 TaskHandle_t watchdogHandle = nullptr;
-TaskHeartbeat taskHeartbeats[TASK_MONITORED_COUNT];
+
 Telemetry telemetry;
 FacilityTelemetry facilityTelemetry;
 MedicationDosageControl medicationDosageControl;

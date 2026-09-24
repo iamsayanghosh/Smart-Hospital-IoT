@@ -70,9 +70,8 @@ const float MEDICATION_CRITICAL_DOSAGE_THRESHOLD = 80.0f;
 const float MEDICATION_RATE_LIMIT_STEP_MG_PER_SEC = 5.0f;
 const uint32_t MEDICATION_BUTTON_DEBOUNCE_MS = 50;
 
-const char *wifiSsid = "Wokwi-GUEST";
-const char *mqttBroker = AIO_MQTT_SERVER;
-const uint16_t mqttPort = AIO_MQTT_PORT;
+#include "connectivity.h"
+#include "watchdog.h"
 
 // ============================================================================
 // HARDWARE INTERFACES
@@ -81,8 +80,6 @@ const uint16_t mqttPort = AIO_MQTT_PORT;
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 OneWire oneWire(DS18B20_PIN);
 DallasTemperature temperatureSensor(&oneWire);
-WiFiClient wifiClient;
-PubSubClient mqttClient(wifiClient);
 
 // ============================================================================
 // FREERTOS SYNCHRONIZATION OBJECTS
@@ -1395,101 +1392,6 @@ void mqttTask(void *parameter)
     }
 }
 
-// ============================================================================
-// WATCHDOG TASK
-// ============================================================================
-
-/**
- * @brief Supervises worker heartbeats and feeds its own watchdog subscription.
- *
- * Monitors temperature, motion, vital, ECG, MQTT, display, alert, and medication tasks.
- * Each task registers with the ESP Task Watchdog and reports through
- * reportTaskHeartbeat(); this supervisor checks active state and heartbeat age
- * under heartbeatMutex. The eight workers are checked every 1 second against
- * the 6-second diagnostic limit. The supervisor itself is subscribed to the
- * 8-second TWDT and feeds it each loop; a 2-second startup grace period allows
- * workers to report their first heartbeat.
- */
-void watchdogTask(void *parameter)
-{
-    (void)parameter;
-    esp_err_t addResult = esp_task_wdt_add(NULL);
-    if (addResult != ESP_OK && addResult != ESP_ERR_INVALID_STATE) {
-        Serial.print("[WATCHDOG] Failed to subscribe watchdog to self: ");
-        Serial.println(esp_err_to_name(addResult));
-    }
-
-    Serial.println("[WATCHDOG] Task health monitor active");
-    const uint32_t monitoringStartMs = millis();
-    uint32_t lastHealthyLogMs = 0;
-    uint32_t lastStackLogMs = 0;
-
-    while (true) {
-        uint32_t now = millis();
-        bool unhealthyFound = false;
-
-        const bool startupGraceActive =
-            (now - monitoringStartMs) < STARTUP_GRACE_PERIOD_MS;
-
-        for (int taskIndex = 0; taskIndex < TASK_MONITORED_COUNT; ++taskIndex) {
-            TaskHeartbeat heartbeat;
-            if (xSemaphoreTake(heartbeatMutex, pdMS_TO_TICKS(HEARTBEAT_MUTEX_WAIT_MS)) == pdTRUE) {
-                heartbeat = taskHeartbeats[taskIndex];
-                xSemaphoreGive(heartbeatMutex);
-            } else {
-                Serial.println("[WATCHDOG] Could not read task heartbeat state");
-                unhealthyFound = true;
-                continue;
-            }
-
-            if (!heartbeat.active) {
-                if (startupGraceActive) {
-                    continue;
-                }
-                unhealthyFound = true;
-                Serial.print("[WATCHDOG] Heartbeat timeout: ");
-                Serial.print(taskNameFromId(static_cast<MonitoredTaskId>(taskIndex)));
-                Serial.println(" has not reported a heartbeat yet");
-                continue;
-            }
-
-            if ((now - heartbeat.lastHeartbeatMs) > WATCHDOG_TIMEOUT_MS) {
-                unhealthyFound = true;
-                Serial.print("[WATCHDOG] Heartbeat timeout: ");
-                Serial.print(taskNameFromId(static_cast<MonitoredTaskId>(taskIndex)));
-                Serial.print(" missed last heartbeat by ");
-                Serial.print(now - heartbeat.lastHeartbeatMs);
-                Serial.println(" ms");
-            }
-        }
-
-        if (!unhealthyFound) {
-            if (millis() - lastHealthyLogMs > 10000) {
-                Serial.println("[WATCHDOG] All monitored tasks healthy");
-                lastHealthyLogMs = millis();
-            }
-        }
-
-        if (now - lastStackLogMs >= 30000U) {
-            lastStackLogMs = now;
-            Serial.print("[WATCHDOG] Free heap: ");
-            Serial.println(ESP.getFreeHeap());
-            Serial.print("[WATCHDOG] Minimum free heap: ");
-            Serial.println(ESP.getMinFreeHeap());
-            for (int taskIndex = 0; taskIndex < TASK_MONITORED_COUNT; ++taskIndex) {
-                if (monitoredHandles[taskIndex] != nullptr) {
-                    Serial.print("[WATCHDOG] ");
-                    Serial.print(taskNameFromId(static_cast<MonitoredTaskId>(taskIndex)));
-                    Serial.print(" stack high-water mark: ");
-                    Serial.println(uxTaskGetStackHighWaterMark(monitoredHandles[taskIndex]));
-                }
-            }
-        }
-
-        esp_task_wdt_reset();
-        vTaskDelay(pdMS_TO_TICKS(WATCHDOG_CHECK_INTERVAL_MS));
-    }
-}
 
 /**
  * @brief Logs a fatal initialization error and holds the system in a safe loop.

@@ -146,7 +146,7 @@ struct SamplingPeriods {
 
 extern TaskHandle_t monitoredHandles[TASK_MONITORED_COUNT];
 extern TaskHandle_t watchdogHandle;
-extern TaskHeartbeat taskHeartbeats[TASK_MONITORED_COUNT];
+
 extern Telemetry telemetry;
 extern FacilityTelemetry facilityTelemetry;
 extern MedicationDosageControl medicationDosageControl;
