@@ -7,6 +7,9 @@
 #include "esp_task_wdt.h"
 #include "adafruit_io_config.h"
 #include <PubSubClient.h>
+#include "environment.h"
+
+PubSubClient mqttClient(wifiClient);
 
 const uint32_t MQTT_TASK_INTERVAL_MS = 3000;
 const uint32_t MQTT_LOOP_INTERVAL_MS = 50;

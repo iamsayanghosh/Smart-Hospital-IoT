@@ -6,7 +6,6 @@ const char *mqttBroker = AIO_MQTT_SERVER;
 const uint16_t mqttPort = AIO_MQTT_PORT;
 
 WiFiClient wifiClient;
-PubSubClient mqttClient(wifiClient);
 
 void setupConnectivity()
 {

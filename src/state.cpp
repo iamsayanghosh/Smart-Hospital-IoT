@@ -218,34 +218,7 @@ AlertCandidate evaluateFacilityAlert(const FacilityTelemetry &snapshot)
 
 
 
-/**
- * @brief Generates simulated room temperature, oxygen, and AQI values.
- *
- * Values are stored under telemetryMux. A transition into an abnormal facility
- * state signals alertSemaphore for alertTask; these are not physical sensors.
- */
-void simulateFacilityData()
-{
-    FacilityTelemetry nextState = getFacilitySnapshot();
 
-    const float roomDelta = random(-4, 5) * 0.4f;
-    const float oxygenDelta = random(-3, 3) * 0.2f;
-    const int aqiDelta = random(-12, 18);
-
-    nextState.roomTemperature = constrain(22.0f + roomDelta, 18.0f, 30.0f);
-    nextState.oxygenLevel = constrain(20.8f + oxygenDelta, 18.0f, 24.0f);
-    nextState.aqi = constrain(35 + aqiDelta, 0, 200);
-
-    portENTER_CRITICAL(&telemetryMux);
-    facilityTelemetry = nextState;
-    const bool wasAbnormal = facilityTelemetry.alertActive;
-    facilityTelemetry.alertActive = isFacilityAbnormal(facilityTelemetry);
-    portEXIT_CRITICAL(&telemetryMux);
-
-    if (facilityTelemetry.alertActive && !wasAbnormal) {
-        xSemaphoreGive(alertSemaphore);
-    }
-}
 
 
 
@@ -293,14 +266,6 @@ void updateFacilitySummaryStats(const FacilityTelemetry &snapshot)
 
 
 
-/**
- * @brief Clears medical and facility accumulators for the next summary window.
- */
-void resetSummaryStats()
-{
-    medicalSummaryStats = MedicalSummaryStats();
-    facilitySummaryStats = FacilitySummaryStats();
-    medicalSummaryStats.minSpo2 = 100;
-}
+
 
     

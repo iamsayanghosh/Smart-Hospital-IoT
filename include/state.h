@@ -178,7 +178,5 @@ FacilityTelemetry getFacilitySnapshot();
 bool sendSensorMessage(const SensorMessage &message, const char *taskName);
 AlertCandidate evaluateMedicalAlert(const Telemetry &snapshot);
 AlertCandidate evaluateFacilityAlert(const FacilityTelemetry &snapshot);
-void simulateFacilityData();
 void updateMedicalSummaryStats(const Telemetry &snapshot);
 void updateFacilitySummaryStats(const FacilityTelemetry &snapshot);
-void resetSummaryStats();

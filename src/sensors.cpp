@@ -6,6 +6,7 @@
 #include "watchdog.h"
 #include "esp_task_wdt.h"
 #include "app.h"
+#include "environment.h"
 
 #define DS18B20_PIN 4
 #define PIR_PIN 27
