@@ -1,0 +1,6 @@
+#pragma once
+
+#define AIO_USERNAME "your_adafruit_io_username"
+#define AIO_KEY "paste_your_adafruit_io_key_here"
+#define AIO_MQTT_SERVER "io.adafruit.com"
+#define AIO_MQTT_PORT 1883

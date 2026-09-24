@@ -1,0 +1,14 @@
+# PlatformIO build output
+.pio/
+
+# PlatformIO and editor-local files
+.vscode/*
+!.vscode/extensions.json
+!.vscode/tasks.json
+!.vscode/launch.json
+
+# Local credentials
+include/adafruit_io_config.local.h
+
+# PlatformIO-generated metadata
+.cache/
