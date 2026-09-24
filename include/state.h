@@ -38,6 +38,10 @@ enum MonitoredTaskId {
     TASK_MEDICATION,
     TASK_MONITORED_COUNT
 };
+extern const float MEDICATION_DOSAGE_MIN;
+extern const float MEDICATION_DOSAGE_MAX;
+extern const float MEDICATION_CRITICAL_DOSAGE_THRESHOLD;
+extern const float MEDICATION_RATE_LIMIT_STEP_MG_PER_SEC;
 
 enum AlertSeverity {
     ALERT_SEVERITY_NORMAL = 0,
@@ -165,3 +169,34 @@ extern uint32_t lastMedicalAlertPublishMs;
 extern uint32_t lastFacilityAlertPublishMs;
 extern bool medicalAlertStateKnown;
 extern bool facilityAlertStateKnown;
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+bool isAbnormal(const Telemetry &data);
+bool isFacilityAbnormal(const FacilityTelemetry &data);
+float clampMedicationDosage(float value);
+MedicationDosageControl getMedicationDosageSnapshot();
+MedicationSafetyLevel getMedicationSafetyLevel(float dosage);
+const char *getMedicationSafetyLabel(float dosage);
+void updateMedicationDosageFromRequest();
+Telemetry getTelemetrySnapshot();
+FacilityTelemetry getFacilitySnapshot();
+bool sendSensorMessage(const SensorMessage &message, const char *taskName);
+AlertCandidate evaluateMedicalAlert(const Telemetry &snapshot);
+AlertCandidate evaluateFacilityAlert(const FacilityTelemetry &snapshot);
+void simulateFacilityData();
+void updateMedicalSummaryStats(const Telemetry &snapshot);
+void updateFacilitySummaryStats(const FacilityTelemetry &snapshot);
+void resetSummaryStats();
+
+Telemetry getTelemetrySnapshot();
+FacilityTelemetry getFacilitySnapshot();
+bool sendSensorMessage(const SensorMessage &message, const char *taskName);
+AlertCandidate evaluateMedicalAlert(const Telemetry &snapshot);
+AlertCandidate evaluateFacilityAlert(const FacilityTelemetry &snapshot);
+void simulateFacilityData();
+void updateMedicalSummaryStats(const Telemetry &snapshot);
+void updateFacilitySummaryStats(const FacilityTelemetry &snapshot);
+void resetSummaryStats();

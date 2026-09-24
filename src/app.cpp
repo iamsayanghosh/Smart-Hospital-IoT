@@ -1,9 +1,9 @@
 #include "app.h"
 #include "watchdog.h"
+#include "display.h"
 #include "esp_task_wdt.h"
 
 // Forward declare tasks from main.cpp that will be moved in later phases
-extern void watchdogTask(void *parameter);
 extern void vitalTask(void *parameter);
 extern void ecgTask(void *parameter);
 extern void temperatureTask(void *parameter);
@@ -11,7 +11,6 @@ extern void motionTask(void *parameter);
 extern void mqttTask(void *parameter);
 extern void alertTask(void *parameter);
 extern void medicationTask(void *parameter);
-extern void displayTask(void *parameter);
 
 static const uint32_t TWDT_TIMEOUT_MS = 8000;
 static const uint32_t HEARTBEAT_MUTEX_WAIT_MS = 50;
