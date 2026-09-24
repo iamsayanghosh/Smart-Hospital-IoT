@@ -1,6 +1,7 @@
 #include "mqtt.h"
 #include "app.h"
 #include "state.h"
+#include "medication.h"
 #include "connectivity.h"
 #include "watchdog.h"
 #include "esp_task_wdt.h"

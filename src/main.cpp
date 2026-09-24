@@ -31,6 +31,8 @@
 #include "adafruit_io_config.h"
 #include "display.h"
 #include "state.h"
+#include "outputs.h"
+#include "medication.h"
 
 // ============================================================================
 // HARDWARE PIN DEFINITIONS
@@ -40,11 +42,6 @@
 #define PIR_PIN 27
 #define OLED_SDA 21
 #define OLED_SCL 22
-#define RED_LED_PIN 25
-#define YELLOW_LED_PIN 26
-#define GREEN_LED_PIN 33
-#define BUZZER_PIN 14
-#define PUSHBUTTON_PIN 13
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
 
@@ -69,8 +66,6 @@
 
 
 
-
-const uint32_t MEDICATION_BUTTON_DEBOUNCE_MS = 50;
 
 #include "connectivity.h"
 #include "watchdog.h"
@@ -130,96 +125,6 @@ enum LiveFeedIndex {
 // ============================================================================
 
 
-
-void handleMedicationConfirmationButton()
-{
-    const uint32_t now = millis();
-    const bool rawPressed = (digitalRead(PUSHBUTTON_PIN) == LOW);
-
-    portENTER_CRITICAL(&telemetryMux);
-    const bool previousPressed = medicationDosageControl.buttonPressed;
-    const uint32_t lastTransitionMs = medicationDosageControl.lastButtonTransitionMs;
-    portEXIT_CRITICAL(&telemetryMux);
-
-    if (rawPressed != previousPressed && (now - lastTransitionMs) >= MEDICATION_BUTTON_DEBOUNCE_MS) {
-        portENTER_CRITICAL(&telemetryMux);
-        medicationDosageControl.buttonPressed = rawPressed;
-        medicationDosageControl.lastButtonTransitionMs = now;
-        if (rawPressed && medicationDosageControl.criticalConfirmationPending) {
-            medicationDosageControl.criticalConfirmationPending = false;
-            medicationDosageControl.criticalConfirmed = true;
-            medicationDosageControl.lastRateLimitUpdateMs = now;
-        }
-        portEXIT_CRITICAL(&telemetryMux);
-    }
-
-}
-
-void updateMedicationSafetyOutputs()
-{
-    static bool buzzerOn = false;
-    MedicationDosageControl state = getMedicationDosageSnapshot();
-    const uint32_t now = millis();
-
-    const bool criticalPending = state.criticalConfirmationPending && state.requested > MEDICATION_CRITICAL_DOSAGE_THRESHOLD;
-    const bool criticalActive = criticalPending || getMedicationSafetyLevel(state.applied) == MEDICATION_SAFETY_CRITICAL;
-    bool redLedOn = false;
-    bool yellowLedOn = false;
-    bool greenLedOn = false;
-    bool desiredBuzzerOn = false;
-
-    if (criticalActive) {
-        const bool redBlinkOn = ((now / 150U) % 2U) == 0U;
-        redLedOn = redBlinkOn;
-        desiredBuzzerOn = redBlinkOn;
-    } else if (getMedicationSafetyLevel(state.applied) == MEDICATION_SAFETY_WARNING) {
-        yellowLedOn = true;
-    } else {
-        greenLedOn = true;
-    }
-
-    digitalWrite(RED_LED_PIN, redLedOn ? HIGH : LOW);
-    digitalWrite(YELLOW_LED_PIN, yellowLedOn ? HIGH : LOW);
-    digitalWrite(GREEN_LED_PIN, greenLedOn ? HIGH : LOW);
-
-    if (desiredBuzzerOn != buzzerOn) {
-        buzzerOn = desiredBuzzerOn;
-        if (buzzerOn) {
-            tone(BUZZER_PIN, 1200);
-        } else {
-            noTone(BUZZER_PIN);
-        }
-    }
-}
-
-// ============================================================================
-// MEDICATION TASK
-// ============================================================================
-
-/**
- * @brief Runs medication confirmation, dosage control, and safety outputs.
- *
- * The task remains responsive to the button and independent of MQTT timing.
- */
-void medicationTask(void *parameter)
-{
-    (void)parameter;
-    esp_err_t wdtResult = esp_task_wdt_add(NULL);
-    if (wdtResult != ESP_OK) {
-        Serial.print("[WATCHDOG] MEDICATION registration failed: ");
-        Serial.println(esp_err_to_name(wdtResult));
-        return;
-    }
-    Serial.println("[WATCHDOG] MEDICATION task registered with TWDT");
-
-    while (true) {
-        handleMedicationConfirmationButton();
-        updateMedicationDosageFromRequest();
-        updateMedicationSafetyOutputs();
-        reportTaskHeartbeat(TASK_MEDICATION);
-        vTaskDelay(pdMS_TO_TICKS(20));
-    }
-}
 
 /**
  * @brief Combines aggregated medical and facility snapshots into one payload.
@@ -557,15 +462,10 @@ void setup()
 
     // Initialize the PIR GPIO and physical DS18B20 temperature interface.
     pinMode(PIR_PIN, INPUT);
-    pinMode(RED_LED_PIN, OUTPUT);
-    pinMode(YELLOW_LED_PIN, OUTPUT);
-    pinMode(GREEN_LED_PIN, OUTPUT);
-    pinMode(BUZZER_PIN, OUTPUT);
-    pinMode(PUSHBUTTON_PIN, INPUT_PULLUP);
-    digitalWrite(RED_LED_PIN, LOW);
-    digitalWrite(YELLOW_LED_PIN, LOW);
-    digitalWrite(GREEN_LED_PIN, LOW);
-    noTone(BUZZER_PIN);
+    
+    outputsInit();
+    medicationInit();
+    
     temperatureSensor.begin();
 
     // Initialize I2C and the 128x64 OLED at the configured 0x3C address.

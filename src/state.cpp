@@ -75,18 +75,6 @@ bool isFacilityAbnormal(const FacilityTelemetry &data)
            data.aqi > facilityThresholds.aqi.high;
 }
 
-
-
-float clampMedicationDosage(float value)
-{
-    if (!isfinite(value)) {
-        return MEDICATION_DOSAGE_MIN;
-    }
-    return constrain(value, MEDICATION_DOSAGE_MIN, MEDICATION_DOSAGE_MAX);
-}
-
-
-
 MedicationDosageControl getMedicationDosageSnapshot()
 {
     MedicationDosageControl snapshot;
@@ -97,88 +85,6 @@ MedicationDosageControl getMedicationDosageSnapshot()
 }
 
 
-
-MedicationSafetyLevel getMedicationSafetyLevel(float dosage)
-{
-    if (dosage > MEDICATION_CRITICAL_DOSAGE_THRESHOLD) {
-        return MEDICATION_SAFETY_CRITICAL;
-    }
-    if (dosage == MEDICATION_CRITICAL_DOSAGE_THRESHOLD) {
-        return MEDICATION_SAFETY_WARNING;
-    }
-    return MEDICATION_SAFETY_NORMAL;
-}
-
-
-
-const char *getMedicationSafetyLabel(float dosage)
-{
-    switch (getMedicationSafetyLevel(dosage)) {
-        case MEDICATION_SAFETY_WARNING:
-            return "WARNING";
-        case MEDICATION_SAFETY_CRITICAL:
-            return "CRITICAL";
-        default:
-            return "NORMAL";
-    }
-}
-
-
-
-void updateMedicationDosageFromRequest()
-{
-    const uint32_t now = millis();
-    MedicationDosageControl state;
-    portENTER_CRITICAL(&telemetryMux);
-    state = medicationDosageControl;
-    portEXIT_CRITICAL(&telemetryMux);
-
-    const float targetDosage = clampMedicationDosage(state.requested);
-
-    if (targetDosage <= MEDICATION_CRITICAL_DOSAGE_THRESHOLD) {
-        state.criticalConfirmed = false;
-    }
-
-    if (state.criticalConfirmationPending && targetDosage <= MEDICATION_CRITICAL_DOSAGE_THRESHOLD) {
-        state.criticalConfirmationPending = false;
-        state.criticalConfirmed = false;
-        state.lastRateLimitUpdateMs = now;
-    }
-
-    if (!state.criticalConfirmationPending && !state.criticalConfirmed && targetDosage > MEDICATION_CRITICAL_DOSAGE_THRESHOLD) {
-        state.criticalConfirmationPending = true;
-        state.applied = min(state.applied, MEDICATION_CRITICAL_DOSAGE_THRESHOLD);
-        state.lastRateLimitUpdateMs = now;
-    }
-
-    const float goal = state.criticalConfirmationPending ? MEDICATION_CRITICAL_DOSAGE_THRESHOLD : targetDosage;
-    if (goal > state.applied) {
-        float elapsedSeconds = 1.0f;
-        if (state.lastRateLimitUpdateMs != 0U && now > state.lastRateLimitUpdateMs) {
-            elapsedSeconds = static_cast<float>(now - state.lastRateLimitUpdateMs) / 1000.0f;
-        }
-        if (elapsedSeconds <= 0.0f) {
-            elapsedSeconds = 1.0f;
-        }
-
-        const float maxIncrease = MEDICATION_RATE_LIMIT_STEP_MG_PER_SEC * elapsedSeconds;
-        const float allowedIncrease = min(maxIncrease, goal - state.applied);
-        state.applied += allowedIncrease;
-        state.lastRateLimitUpdateMs = now;
-    } else {
-        state.applied = goal;
-        state.lastRateLimitUpdateMs = now;
-    }
-
-    state.applied = constrain(state.applied, MEDICATION_DOSAGE_MIN, MEDICATION_DOSAGE_MAX);
-
-    portENTER_CRITICAL(&telemetryMux);
-    medicationDosageControl.applied = state.applied;
-    medicationDosageControl.criticalConfirmationPending = state.criticalConfirmationPending;
-    medicationDosageControl.criticalConfirmed = state.criticalConfirmed;
-    medicationDosageControl.lastRateLimitUpdateMs = state.lastRateLimitUpdateMs;
-    portEXIT_CRITICAL(&telemetryMux);
-}
 
 
 
@@ -396,14 +302,5 @@ void resetSummaryStats()
     facilitySummaryStats = FacilitySummaryStats();
     medicalSummaryStats.minSpo2 = 100;
 }
-
-
-const float MEDICATION_DOSAGE_MIN = 0.0f;
-
-const float MEDICATION_DOSAGE_MAX = 100.0f;
-
-const float MEDICATION_CRITICAL_DOSAGE_THRESHOLD = 80.0f;
-
-const float MEDICATION_RATE_LIMIT_STEP_MG_PER_SEC = 5.0f;
 
     

@@ -10,7 +10,8 @@ extern void temperatureTask(void *parameter);
 extern void motionTask(void *parameter);
 extern void mqttTask(void *parameter);
 extern void alertTask(void *parameter);
-extern void medicationTask(void *parameter);
+
+#include "medication.h"
 
 static const uint32_t TWDT_TIMEOUT_MS = 8000;
 static const uint32_t HEARTBEAT_MUTEX_WAIT_MS = 50;

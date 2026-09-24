@@ -1,5 +1,6 @@
 #include "display.h"
 #include "state.h"
+#include "medication.h"
 #include "watchdog.h"
 #include "esp_task_wdt.h"
 #include "freertos/FreeRTOS.h"
