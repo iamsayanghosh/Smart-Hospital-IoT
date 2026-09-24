@@ -1,2 +1,72 @@
 #include "environment.h"
+#include <Arduino.h>
+#include "state.h"
 
+/**
+ * @brief Processes serial commands for facility telemetry simulation/testing.
+ *
+ * Supported commands are SET_ROOM <C>, SET_OXYGEN <percent>, SET_AQI <value>,
+ * RESET_FACILITY, and SHOW_TASK2; these are simulation controls, not
+ * production facility-management commands.
+ */
+void handleSerialCommands()
+{
+    static char lineBuffer[96];
+    static size_t lineLength = 0;
+
+    while (Serial.available() > 0) {
+        const char character = static_cast<char>(Serial.read());
+        if (character == '\n' || character == '\r') {
+            if (lineLength == 0) {
+                continue;
+            }
+            lineBuffer[lineLength] = '\0';
+            String command(lineBuffer);
+            lineLength = 0;
+
+            if (command.startsWith("SET_ROOM ")) {
+                String value = command.substring(9);
+                portENTER_CRITICAL(&telemetryMux);
+                facilityTelemetry.roomTemperature = value.toFloat();
+                const float roomTemperature = facilityTelemetry.roomTemperature;
+                portEXIT_CRITICAL(&telemetryMux);
+                Serial.print("[SIM] Room temperature set to ");
+                Serial.println(roomTemperature, 1);
+            } else if (command.startsWith("SET_OXYGEN ")) {
+                String value = command.substring(11);
+                const float oxygenLevel = constrain(value.toFloat(), 16.0f, 25.0f);
+                portENTER_CRITICAL(&telemetryMux);
+                facilityTelemetry.oxygenLevel = oxygenLevel;
+                portEXIT_CRITICAL(&telemetryMux);
+                Serial.print("[SIM] Oxygen set to ");
+                Serial.println(oxygenLevel, 1);
+            } else if (command.startsWith("SET_AQI ")) {
+                String value = command.substring(8);
+                const int aqi = constrain(value.toInt(), 0, 250);
+                portENTER_CRITICAL(&telemetryMux);
+                facilityTelemetry.aqi = aqi;
+                portEXIT_CRITICAL(&telemetryMux);
+                Serial.print("[SIM] AQI set to ");
+                Serial.println(aqi);
+            } else if (command == "RESET_FACILITY") {
+                portENTER_CRITICAL(&telemetryMux);
+                facilityTelemetry.roomTemperature = 22.0f;
+                facilityTelemetry.oxygenLevel = 20.8f;
+                facilityTelemetry.aqi = 35;
+                portEXIT_CRITICAL(&telemetryMux);
+                Serial.println("[SIM] Facility simulation reset to normal range");
+            } else if (command == "SHOW_TASK2") {
+                Serial.println("[TASK2] Medical feeds: medical-heart-rate | medical-spo2 | medical-body-temperature");
+                Serial.println("[TASK2] Facility feeds: facility-room-temperature | facility-oxygen | facility-aqi");
+                Serial.println("[TASK2] Event feed: hospital-events (alerts + summaries + status)");
+            } else {
+                Serial.println("[SIM] Commands: SET_ROOM <C>, SET_OXYGEN <percent>, SET_AQI <value>, RESET_FACILITY, SHOW_TASK2");
+            }
+            continue;
+        }
+
+        if (lineLength < sizeof(lineBuffer) - 1) {
+            lineBuffer[lineLength++] = character;
+        }
+    }
+}
