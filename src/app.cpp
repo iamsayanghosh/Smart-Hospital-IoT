@@ -4,10 +4,10 @@
 #include "esp_task_wdt.h"
 
 #include "sensors.h"
+#include "alerts.h"
 
 // Forward declare tasks from main.cpp that will be moved in later phases
 extern void mqttTask(void *parameter);
-extern void alertTask(void *parameter);
 
 #include "medication.h"
 
