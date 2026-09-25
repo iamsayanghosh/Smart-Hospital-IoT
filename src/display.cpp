@@ -80,7 +80,7 @@ void displayTask(void *parameter)
             display.setTextSize(1);
             if (dosageSnapshot.criticalConfirmationPending) {
                 display.setCursor(0, 0);
-                display.println("CRITICAL DOSAGE");
+                display.println("CRITICAL REQUEST");
                 display.setCursor(0, 12);
                 display.print("Req: ");
                 display.print(dosageSnapshot.requested, 1);
@@ -98,7 +98,11 @@ void displayTask(void *parameter)
                 display.println(" mg/hr");
                 display.setCursor(0, 12);
                 display.print("Status: ");
-                display.println(getMedicationSafetyLabel(dosageSnapshot.applied));
+                if (dosageSnapshot.criticalConfirmed) {
+                    display.println("CRITICAL");
+                } else {
+                    display.println(getMedicationSafetyLabel(dosageSnapshot.applied));
+                }
                 if (dosageSnapshot.criticalConfirmed) {
                     display.setCursor(0, 24);
                     display.println("CONFIRMED");
