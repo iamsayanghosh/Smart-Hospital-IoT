@@ -93,12 +93,10 @@ void displayTask(void *parameter)
                 display.println("PRESS BUTTON");
             } else {
                 display.setCursor(0, 0);
-                display.println("SMART HOSPITAL");
-                display.setCursor(0, 12);
                 display.print("Dose: ");
                 display.print(dosageSnapshot.applied, 1);
                 display.println(" mg/hr");
-                display.setCursor(0, 30);
+                display.setCursor(0, 12);
                 display.print("Status: ");
                 display.println(getMedicationSafetyLabel(dosageSnapshot.applied));
             }

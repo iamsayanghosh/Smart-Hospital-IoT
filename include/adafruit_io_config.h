@@ -4,7 +4,7 @@
 // The placeholder values keep the project buildable without exposing a secret.
 
 #if __has_include("adafruit_io_config.local.h")
-#include "adafruit_io_config.local.h"
+#include "adafruit_io_config.local.h"  // IWYU pragma: export // NOLINT(misc-include-cleaner)
 #else
 #define AIO_USERNAME "YOUR_ADAFRUIT_IO_USERNAME"
 #define AIO_KEY "YOUR_ADAFRUIT_IO_KEY"

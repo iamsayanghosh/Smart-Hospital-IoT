@@ -1,0 +1,13 @@
+CompileFlags:
+  # Strip Xtensa-specific GCC flags that clangd/clang does not understand.
+  # These are valid flags for xtensa-esp32-elf-gcc but unknown to clang,
+  # causing false-positive "Unknown argument" errors in the IDE.
+  Remove:
+    - -mlongcalls
+    - -mdisable-hardware-atomics
+    - -mfix-esp32-psram-cache-issue
+    - -mfix-esp32-psram-cache-strategy=*
+    - -fstrict-volatile-bitfields
+    - -fno-tree-switch-conversion
+    - -Wno-frame-address
+    - -fno-jump-tables
