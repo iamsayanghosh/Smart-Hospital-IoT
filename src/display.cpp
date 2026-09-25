@@ -99,6 +99,10 @@ void displayTask(void *parameter)
                 display.setCursor(0, 12);
                 display.print("Status: ");
                 display.println(getMedicationSafetyLabel(dosageSnapshot.applied));
+                if (dosageSnapshot.criticalConfirmed) {
+                    display.setCursor(0, 24);
+                    display.println("CONFIRMED");
+                }
             }
             display.display();
             xSemaphoreGive(displayMutex);

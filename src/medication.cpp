@@ -132,16 +132,18 @@ static void updateMedicationSafetyOutputs()
     const uint32_t now = millis();
 
     const bool criticalPending = state.criticalConfirmationPending && state.requested > MEDICATION_CRITICAL_DOSAGE_THRESHOLD;
-    const bool criticalActive = criticalPending || getMedicationSafetyLevel(state.applied) == MEDICATION_SAFETY_CRITICAL;
+    
     bool redLedOn = false;
     bool yellowLedOn = false;
     bool greenLedOn = false;
     bool desiredBuzzerOn = false;
 
-    if (criticalActive) {
-        const bool redBlinkOn = ((now / 150U) % 2U) == 0U;
+    if (criticalPending) {
+        const bool redBlinkOn = ((now / 75U) % 2U) == 0U;
         redLedOn = redBlinkOn;
-        desiredBuzzerOn = redBlinkOn;
+        desiredBuzzerOn = true;
+    } else if (getMedicationSafetyLevel(state.applied) == MEDICATION_SAFETY_CRITICAL) {
+        redLedOn = true;
     } else if (getMedicationSafetyLevel(state.applied) == MEDICATION_SAFETY_WARNING) {
         yellowLedOn = true;
     } else {
