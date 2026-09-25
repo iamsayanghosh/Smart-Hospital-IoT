@@ -139,7 +139,7 @@ static void updateMedicationSafetyOutputs()
     bool desiredBuzzerOn = false;
 
     if (criticalPending) {
-        const bool redBlinkOn = ((now / 150U) % 2U) == 0U;
+        const bool redBlinkOn = ((now / 500U) % 2U) == 0U;
         redLedOn = redBlinkOn;
         desiredBuzzerOn = redBlinkOn;
     } else if (getMedicationSafetyLevel(state.applied) == MEDICATION_SAFETY_CRITICAL) {
