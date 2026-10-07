@@ -11,6 +11,7 @@
 // ============================================================================
 
 extern QueueHandle_t sensorQueue;
+extern QueueHandle_t samplingQueue;
 extern SemaphoreHandle_t displayMutex;
 extern SemaphoreHandle_t alertSemaphore;
 extern SemaphoreHandle_t heartbeatMutex;
@@ -36,6 +37,7 @@ enum MonitoredTaskId {
     TASK_DISPLAY,
     TASK_ALERT,
     TASK_MEDICATION,
+    TASK_SAMPLING,
     TASK_MONITORED_COUNT
 };
 

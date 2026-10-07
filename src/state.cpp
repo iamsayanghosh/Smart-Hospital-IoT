@@ -5,6 +5,7 @@
 // ============================================================================
 
 QueueHandle_t sensorQueue;
+QueueHandle_t samplingQueue;
 SemaphoreHandle_t displayMutex;
 SemaphoreHandle_t alertSemaphore;
 SemaphoreHandle_t heartbeatMutex;
@@ -47,11 +48,13 @@ bool facilityAlertStateKnown = false;
  */
 bool isAbnormal(const Telemetry &data)
 {
-    if (!data.temperatureValid) {
-        return false;
+    bool tempAbnormal = false;
+    if (data.temperatureValid) {
+        tempAbnormal = (data.temperature < medicalThresholds.bodyTemperature.low ||
+                        data.temperature > medicalThresholds.bodyTemperature.high);
     }
-    return data.temperature < medicalThresholds.bodyTemperature.low ||
-           data.temperature > medicalThresholds.bodyTemperature.high ||
+
+    return tempAbnormal ||
            data.heartRate < medicalThresholds.heartRate.low ||
            data.heartRate > medicalThresholds.heartRate.high ||
            data.spo2 < medicalThresholds.spo2.low ||

@@ -27,6 +27,7 @@ const uint16_t MQTT_SUMMARY_BUFFER_MARGIN = 64;
 #define FACILITY_AQI_FEED "facility-aqi"
 #define HOSPITAL_EVENTS_FEED "hospital-events"
 #define MEDICATION_DOSAGE_FEED "medication-dosage"
+#define SAMPLING_RATE_FEED "sampling-rate"
 
 enum LiveFeedIndex {
     LIVE_MEDICAL_HEART_RATE,
@@ -167,6 +168,7 @@ struct MqttMessageRoute {
 };
 
 String medicationDosageTopic;
+String samplingRateTopic;
 
 void handleMedicationDosagePayload(const char *payload, size_t length)
 {
@@ -187,8 +189,25 @@ void handleMedicationDosagePayload(const char *payload, size_t length)
     Serial.println(" mg/hr");
 }
 
+void handleSamplingRatePayload(const char *payload, size_t length)
+{
+    if (length == 0) {
+        return;
+    }
+    
+    uint32_t rate = strtoul(payload, nullptr, 10);
+    if (rate < 5) rate = 5;
+    if (rate > 60) rate = 60;
+    
+    xQueueOverwrite(samplingQueue, &rate);
+    Serial.print("[MQTT TASK] sampling-rate received: ");
+    Serial.print(rate);
+    Serial.println(" s");
+}
+
 MqttMessageRoute mqttRoutes[] = {
-    {nullptr, handleMedicationDosagePayload}
+    {nullptr, handleMedicationDosagePayload},
+    {nullptr, handleSamplingRatePayload}
 };
 
 void mqttMessageCallback(char *topic, byte *payload, unsigned int length)
@@ -216,9 +235,14 @@ bool connectMqtt()
     String clientId = "smart-hospital-" + String(static_cast<uint32_t>(ESP.getEfuseMac()), HEX);
     if (mqttClient.connect(clientId.c_str(), AIO_USERNAME, AIO_KEY)) {
         medicationDosageTopic = getAioFeedTopic(MEDICATION_DOSAGE_FEED);
+        samplingRateTopic = getAioFeedTopic(SAMPLING_RATE_FEED);
+        
         mqttRoutes[0].topic = medicationDosageTopic.c_str();
+        mqttRoutes[1].topic = samplingRateTopic.c_str();
+        
         mqttClient.setCallback(mqttMessageCallback);
         mqttClient.subscribe(medicationDosageTopic.c_str());
+        mqttClient.subscribe(samplingRateTopic.c_str());
         mqttClient.loop();
         Serial.println("[MQTT TASK] Connected to Adafruit IO broker");
         return true;

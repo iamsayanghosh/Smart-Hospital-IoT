@@ -36,18 +36,25 @@ void temperatureTask(void *parameter)
     }
     Serial.println("[WATCHDOG] TEMP task registered with TWDT");
 
+    uint32_t lastSampleMs = 0;
     while (true) {
-        temperatureSensor.requestTemperatures();
-        SensorMessage message = {};
-        message.type = TEMP_DATA;
-        message.temperature = temperatureSensor.getTempCByIndex(0);
-        sendSensorMessage(message, "TEMP TASK");
+        uint32_t now = millis();
+        uint32_t period = getSamplePeriodMs(TASK_TEMP);
+        
+        if (now - lastSampleMs >= period || lastSampleMs == 0) {
+            lastSampleMs = now;
+            temperatureSensor.requestTemperatures();
+            SensorMessage message = {};
+            message.type = TEMP_DATA;
+            message.temperature = temperatureSensor.getTempCByIndex(0);
+            sendSensorMessage(message, "TEMP TASK");
 
-        Serial.print("[TEMP TASK] Temperature: ");
-        Serial.print(message.temperature, 1);
-        Serial.println(" C");
+            Serial.print("[TEMP TASK] Temperature: ");
+            Serial.print(message.temperature, 1);
+            Serial.println(" C");
+        }
         reportTaskHeartbeat(TASK_TEMP);
-        vTaskDelay(pdMS_TO_TICKS(getSamplePeriodMs(TASK_TEMP)));
+        vTaskDelay(pdMS_TO_TICKS(500));
     }
 }
 
@@ -99,22 +106,29 @@ void vitalTask(void *parameter)
     }
     Serial.println("[WATCHDOG] VITAL task registered with TWDT");
 
+    uint32_t lastSampleMs = 0;
     while (true) {
-        SensorMessage message = {};
-        message.type = VITAL_DATA;
-        message.heartRate = random(68, 81);
-        message.spo2 = random(95, 99);
-        sendSensorMessage(message, "VITAL TASK");
+        uint32_t now = millis();
+        uint32_t period = getSamplePeriodMs(TASK_VITAL);
+        
+        if (now - lastSampleMs >= period || lastSampleMs == 0) {
+            lastSampleMs = now;
+            SensorMessage message = {};
+            message.type = VITAL_DATA;
+            message.heartRate = random(68, 81);
+            message.spo2 = random(95, 99);
+            sendSensorMessage(message, "VITAL TASK");
 
-        Serial.print("[VITAL TASK] HR: ");
-        Serial.print(message.heartRate);
-        Serial.print(" BPM | SpO2: ");
-        Serial.print(message.spo2);
-        Serial.println(" %");
+            Serial.print("[VITAL TASK] HR: ");
+            Serial.print(message.heartRate);
+            Serial.print(" BPM | SpO2: ");
+            Serial.print(message.spo2);
+            Serial.println(" %");
 
-        simulateFacilityData();
+            simulateFacilityData();
+        }
         reportTaskHeartbeat(TASK_VITAL);
-        vTaskDelay(pdMS_TO_TICKS(getSamplePeriodMs(TASK_VITAL)));
+        vTaskDelay(pdMS_TO_TICKS(500));
     }
 }
 

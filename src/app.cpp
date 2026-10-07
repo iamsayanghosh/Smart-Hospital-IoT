@@ -5,6 +5,7 @@
 
 #include "sensors.h"
 #include "alerts.h"
+#include "sampling.h"
 
 // Forward declare tasks from main.cpp that will be moved in later phases
 extern void mqttTask(void *parameter);
@@ -54,6 +55,8 @@ const char *taskNameFromId(MonitoredTaskId taskId)
             return "ALERT";
         case TASK_MEDICATION:
             return "MEDICATION";
+        case TASK_SAMPLING:
+            return "SAMPLING";
         default:
             return "UNKNOWN";
     }
@@ -89,6 +92,10 @@ void appInit()
     sensorQueue = xQueueCreate(16, sizeof(SensorMessage));
     if (sensorQueue == NULL) {
         failSetup("[SETUP] Queue creation failed");
+    }
+    samplingQueue = xQueueCreate(1, sizeof(uint32_t));
+    if (samplingQueue == NULL) {
+        failSetup("[SETUP] Sampling queue creation failed");
     }
     displayMutex = xSemaphoreCreateMutex();
     if (displayMutex == NULL) {
@@ -150,6 +157,7 @@ void appStartTasks()
         createTask(mqttTask, "MQTT Task", 2, &monitoredHandles[TASK_MQTT], 8192) &&
         createTask(alertTask, "Alert Task", 2, &monitoredHandles[TASK_ALERT]) &&
         createTask(medicationTask, "Medication Task", 3, &monitoredHandles[TASK_MEDICATION]) &&
+        createTask(samplingTask, "Sampling Task", 2, &monitoredHandles[TASK_SAMPLING]) &&
         createTask(displayTask, "Display Task", 1, &monitoredHandles[TASK_DISPLAY]);
     if (!tasksStarted) {
         failSetup("[SETUP] One or more tasks failed to start");
