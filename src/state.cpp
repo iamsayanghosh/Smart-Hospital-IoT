@@ -10,6 +10,7 @@ SemaphoreHandle_t displayMutex;
 SemaphoreHandle_t alertSemaphore;
 SemaphoreHandle_t heartbeatMutex;
 portMUX_TYPE telemetryMux = portMUX_INITIALIZER_UNLOCKED;
+QueueHandle_t bedQueue;
 
 // ============================================================================
 // SHARED TELEMETRY STATE
@@ -146,16 +147,13 @@ bool sendSensorMessage(const SensorMessage &message, const char *taskName)
 AlertCandidate evaluateMedicalAlert(const Telemetry &snapshot)
 {
     AlertCandidate candidate;
-    if (!snapshot.temperatureValid) {
-        return candidate;
-    }
 
     if (snapshot.heartRate < medicalThresholds.heartRate.low || snapshot.heartRate > medicalThresholds.heartRate.high) {
         candidate.active = true;
         candidate.parameter = "heartRate";
         candidate.value = static_cast<float>(snapshot.heartRate);
         candidate.message = snapshot.heartRate < medicalThresholds.heartRate.low ? "Low heart rate" : "High heart rate";
-        candidate.severity = snapshot.heartRate < 60 || snapshot.heartRate > 110 ? ALERT_SEVERITY_CRITICAL : ALERT_SEVERITY_WARNING;
+        candidate.severity = ALERT_SEVERITY_CRITICAL;
         return candidate;
     }
 
@@ -168,13 +166,24 @@ AlertCandidate evaluateMedicalAlert(const Telemetry &snapshot)
         return candidate;
     }
 
-    if (snapshot.temperature < medicalThresholds.bodyTemperature.low || snapshot.temperature > medicalThresholds.bodyTemperature.high) {
+    if (snapshot.ecgRate < 50 || snapshot.ecgRate > 110) {
         candidate.active = true;
-        candidate.parameter = "bodyTemperature";
-        candidate.value = snapshot.temperature;
-        candidate.message = snapshot.temperature < medicalThresholds.bodyTemperature.low ? "Low body temperature" : "High body temperature";
-        candidate.severity = snapshot.temperature < 34.0f || snapshot.temperature > 39.5f ? ALERT_SEVERITY_CRITICAL : ALERT_SEVERITY_WARNING;
+        candidate.parameter = "ecgRate";
+        candidate.value = static_cast<float>(snapshot.ecgRate);
+        candidate.message = snapshot.ecgRate < 50 ? "Low ECG rate" : "High ECG rate";
+        candidate.severity = ALERT_SEVERITY_CRITICAL;
         return candidate;
+    }
+
+    if (snapshot.temperatureValid) {
+        if (snapshot.temperature < medicalThresholds.bodyTemperature.low || snapshot.temperature > medicalThresholds.bodyTemperature.high) {
+            candidate.active = true;
+            candidate.parameter = "bodyTemperature";
+            candidate.value = snapshot.temperature;
+            candidate.message = snapshot.temperature < medicalThresholds.bodyTemperature.low ? "Low body temperature" : "High body temperature";
+            candidate.severity = snapshot.temperature < 34.0f || snapshot.temperature > 39.5f ? ALERT_SEVERITY_CRITICAL : ALERT_SEVERITY_WARNING;
+            return candidate;
+        }
     }
 
     return candidate;

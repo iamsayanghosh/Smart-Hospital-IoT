@@ -11,6 +11,7 @@
 extern void mqttTask(void *parameter);
 
 #include "medication.h"
+#include "bed.h"
 
 static const uint32_t TWDT_TIMEOUT_MS = 8000;
 static const uint32_t HEARTBEAT_MUTEX_WAIT_MS = 50;
@@ -57,6 +58,8 @@ const char *taskNameFromId(MonitoredTaskId taskId)
             return "MEDICATION";
         case TASK_SAMPLING:
             return "SAMPLING";
+        case TASK_BED:
+            return "BED";
         default:
             return "UNKNOWN";
     }
@@ -96,6 +99,10 @@ void appInit()
     samplingQueue = xQueueCreate(1, sizeof(uint32_t));
     if (samplingQueue == NULL) {
         failSetup("[SETUP] Sampling queue creation failed");
+    }
+    bedQueue = xQueueCreate(1, sizeof(float));
+    if (bedQueue == NULL) {
+        failSetup("[SETUP] Bed queue creation failed");
     }
     displayMutex = xSemaphoreCreateMutex();
     if (displayMutex == NULL) {
@@ -158,6 +165,7 @@ void appStartTasks()
         createTask(alertTask, "Alert Task", 2, &monitoredHandles[TASK_ALERT]) &&
         createTask(medicationTask, "Medication Task", 3, &monitoredHandles[TASK_MEDICATION]) &&
         createTask(samplingTask, "Sampling Task", 2, &monitoredHandles[TASK_SAMPLING]) &&
+        createTask(bedTask, "Bed Task", 2, &monitoredHandles[TASK_BED]) &&
         createTask(displayTask, "Display Task", 1, &monitoredHandles[TASK_DISPLAY]);
     if (!tasksStarted) {
         failSetup("[SETUP] One or more tasks failed to start");

@@ -16,6 +16,7 @@ extern SemaphoreHandle_t displayMutex;
 extern SemaphoreHandle_t alertSemaphore;
 extern SemaphoreHandle_t heartbeatMutex;
 extern portMUX_TYPE telemetryMux;
+extern QueueHandle_t bedQueue;
 
 // ============================================================================
 // SHARED TELEMETRY STATE
@@ -38,6 +39,7 @@ enum MonitoredTaskId {
     TASK_ALERT,
     TASK_MEDICATION,
     TASK_SAMPLING,
+    TASK_BED,
     TASK_MONITORED_COUNT
 };
 

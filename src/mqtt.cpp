@@ -28,6 +28,7 @@ const uint16_t MQTT_SUMMARY_BUFFER_MARGIN = 64;
 #define HOSPITAL_EVENTS_FEED "hospital-events"
 #define MEDICATION_DOSAGE_FEED "medication-dosage"
 #define SAMPLING_RATE_FEED "sampling-rate"
+#define BED_ANGLE_FEED "bed-angle"
 
 enum LiveFeedIndex {
     LIVE_MEDICAL_HEART_RATE,
@@ -169,6 +170,7 @@ struct MqttMessageRoute {
 
 String medicationDosageTopic;
 String samplingRateTopic;
+String bedAngleTopic;
 
 void handleMedicationDosagePayload(const char *payload, size_t length)
 {
@@ -205,9 +207,19 @@ void handleSamplingRatePayload(const char *payload, size_t length)
     Serial.println(" s");
 }
 
+void handleBedAnglePayload(const char *payload, size_t length)
+{
+    if (length == 0) return;
+    float angle = strtof(payload, nullptr);
+    xQueueOverwrite(bedQueue, &angle);
+    Serial.print("[MQTT TASK] bed-angle received: ");
+    Serial.println(angle);
+}
+
 MqttMessageRoute mqttRoutes[] = {
     {nullptr, handleMedicationDosagePayload},
-    {nullptr, handleSamplingRatePayload}
+    {nullptr, handleSamplingRatePayload},
+    {nullptr, handleBedAnglePayload}
 };
 
 void mqttMessageCallback(char *topic, byte *payload, unsigned int length)
@@ -236,13 +248,16 @@ bool connectMqtt()
     if (mqttClient.connect(clientId.c_str(), AIO_USERNAME, AIO_KEY)) {
         medicationDosageTopic = getAioFeedTopic(MEDICATION_DOSAGE_FEED);
         samplingRateTopic = getAioFeedTopic(SAMPLING_RATE_FEED);
+        bedAngleTopic = getAioFeedTopic(BED_ANGLE_FEED);
         
         mqttRoutes[0].topic = medicationDosageTopic.c_str();
         mqttRoutes[1].topic = samplingRateTopic.c_str();
+        mqttRoutes[2].topic = bedAngleTopic.c_str();
         
         mqttClient.setCallback(mqttMessageCallback);
         mqttClient.subscribe(medicationDosageTopic.c_str());
         mqttClient.subscribe(samplingRateTopic.c_str());
+        mqttClient.subscribe(bedAngleTopic.c_str());
         mqttClient.loop();
         Serial.println("[MQTT TASK] Connected to Adafruit IO broker");
         return true;
