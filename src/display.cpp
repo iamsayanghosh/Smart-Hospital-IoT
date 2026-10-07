@@ -7,6 +7,7 @@
 #include "freertos/task.h"
 #include "app.h" // For failSetup
 #include <DallasTemperature.h>
+#include "offline.h"
 
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
@@ -39,9 +40,11 @@ void updateTelemetry(const SensorMessage &message)
     } else if (message.type == VITAL_DATA) {
         telemetry.heartRate = message.heartRate;
         telemetry.spo2 = message.spo2;
+        telemetry.initialVitalsProcessed = true;
     } else if (message.type == ECG_DATA) {
         telemetry.ecgRate = message.ecgRate;
         telemetry.ecgSample = message.ecgSample;
+        telemetry.initialEcgProcessed = true;
     }
     bool abnormal = isAbnormal(telemetry);
     bool wasAbnormal = telemetry.alertActive;
@@ -75,37 +78,46 @@ void displayTask(void *parameter)
 
         MedicationDosageControl dosageSnapshot = getMedicationDosageSnapshot();
         if (xSemaphoreTake(displayMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
-            display.clearDisplay();
-            display.setTextColor(SSD1306_WHITE);
-            display.setTextSize(1);
-            if (dosageSnapshot.criticalConfirmationPending) {
+            SystemHealthState health = getSystemHealthState();
+            if (health == SYSTEM_OFFLINE) {
+                display.clearDisplay();
+                display.setTextColor(SSD1306_WHITE);
+                display.setTextSize(1);
                 display.setCursor(0, 0);
-                display.println("CRITICAL REQUEST");
-                display.setCursor(0, 12);
-                display.print("Req: ");
-                display.print(dosageSnapshot.requested, 1);
-                display.println(" mg/hr");
-                display.setCursor(0, 30);
-                display.print("Now: ");
-                display.print(dosageSnapshot.applied, 1);
-                display.println(" mg/hr");
-                display.setCursor(0, 45);
-                display.println("PRESS BUTTON");
+                display.println("LOGGING OFFLINE");
             } else {
-                display.setCursor(0, 0);
-                display.print("Dose: ");
-                display.print(dosageSnapshot.applied, 1);
-                display.println(" mg/hr");
-                display.setCursor(0, 12);
-                display.print("Status: ");
-                if (dosageSnapshot.criticalConfirmed) {
-                    display.println("CRITICAL");
+                display.clearDisplay();
+                display.setTextColor(SSD1306_WHITE);
+                display.setTextSize(1);
+                if (dosageSnapshot.criticalConfirmationPending) {
+                    display.setCursor(0, 0);
+                    display.println("CRITICAL REQUEST");
+                    display.setCursor(0, 12);
+                    display.print("Req: ");
+                    display.print(dosageSnapshot.requested, 1);
+                    display.println(" mg/hr");
+                    display.setCursor(0, 30);
+                    display.print("Now: ");
+                    display.print(dosageSnapshot.applied, 1);
+                    display.println(" mg/hr");
+                    display.setCursor(0, 45);
+                    display.println("PRESS BUTTON");
                 } else {
-                    display.println(getMedicationSafetyLabel(dosageSnapshot.applied));
-                }
-                if (dosageSnapshot.criticalConfirmed) {
-                    display.setCursor(0, 24);
-                    display.println("CONFIRMED");
+                    display.setCursor(0, 0);
+                    display.print("Dose: ");
+                    display.print(dosageSnapshot.applied, 1);
+                    display.println(" mg/hr");
+                    display.setCursor(0, 12);
+                    display.print("Status: ");
+                    if (dosageSnapshot.criticalConfirmed) {
+                        display.println("CRITICAL");
+                    } else {
+                        display.println(getMedicationSafetyLabel(dosageSnapshot.applied));
+                    }
+                    if (dosageSnapshot.criticalConfirmed) {
+                        display.setCursor(0, 24);
+                        display.println("CONFIRMED");
+                    }
                 }
             }
             display.display();

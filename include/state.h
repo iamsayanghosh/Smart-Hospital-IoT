@@ -40,6 +40,7 @@ enum MonitoredTaskId {
     TASK_MEDICATION,
     TASK_SAMPLING,
     TASK_BED,
+    TASK_OFFLINE,
     TASK_MONITORED_COUNT
 };
 
@@ -96,6 +97,8 @@ struct Telemetry {
     int ecgRate = 72;
     float ecgSample = 0.0f;
     bool alertActive = false;
+    bool initialVitalsProcessed = false;
+    bool initialEcgProcessed = false;
 };
 
 struct FacilityTelemetry {

@@ -3,8 +3,19 @@
 #include "watchdog.h"
 #include <ESP32Servo.h>
 #include "esp_task_wdt.h"
+#include <cmath>
 
 static const int BED_SERVO_PIN = 18;
+static const int BED_SERVO_MIN_PULSE = 500;
+static const int BED_SERVO_MAX_PULSE = 2400;
+static const float BED_SERVO_MAX_ANGLE = 180.0f;
+
+enum BedMode {
+    BED_MODE_SLEEPING,
+    BED_MODE_BREATHING_SUPPORT,
+    BED_MODE_EMERGENCY,
+    BED_MODE_MANUAL
+};
 
 void bedTask(void *parameter)
 {
@@ -19,55 +30,105 @@ void bedTask(void *parameter)
 
     Servo bedServo;
     bedServo.setPeriodHertz(50);
-    bedServo.attach(BED_SERVO_PIN, 500, 2400);
+    bedServo.attach(BED_SERVO_PIN, BED_SERVO_MIN_PULSE, BED_SERVO_MAX_PULSE);
 
-    float currentAngle = 10.0f;
-    float targetAngle = 10.0f;
-    bedServo.write(currentAngle);
+    // Startup requirement: Servo starts at exactly 0°.
+    float currentAngle = 0.0f;
+    bedServo.writeMicroseconds(BED_SERVO_MIN_PULSE + (int)((currentAngle / BED_SERVO_MAX_ANGLE) * (BED_SERVO_MAX_PULSE - BED_SERVO_MIN_PULSE)));
 
-    AlertSeverity lastSeverity = ALERT_SEVERITY_NORMAL;
-    bool forceUpdate = false;
+    BedMode lastAutoMode = BED_MODE_SLEEPING;
+    bool isManualOverride = false;
+    float targetAngle = 0.0f;
+    float speedPerSecond = 1.5f;
+
+    // Force an initial update to evaluate telemetry and move from 0°
+    bool initialEval = true;
 
     while (true) {
+        Telemetry data = getTelemetrySnapshot();
+        if (initialEval && (!data.initialVitalsProcessed || !data.initialEcgProcessed)) {
+            reportTaskHeartbeat(TASK_BED);
+            vTaskDelay(pdMS_TO_TICKS(20));
+            continue;
+        }
+
         // 1. Check for manual override from MQTT
         float manualTarget = -1.0f;
         if (xQueueReceive(bedQueue, &manualTarget, 0) == pdTRUE) {
             targetAngle = manualTarget;
             if (targetAngle < 0.0f) targetAngle = 0.0f;
             if (targetAngle > 90.0f) targetAngle = 90.0f;
-            Serial.print("[BED] Manual target angle received: ");
+            
+            isManualOverride = true;
+            speedPerSecond = 2.0f; // Manual: 2°/second
+            Serial.print("[BED] Manual mode activated, target angle: ");
             Serial.println(targetAngle);
         }
 
-        // 2. Check for automatic state change
-        Telemetry snapshot = getTelemetrySnapshot();
-        AlertCandidate alert = evaluateMedicalAlert(snapshot);
-        if (alert.severity != lastSeverity || forceUpdate) {
-            lastSeverity = alert.severity;
-            forceUpdate = false;
-            
-            if (lastSeverity == ALERT_SEVERITY_NORMAL) {
+        // 2. Automatic condition logic
+        BedMode currentAutoMode = BED_MODE_SLEEPING;
+
+        // CRITICAL CONDITION -> EMERGENCY (90°)
+        if (data.heartRate < medicalThresholds.heartRate.low || data.heartRate > medicalThresholds.heartRate.high ||
+            data.spo2 < 88 ||
+            data.ecgRate < 50 || data.ecgRate > 110 ||
+            (data.temperatureValid && (data.temperature < 34.0f || data.temperature > 39.5f))) {
+            currentAutoMode = BED_MODE_EMERGENCY;
+        } 
+        // BREATHING ISSUE -> BREATHING_SUPPORT (45°)
+        else if (data.spo2 < medicalThresholds.spo2.low) { // default 92, meaning 88 to 91 inclusive
+            currentAutoMode = BED_MODE_BREATHING_SUPPORT;
+        }
+        // OTHER NON-CRITICAL ABNORMALITIES or PATIENT OK / STABLE -> SLEEPING (10°)
+        // The assignment does not define a separate bed response for every possible abnormal vital.
+        // Therefore, we use SLEEPING as the safest existing/default bed behavior for any other abnormalities (e.g. Temperature = 38.5).
+        else {
+            currentAutoMode = BED_MODE_SLEEPING;
+        }
+
+        // Apply if the auto mode changed OR if it's the very first evaluation.
+        // This implicitly breaks out of manual override if the patient's condition changes.
+        if (currentAutoMode != lastAutoMode || initialEval) {
+            lastAutoMode = currentAutoMode;
+            initialEval = false;
+            isManualOverride = false;
+
+            if (currentAutoMode == BED_MODE_SLEEPING) {
                 targetAngle = 10.0f;
-            } else if (lastSeverity == ALERT_SEVERITY_WARNING) {
+                speedPerSecond = 1.5f;
+            } else if (currentAutoMode == BED_MODE_BREATHING_SUPPORT) {
                 targetAngle = 45.0f;
-            } else if (lastSeverity == ALERT_SEVERITY_CRITICAL) {
+                speedPerSecond = 1.5f;
+            } else if (currentAutoMode == BED_MODE_EMERGENCY) {
                 targetAngle = 90.0f;
+                speedPerSecond = 5.0f;
             }
-            Serial.print("[BED] Automatic state change, target angle: ");
+
+            Serial.print("[BED] Automatic state change, mode: ");
+            Serial.print(currentAutoMode);
+            Serial.print(", target angle: ");
             Serial.println(targetAngle);
         }
 
         // 3. Smooth movement
-        if (abs(currentAngle - targetAngle) > 0.5f) {
+        // Loop runs at 50Hz, so dt is 0.02s
+        float stepSize = speedPerSecond * 0.02f;
+        
+        if (fabsf(currentAngle - targetAngle) > stepSize) {
             if (currentAngle < targetAngle) {
-                currentAngle += 1.0f;
+                currentAngle += stepSize;
             } else {
-                currentAngle -= 1.0f;
+                currentAngle -= stepSize;
             }
-            bedServo.write(currentAngle);
+            int pulse = BED_SERVO_MIN_PULSE + (int)((currentAngle / BED_SERVO_MAX_ANGLE) * (BED_SERVO_MAX_PULSE - BED_SERVO_MIN_PULSE));
+            bedServo.writeMicroseconds(pulse);
+        } else if (currentAngle != targetAngle) {
+            currentAngle = targetAngle;
+            int pulse = BED_SERVO_MIN_PULSE + (int)((currentAngle / BED_SERVO_MAX_ANGLE) * (BED_SERVO_MAX_PULSE - BED_SERVO_MIN_PULSE));
+            bedServo.writeMicroseconds(pulse);
         }
 
         reportTaskHeartbeat(TASK_BED);
-        vTaskDelay(pdMS_TO_TICKS(20)); // 50 Hz update for smooth movement
+        vTaskDelay(pdMS_TO_TICKS(20)); // 50 Hz update
     }
 }

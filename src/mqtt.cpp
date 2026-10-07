@@ -8,6 +8,7 @@
 #include "adafruit_io_config.h"
 #include <PubSubClient.h>
 #include "environment.h"
+#include "offline.h"
 
 PubSubClient mqttClient(wifiClient);
 
@@ -275,7 +276,29 @@ bool connectMqtt()
  * task cycle, and resetLiveFeedPublishState() forces the first value after a
  * connection or reconnection to be sent.
  */
-bool publishLiveFeed(const Telemetry &snapshot, const FacilityTelemetry &facilitySnapshot, LiveFeedIndex feedIndex)
+bool safePublish(const String& topic, const String& payload, bool offline) {
+    if (offline) {
+        return enqueueBufferedTelemetry(topic.c_str(), payload.c_str());
+    } else {
+        if (mqttClient.publish(topic.c_str(), payload.c_str())) {
+            return true;
+        } else {
+            Serial.println("[MQTT TASK] Publish failed; buffering telemetry");
+            enqueueBufferedTelemetry(topic.c_str(), payload.c_str());
+            return false;
+        }
+    }
+}
+
+/**
+ * @brief Publishes one changed medical or facility live feed value.
+ *
+ * Feed names are mapped to the six existing medical and facility Adafruit IO
+ * topics. Unchanged values are suppressed, one slot is attempted per MQTT
+ * task cycle, and resetLiveFeedPublishState() forces the first value after a
+ * connection or reconnection to be sent.
+ */
+bool publishLiveFeed(const Telemetry &snapshot, const FacilityTelemetry &facilitySnapshot, LiveFeedIndex feedIndex, bool offline)
 {
     String feedName;
     String payload;
@@ -320,7 +343,7 @@ bool publishLiveFeed(const Telemetry &snapshot, const FacilityTelemetry &facilit
         return false;
     }
 
-    if (mqttClient.publish(getAioFeedTopic(feedName.c_str()).c_str(), payload.c_str())) {
+    if (safePublish(getAioFeedTopic(feedName.c_str()), payload, offline)) {
         liveFeedPublished[feedIndex] = true;
         switch (feedIndex) {
             case LIVE_MEDICAL_HEART_RATE:
@@ -366,7 +389,7 @@ void resetLiveFeedPublishState()
  * feed. Repeated states are suppressed and messages are rate-limited by
  * ALERT_PUBLISH_INTERVAL_MS.
  */
-void publishMedicalAlertIfNeeded(const Telemetry &snapshot)
+void publishMedicalAlertIfNeeded(const Telemetry &snapshot, bool offline)
 {
     AlertCandidate candidate = evaluateMedicalAlert(snapshot);
     const uint32_t now = millis();
@@ -376,7 +399,7 @@ void publishMedicalAlertIfNeeded(const Telemetry &snapshot)
                 return;
             }
             const char *normalPayload = "MEDICAL STATUS: NORMAL\nNo active medical alerts.";
-            if (mqttClient.publish(getAioFeedTopic(HOSPITAL_EVENTS_FEED).c_str(), normalPayload)) {
+            if (safePublish(getAioFeedTopic(HOSPITAL_EVENTS_FEED), String(normalPayload), offline)) {
                 lastMedicalAlertPublishMs = now;
                 medicalAlertStateKnown = true;
             }
@@ -394,7 +417,7 @@ void publishMedicalAlertIfNeeded(const Telemetry &snapshot)
     }
 
     String alertPayload = buildAlertPayload("MEDICAL", candidate.parameter, candidate.value, candidate.severity, candidate.message);
-    if (mqttClient.publish(getAioFeedTopic(HOSPITAL_EVENTS_FEED).c_str(), alertPayload.c_str())) {
+    if (safePublish(getAioFeedTopic(HOSPITAL_EVENTS_FEED), alertPayload, offline)) {
         medicalAlertPublished = true;
         lastMedicalAlertParameter = candidate.parameter;
         lastMedicalAlertSeverity = candidate.severity;
@@ -410,7 +433,7 @@ void publishMedicalAlertIfNeeded(const Telemetry &snapshot)
  * feed. Repeated states are suppressed and messages are rate-limited by
  * ALERT_PUBLISH_INTERVAL_MS.
  */
-void publishFacilityAlertIfNeeded(const FacilityTelemetry &snapshot)
+void publishFacilityAlertIfNeeded(const FacilityTelemetry &snapshot, bool offline)
 {
     AlertCandidate candidate = evaluateFacilityAlert(snapshot);
     const uint32_t now = millis();
@@ -420,7 +443,7 @@ void publishFacilityAlertIfNeeded(const FacilityTelemetry &snapshot)
                 return;
             }
             const char *normalPayload = "FACILITY STATUS: NORMAL\nNo active facility alerts.";
-            if (mqttClient.publish(getAioFeedTopic(HOSPITAL_EVENTS_FEED).c_str(), normalPayload)) {
+            if (safePublish(getAioFeedTopic(HOSPITAL_EVENTS_FEED), String(normalPayload), offline)) {
                 lastFacilityAlertPublishMs = now;
                 facilityAlertStateKnown = true;
             }
@@ -438,7 +461,7 @@ void publishFacilityAlertIfNeeded(const FacilityTelemetry &snapshot)
     }
 
     String alertPayload = buildAlertPayload("FACILITY", candidate.parameter, candidate.value, candidate.severity, candidate.message);
-    if (mqttClient.publish(getAioFeedTopic(HOSPITAL_EVENTS_FEED).c_str(), alertPayload.c_str())) {
+    if (safePublish(getAioFeedTopic(HOSPITAL_EVENTS_FEED), alertPayload, offline)) {
         facilityAlertPublished = true;
         lastFacilityAlertParameter = candidate.parameter;
         lastFacilityAlertSeverity = candidate.severity;
@@ -454,7 +477,7 @@ void publishFacilityAlertIfNeeded(const FacilityTelemetry &snapshot)
  * mqttTask, combined into one payload, and published through hospital-events
  * every 60000 ms. The accumulators are reset after the publish attempt.
  */
-void publishSummaryData()
+void publishSummaryData(bool offline)
 {
     Telemetry snapshot = getTelemetrySnapshot();
     FacilityTelemetry facilitySnapshot = getFacilitySnapshot();
@@ -495,7 +518,7 @@ void publishSummaryData()
     Serial.println(" bytes");
     Serial.println("[MQTT] HOSPITAL SUMMARY PAYLOAD:");
     Serial.println(hospitalSummaryPayload);
-    const bool hospitalSummaryPublishResult = mqttClient.publish(getAioFeedTopic(HOSPITAL_EVENTS_FEED).c_str(), hospitalSummaryPayload.c_str());
+    const bool hospitalSummaryPublishResult = safePublish(getAioFeedTopic(HOSPITAL_EVENTS_FEED), hospitalSummaryPayload, offline);
     Serial.print("[MQTT] hospital summary publish result: ");
     Serial.println(hospitalSummaryPublishResult ? "SUCCESS" : "FAILURE");
     if (!hospitalSummaryPublishResult) {
@@ -536,6 +559,8 @@ void mqttTask(void *parameter)
     mqttClient.setSocketTimeout(3);
     configureMqttBuffer();
     uint32_t lastWifiAttempt = 0;
+    uint32_t nextWifiRetryMs = 0;
+    uint32_t wifiRetryDelayMs = MQTT_INITIAL_RETRY_DELAY_MS;
     uint32_t lastSummaryPublishMs = 0;
     uint32_t lastPublishMs = 0;
     uint32_t nextMqttRetryMs = 0;
@@ -545,51 +570,83 @@ void mqttTask(void *parameter)
     while (true) {
         const uint32_t now = millis();
         if (WiFi.status() != WL_CONNECTED) {
-            // Elapsed-time retry avoids repeatedly blocking the MQTT task on Wi-Fi setup.
-            if (now - lastWifiAttempt > 10000) {
-                lastWifiAttempt = now;
-                Serial.println("[MQTT TASK] WiFi unavailable; retrying later");
+            if (now >= nextWifiRetryMs) {
+                Serial.println("[MQTT TASK] WiFi unavailable; retrying...");
                 WiFi.disconnect();
                 WiFi.begin(wifiSsid, "");
+                nextWifiRetryMs = now + wifiRetryDelayMs;
+                wifiRetryDelayMs = min(wifiRetryDelayMs * 2U, MQTT_MAX_RETRY_DELAY_MS);
             }
-        } else if (!mqttClient.connected()) {
-            if (now >= nextMqttRetryMs) {
-                if (connectMqtt()) {
-                    resetLiveFeedPublishState();
-                    lastPublishMs = now - MQTT_TASK_INTERVAL_MS;
-                    lastSummaryPublishMs = now;
-                    mqttRetryDelayMs = MQTT_INITIAL_RETRY_DELAY_MS;
-                    nextMqttRetryMs = now;
-                } else {
-                    nextMqttRetryMs = now + mqttRetryDelayMs;
-                    mqttRetryDelayMs = min(mqttRetryDelayMs * 2U, MQTT_MAX_RETRY_DELAY_MS);
-                }
-            }
+            // Reset MQTT backoff since it depends on Wi-Fi
+            mqttRetryDelayMs = MQTT_INITIAL_RETRY_DELAY_MS;
+            nextMqttRetryMs = now;
         } else {
-            mqttClient.loop();
-
-            if (now - lastPublishMs >= MQTT_TASK_INTERVAL_MS) {
-                lastPublishMs = now;
-                Telemetry snapshot = getTelemetrySnapshot();
-                FacilityTelemetry facilitySnapshot = getFacilitySnapshot();
-
-                if (snapshot.temperatureValid) {
-                    updateMedicalSummaryStats(snapshot);
+            wifiRetryDelayMs = MQTT_INITIAL_RETRY_DELAY_MS; // reset on success
+            
+            if (!mqttClient.connected()) {
+                if (now >= nextMqttRetryMs) {
+                    if (connectMqtt()) {
+                        resetLiveFeedPublishState();
+                        lastPublishMs = now - MQTT_TASK_INTERVAL_MS;
+                        lastSummaryPublishMs = now;
+                        mqttRetryDelayMs = MQTT_INITIAL_RETRY_DELAY_MS;
+                        nextMqttRetryMs = now;
+                    } else {
+                        nextMqttRetryMs = now + mqttRetryDelayMs;
+                        mqttRetryDelayMs = min(mqttRetryDelayMs * 2U, MQTT_MAX_RETRY_DELAY_MS);
+                    }
                 }
-                updateFacilitySummaryStats(facilitySnapshot);
+            } else {
+                mqttClient.loop();
+            }
+        }
 
-                publishLiveFeed(snapshot, facilitySnapshot, static_cast<LiveFeedIndex>(nextLiveFeed));
+        if (now - lastPublishMs >= MQTT_TASK_INTERVAL_MS) {
+            lastPublishMs = now;
+            bool offline = (WiFi.status() != WL_CONNECTED || !mqttClient.connected());
+            
+            Telemetry snapshot = getTelemetrySnapshot();
+            FacilityTelemetry facilitySnapshot = getFacilitySnapshot();
+
+            if (snapshot.temperatureValid) {
+                updateMedicalSummaryStats(snapshot);
+            }
+            updateFacilitySummaryStats(facilitySnapshot);
+
+            publishMedicalAlertIfNeeded(snapshot, offline);
+            publishFacilityAlertIfNeeded(facilitySnapshot, offline);
+
+            if (now - lastSummaryPublishMs >= SUMMARY_INTERVAL_MS) {
+                Serial.println("[MQTT] Summary interval reached");
+                lastSummaryPublishMs = now;
+                publishSummaryData(offline);
+            }
+
+            static bool syncTurn = false;
+            
+            if (!offline && getBufferedTelemetryCount() > 0 && syncTurn) {
+                BufferedTelemetryMessage msg;
+                if (peekBufferedTelemetry(&msg)) {
+                    if (mqttClient.publish(msg.topic, msg.payload)) {
+                        dequeueBufferedTelemetry(&msg);
+                        Serial.println("[MQTT TASK] Synced buffered item");
+                    }
+                }
+                syncTurn = false;
+            } else {
+                bool livePublished = publishLiveFeed(snapshot, facilitySnapshot, static_cast<LiveFeedIndex>(nextLiveFeed), offline);
                 nextLiveFeed = (nextLiveFeed + 1) % LIVE_FEED_COUNT;
-
-                publishMedicalAlertIfNeeded(snapshot);
-                publishFacilityAlertIfNeeded(facilitySnapshot);
-
-                // Elapsed-time scheduling keeps periodic summary work inside the task loop
-                // without adding a separate blocking wait for the 60-second interval.
-                if (now - lastSummaryPublishMs >= SUMMARY_INTERVAL_MS) {
-                    Serial.println("[MQTT] Summary interval reached");
-                    lastSummaryPublishMs = now;
-                    publishSummaryData();
+                
+                if (!livePublished && !offline && getBufferedTelemetryCount() > 0) {
+                    BufferedTelemetryMessage msg;
+                    if (peekBufferedTelemetry(&msg)) {
+                        if (mqttClient.publish(msg.topic, msg.payload)) {
+                            dequeueBufferedTelemetry(&msg);
+                            Serial.println("[MQTT TASK] Synced buffered item (idle slot)");
+                        }
+                    }
+                } else if (getBufferedTelemetryCount() > 0) {
+                    syncTurn = true;
                 }
             }
         }

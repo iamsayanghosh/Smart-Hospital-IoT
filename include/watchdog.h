@@ -6,3 +6,4 @@
 void watchdogInit();
 void watchdogTask(void *parameter);
 void reportTaskHeartbeat(MonitoredTaskId taskId);
+bool isSystemHealthy();

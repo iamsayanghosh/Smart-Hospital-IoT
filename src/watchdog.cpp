@@ -8,6 +8,11 @@ static const uint32_t STARTUP_GRACE_PERIOD_MS = 2000;
 static const uint32_t HEARTBEAT_MUTEX_WAIT_MS = 50;
 
 TaskHeartbeat taskHeartbeats[TASK_MONITORED_COUNT];
+static bool globalSystemHealthy = true;
+
+bool isSystemHealthy() {
+    return globalSystemHealthy;
+}
 
 void watchdogInit()
 {
@@ -96,6 +101,8 @@ void watchdogTask(void *parameter)
                 Serial.println(" ms");
             }
         }
+
+        globalSystemHealthy = !unhealthyFound;
 
         if (!unhealthyFound) {
             if (millis() - lastHealthyLogMs > 10000) {

@@ -17,17 +17,34 @@ void outputsInit()
     noTone(BUZZER_PIN);
 }
 
+static bool medicationBuzzerActive = false;
+static bool actualBuzzerState = false;
+
 void setSafetyOutputs(bool red, bool yellow, bool green, bool buzzer)
 {
-    static bool buzzerOn = false;
-
     digitalWrite(RED_LED_PIN, red ? HIGH : LOW);
     digitalWrite(YELLOW_LED_PIN, yellow ? HIGH : LOW);
     digitalWrite(GREEN_LED_PIN, green ? HIGH : LOW);
 
-    if (buzzer != buzzerOn) {
-        buzzerOn = buzzer;
-        if (buzzerOn) {
+    medicationBuzzerActive = buzzer;
+}
+
+void updateOfflineBuzzer(OfflineBuzzerMode mode) {
+    bool shouldBuzz = medicationBuzzerActive;
+    
+    if (!shouldBuzz) {
+        if (mode == BUZZER_MODE_WIFI_FAIL) {
+            uint32_t ms = millis() % 1000;
+            shouldBuzz = (ms < 100) || (ms > 200 && ms < 300);
+        } else if (mode == BUZZER_MODE_MQTT_FAIL) {
+            uint32_t ms = millis() % 1000;
+            shouldBuzz = (ms < 500);
+        }
+    }
+
+    if (shouldBuzz != actualBuzzerState) {
+        actualBuzzerState = shouldBuzz;
+        if (actualBuzzerState) {
             tone(BUZZER_PIN, 1200);
         } else {
             noTone(BUZZER_PIN);

@@ -12,6 +12,7 @@ extern void mqttTask(void *parameter);
 
 #include "medication.h"
 #include "bed.h"
+#include "offline.h"
 
 static const uint32_t TWDT_TIMEOUT_MS = 8000;
 static const uint32_t HEARTBEAT_MUTEX_WAIT_MS = 50;
@@ -60,6 +61,8 @@ const char *taskNameFromId(MonitoredTaskId taskId)
             return "SAMPLING";
         case TASK_BED:
             return "BED";
+        case TASK_OFFLINE:
+            return "OFFLINE";
         default:
             return "UNKNOWN";
     }
@@ -117,7 +120,8 @@ void appInit()
         failSetup("[SETUP] Heartbeat mutex creation failed");
     }
     watchdogInit();
-    Serial.println("[SETUP] Queue, display mutex, alert semaphore, and heartbeat mutex created");
+    initOfflineBuffer();
+    Serial.println("[SETUP] Queues, mutexes, and offline buffer created");
 
     // Initialize thresholds, simulation state, telemetry, and summary windows.
     medicalThresholds = MedicalThresholdConfig();
@@ -166,6 +170,7 @@ void appStartTasks()
         createTask(medicationTask, "Medication Task", 3, &monitoredHandles[TASK_MEDICATION]) &&
         createTask(samplingTask, "Sampling Task", 2, &monitoredHandles[TASK_SAMPLING]) &&
         createTask(bedTask, "Bed Task", 2, &monitoredHandles[TASK_BED]) &&
+        createTask(offlineTask, "Offline Task", 2, &monitoredHandles[TASK_OFFLINE]) &&
         createTask(displayTask, "Display Task", 1, &monitoredHandles[TASK_DISPLAY]);
     if (!tasksStarted) {
         failSetup("[SETUP] One or more tasks failed to start");
