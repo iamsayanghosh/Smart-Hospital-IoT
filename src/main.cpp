@@ -56,10 +56,9 @@ void setup()
     Serial.begin(115200);
     vTaskDelay(pdMS_TO_TICKS(500));
     Serial.println("\n================================");
-    Serial.println(" SMART HOSPITAL IoT - TASK 3");
-    Serial.println(" REMOTE MEDICATION DOSAGE CONTROL");
+    Serial.println("       SMART HOSPITAL IoT       ");
     Serial.println("================================");
-    Serial.println("[TASK3] Adafruit IO credentials loaded from include/adafruit_io_config.h or include/adafruit_io_config.local.h");
+    Serial.println("[SETUP] Adafruit IO credentials loaded from include/adafruit_io_config.h or include/adafruit_io_config.local.h");
 
     outputsInit();
     medicationInit();
