@@ -1,3 +1,20 @@
+/**
+ * @file state.cpp
+ * @brief Global state storage, FreeRTOS synchronization objects, and evaluation helpers.
+ *
+ * Responsibilities:
+ * 1. Storage of FreeRTOS IPC handles (sensorQueue, samplingQueue, bedQueue, displayMutex,
+ *    alertSemaphore, heartbeatMutex).
+ * 2. Storage and critical-section synchronization of global telemetry structs
+ *    (telemetry, facilityTelemetry, medicationDosageControl, samplingPeriods).
+ * 3. Clinical and facility condition evaluation logic:
+ *    - isAbnormal(): Evaluates patient medical vitals against clinical thresholds.
+ *    - isFacilityAbnormal(): Evaluates room environment against facility thresholds.
+ * 4. Atomic snapshot getters:
+ *    - getTelemetrySnapshot(), getFacilitySnapshot(), getMedicationDosageSnapshot().
+ * 5. Rolling statistical aggregation for periodic 60 s hospital summary reports.
+ */
+
 #include "state.h"
 
 // ============================================================================
@@ -11,6 +28,7 @@ SemaphoreHandle_t alertSemaphore;
 SemaphoreHandle_t heartbeatMutex;
 portMUX_TYPE telemetryMux = portMUX_INITIALIZER_UNLOCKED;
 QueueHandle_t bedQueue;
+
 
 // ============================================================================
 // SHARED TELEMETRY STATE
@@ -141,8 +159,8 @@ bool sendSensorMessage(const SensorMessage &message, const char *taskName)
 /**
  * @brief Selects the first active medical alert in a telemetry snapshot.
  *
- * Supported candidates are heart rate, SpO2, and body temperature. ECG rate
- * contributes to isAbnormal(), but is not a separate candidate here.
+ * Evaluates physiological parameters in priority order: heart rate, SpO2,
+ * ECG rate, and body temperature against critical and warning thresholds.
  */
 AlertCandidate evaluateMedicalAlert(const Telemetry &snapshot)
 {

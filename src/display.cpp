@@ -1,3 +1,19 @@
+/**
+ * @file display.cpp
+ * @brief SSD1306 OLED rendering and centralized sensorQueue message processing.
+ *
+ * Responsibilities:
+ * 1. Hardware Control: Drives the 128x64 monochrome OLED via I2C at 400 kHz.
+ * 2. Central Telemetry Aggregator: Drains sensorQueue (carrying TEMP, MOTION, VITAL,
+ *    and ECG messages from sensor tasks) and writes atomically into the global
+ *    telemetry structure under telemetryMux critical section.
+ * 3. Alert Triggering: Detects rising-edge clinical abnormalities (abnormal && !wasAbnormal)
+ *    and gives alertSemaphore to awaken alertTask.
+ * 4. UI Ownership: Exclusively displays Task 3 Medication Dosage status (applied dose,
+ *    safety label, confirmation prompt) or Task 6 offline logging banner. Patient vitals
+ *    are intentionally NOT rendered on this display.
+ */
+
 #include "display.h"
 #include "state.h"
 #include "medication.h"
@@ -13,6 +29,12 @@
 #define SCREEN_HEIGHT 64
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 
+/**
+ * @brief Configures I2C bus clock and initializes SSD1306 display hardware.
+ *
+ * @param sda GPIO pin for I2C data line.
+ * @param scl GPIO pin for I2C clock line.
+ */
 void displayInit(uint8_t sda, uint8_t scl)
 {
     Wire.begin(sda, scl);
@@ -28,6 +50,18 @@ void displayInit(uint8_t sda, uint8_t scl)
     display.display();
 }
 
+/**
+ * @brief Ingests a single SensorMessage and merges it into the shared telemetry state.
+ *
+ * Concurrency & Synchronization:
+ * - Executes within a spinlock critical section (portENTER_CRITICAL / portEXIT_CRITICAL)
+ *   protecting the global telemetry structure.
+ * - Marks initial validity flags (temperatureValid, initialVitalsProcessed, initialEcgProcessed).
+ * - Evaluates isAbnormal(telemetry). If the clinical condition transitions from normal to abnormal,
+ *   it signals alertSemaphore to wake up alertTask asynchronously.
+ *
+ * @param message Sensor message popped from sensorQueue.
+ */
 void updateTelemetry(const SensorMessage &message)
 {
     portENTER_CRITICAL(&telemetryMux);
@@ -56,6 +90,11 @@ void updateTelemetry(const SensorMessage &message)
     }
 }
 
+/**
+ * @brief FreeRTOS task responsible for draining sensorQueue and refreshing OLED UI.
+ *
+ * @param parameter Unused FreeRTOS task parameter pointer (NULL).
+ */
 void displayTask(void *parameter)
 {
     (void)parameter;

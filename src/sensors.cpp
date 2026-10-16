@@ -1,3 +1,21 @@
+/**
+ * @file sensors.cpp
+ * @brief Multi-sensor acquisition and physiological data simulation task implementations (Task 1).
+ *
+ * Responsibilities:
+ * 1. Physical Sensing:
+ *    - temperatureTask: Acquires Dallas DS18B20 1-Wire temperature from GPIO 4.
+ *    - motionTask: Acquires binary motion detection from HC-SR501 PIR sensor on GPIO 27.
+ * 2. Physiological Simulation:
+ *    - vitalTask: Simulates optical PPG telemetry (Heart Rate in BPM and SpO2 in %).
+ *    - ecgTask: Synthesizes continuous AD8232 PQRST electrocardiogram waveforms using Gaussian modeling.
+ * 3. Concurrency & Adaptive Sampling:
+ *    - Both temperatureTask and vitalTask query their active period dynamically via
+ *      getSamplePeriodMs() [5000 ms to 60000 ms], while executing an inner 500 ms delay
+ *      to ensure prompt watchdog heartbeat reporting without TWDT starvation.
+ *    - All sensor readings are packaged into SensorMessage structs and dispatched to sensorQueue.
+ */
+
 #include "sensors.h"
 #include <Arduino.h>
 #include <OneWire.h>
@@ -8,22 +26,30 @@
 #include "app.h"
 #include "environment.h"
 
-#define DS18B20_PIN 4
-#define PIR_PIN 27
+#define DS18B20_PIN 4  ///< GPIO pin assigned to 1-Wire data bus for DS18B20
+#define PIR_PIN 27     ///< GPIO pin assigned to digital output of PIR motion sensor
 
 OneWire oneWire(DS18B20_PIN);
 DallasTemperature temperatureSensor(&oneWire);
 
+/**
+ * @brief Configures sensor hardware interfaces.
+ */
 void sensorsInit() {
     pinMode(PIR_PIN, INPUT);
     temperatureSensor.begin();
 }
 
 /**
- * @brief Reads the physical DS18B20 temperature sensor.
+ * @brief Acquires physical body temperature from DS18B20 and posts readings to sensorQueue.
  *
- * Enqueues each reading for the display task to apply to shared telemetry.
- * It subscribes to the TWDT, reports its heartbeat, and samples every 2 seconds.
+ * Concurrency & Adaptive Timing:
+ * - Sampling Cadence: Determined dynamically by getSamplePeriodMs(TASK_TEMP) [5 s to 60 s].
+ * - Watchdog Polling: Runs an internal 500 ms evaluation tick to regularly report task heartbeats
+ *   to TWDT even when the temperature acquisition interval is stretched to 60 seconds.
+ * - IPC: Dispatches TEMP_DATA messages via sendSensorMessage() into sensorQueue.
+ *
+ * @param parameter Unused FreeRTOS task parameter pointer (NULL).
  */
 void temperatureTask(void *parameter)
 {
@@ -59,10 +85,12 @@ void temperatureTask(void *parameter)
 }
 
 /**
- * @brief Reads the physical PIR motion input.
+ * @brief Reads the physical PIR motion input on GPIO 27.
  *
- * Enqueues the digital motion state for the display task. The task feeds its
- * watchdog heartbeat after TWDT registration and samples every 1 second.
+ * Enqueues digital motion state (true=motion detected, false=quiescent) to sensorQueue.
+ * Runs on a dedicated 1000 ms period, registering and feeding its TWDT heartbeat.
+ *
+ * @param parameter Unused FreeRTOS task parameter pointer (NULL).
  */
 void motionTask(void *parameter)
 {
@@ -89,11 +117,17 @@ void motionTask(void *parameter)
 }
 
 /**
- * @brief Generates simulated heart-rate and SpO2 values.
+ * @brief Generates simulated heart rate (BPM) and blood oxygen saturation (SpO2 %).
  *
- * Vital samples are sent to the display task, while simulated facility values
- * are updated under telemetryMux. The task feeds its watchdog heartbeat and
- * runs every 2 seconds after registering with the TWDT.
+ * Concurrency & Adaptive Timing:
+ * - Dynamic Sampling: Evaluates acquisition schedule dynamically via getSamplePeriodMs(TASK_VITAL)
+ *   (5 s to 60 s), adjusting sampling frequency based on patient clinical stability.
+ * - Watchdog Polling: Runs an inner 500 ms evaluation loop to feed its TWDT heartbeat
+ *   frequently, preventing watchdog timeouts during 60-second stable periods.
+ * - Facility Sync: Calls simulateFacilityData() upon each vital sample generation to advance
+ *   ambient room parameters in lockstep.
+ *
+ * @param parameter Unused FreeRTOS task parameter pointer (NULL).
  */
 void vitalTask(void *parameter)
 {
@@ -133,7 +167,10 @@ void vitalTask(void *parameter)
 }
 
 /**
- * @brief Generates the simulated P/Q/R/S/T ECG waveform used by the prototype.
+ * @brief Generates the simulated P/Q/R/S/T ECG waveform using Gaussian curve superposition.
+ *
+ * @param phase Normalized cardiac cycle phase [0.0 - 1.0].
+ * @return float Synthesized millivolt-scale electrocardiogram amplitude.
  */
 static float generateEcgWaveform(float phase)
 {
@@ -146,11 +183,12 @@ static float generateEcgWaveform(float phase)
 }
 
 /**
- * @brief Generates and queues a simulated ECG waveform sample.
+ * @brief Generates and queues simulated ECG waveform samples at fixed cadence (5 Hz / 200 ms).
  *
- * The waveform and heart rate are passed to displayTask through sensorQueue.
- * The task registers with the TWDT, reports its heartbeat, and samples every
- * 200 ms; it does not acquire physical ECG hardware.
+ * Runs on a dedicated high-priority schedule (Priority 3) querying samplingPeriods.ecgMs (200 ms).
+ * Operates independently of adaptive sampling rules to maintain uninterrupted cardiac rhythms.
+ *
+ * @param parameter Unused FreeRTOS task parameter pointer (NULL).
  */
 void ecgTask(void *parameter)
 {

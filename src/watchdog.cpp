@@ -1,19 +1,45 @@
+/**
+ * @file watchdog.cpp
+ * @brief Implementation of dual-tier task watchdog and diagnostic supervision.
+ *
+ * Responsibilities:
+ * 1. Hardware Watchdog Interfacing:
+ *    - Each monitored FreeRTOS task subscribes to ESP32 Task Watchdog Timer (TWDT).
+ *    - Invocations of reportTaskHeartbeat() perform the hardware esp_task_wdt_reset() feed.
+ * 2. Software Task Liveness Supervision:
+ *    - Maintains a table of alive timestamps (taskHeartbeats[]) synchronized with heartbeatMutex.
+ *    - watchdogTask (Priority 4) audits all task timestamps every 1000 ms against a 6000 ms limit.
+ * 3. System Health Flagging:
+ *    - Sets globalSystemHealthy = false if any task is unresponsive, triggering SYSTEM_DEGRADED.
+ * 4. Resource Diagnostics:
+ *    - Emits free heap and task stack high-water mark logs every 30 seconds to catch memory leaks
+ *      or impending stack overflows early.
+ */
+
 #include "watchdog.h"
 #include "app.h" // For taskNameFromId
 #include "esp_task_wdt.h"
 
-static const uint32_t WATCHDOG_TIMEOUT_MS = 6000;
-static const uint32_t WATCHDOG_CHECK_INTERVAL_MS = 1000;
-static const uint32_t STARTUP_GRACE_PERIOD_MS = 2000;
-static const uint32_t HEARTBEAT_MUTEX_WAIT_MS = 50;
+static const uint32_t WATCHDOG_TIMEOUT_MS = 6000;         ///< Maximum allowable silent period before task flagged unresponsive (6 s)
+static const uint32_t WATCHDOG_CHECK_INTERVAL_MS = 1000;  ///< Supervisory evaluation period (1 s)
+static const uint32_t STARTUP_GRACE_PERIOD_MS = 2000;     ///< Initial boot grace period allowing slow tasks to register (2 s)
+static const uint32_t HEARTBEAT_MUTEX_WAIT_MS = 50;       ///< Maximum mutex wait when logging task heartbeat (50 ms)
 
 TaskHeartbeat taskHeartbeats[TASK_MONITORED_COUNT];
 static bool globalSystemHealthy = true;
 
+/**
+ * @brief Returns whether all monitored tasks are healthy and responsive.
+ *
+ * @return true if no tasks have missed heartbeats; false otherwise.
+ */
 bool isSystemHealthy() {
     return globalSystemHealthy;
 }
 
+/**
+ * @brief Initializes the task heartbeat tracking table.
+ */
 void watchdogInit()
 {
     for (int i = 0; i < TASK_MONITORED_COUNT; ++i) {
@@ -22,6 +48,16 @@ void watchdogInit()
     }
 }
 
+/**
+ * @brief Records task heartbeat timestamp and feeds the calling task's hardware TWDT registration.
+ *
+ * Synchronization & Safety:
+ * - Obtains heartbeatMutex with 50 ms timeout to prevent deadlock.
+ * - Updates taskHeartbeats[taskId].lastHeartbeatMs with current millis().
+ * - Calls esp_task_wdt_reset() for hardware watchdog timer enforcement.
+ *
+ * @param taskId Enum representing the calling task.
+ */
 void reportTaskHeartbeat(MonitoredTaskId taskId)
 {
     if (taskId < TASK_TEMP || taskId >= TASK_MONITORED_COUNT) {
@@ -49,6 +85,11 @@ void reportTaskHeartbeat(MonitoredTaskId taskId)
     }
 }
 
+/**
+ * @brief FreeRTOS supervisory task running at Priority 4 monitoring task health and memory.
+ *
+ * @param parameter Unused FreeRTOS task parameter pointer (NULL).
+ */
 void watchdogTask(void *parameter)
 {
     (void)parameter;

@@ -1,3 +1,21 @@
+/**
+ * @file environment.cpp
+ * @brief Implementation of facility environment simulation and test command processing (Task 2).
+ *
+ * Responsibilities:
+ * - Implements simulated environmental sensing for Task 2 (Dual-Role IoT Monitoring):
+ *     1. Room Temperature (18.0 - 30.0 °C)
+ *     2. Ambient Oxygen Percentage (18.0 - 24.0 %)
+ *     3. Air Quality Index (0 - 200 AQI)
+ * - Concurrency & Synchronization:
+ *     Updates facilityTelemetry protected by telemetryMux spinlock critical sections.
+ * - Alerting:
+ *     Checks isFacilityAbnormal() and signals alertSemaphore when environmental thresholds
+ *     are breached (Room Temp <19 or >27 °C, O2 <19.5 or >23.5 %, AQI >100).
+ * - Diagnostic Command Interface:
+ *     Processes interactive UART commands for testing boundary conditions in Wokwi simulator.
+ */
+
 #include "environment.h"
 #include <Arduino.h>
 #include "state.h"
@@ -5,9 +23,12 @@
 /**
  * @brief Processes serial commands for facility telemetry simulation/testing.
  *
- * Supported commands are SET_ROOM <C>, SET_OXYGEN <percent>, SET_AQI <value>,
- * RESET_FACILITY, and SHOW_TASK2; these are simulation controls, not
- * production facility-management commands.
+ * Supported commands:
+ * - SET_ROOM <C>        : Forces simulated room temperature in degrees Celsius
+ * - SET_OXYGEN <percent>: Forces simulated room oxygen percentage [16.0 - 25.0 %]
+ * - SET_AQI <value>     : Forces simulated air quality index [0 - 250]
+ * - RESET_FACILITY      : Restores default nominal facility parameters
+ * - SHOW_TASK2          : Prints topic mapping for Task 2 dual-role monitoring
  */
 void handleSerialCommands()
 {

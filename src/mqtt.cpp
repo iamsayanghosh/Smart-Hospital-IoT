@@ -1,3 +1,26 @@
+/**
+ * @file mqtt.cpp
+ * @brief Adafruit IO MQTT communications, subscription handlers, and publication coordinator.
+ *
+ * Responsibilities:
+ * 1. Network & Broker Lifecycle:
+ *    - Reconnects Wi-Fi and MQTT with exponential backoff (1000 ms to 30000 ms).
+ *    - Automatically resubscribes to control topics upon reconnection.
+ * 2. Inbound Control Handlers:
+ *    - "medication-dosage": Decodes and clamps dosage requests into medicationDosageControl.
+ *    - "sampling-rate": Decodes doctor-specified sampling interval [5 - 60 s] and pushes to samplingQueue.
+ *    - "bed-angle": Decodes doctor-specified bed angle [0 - 90 deg] and pushes to bedQueue.
+ * 3. Rate-Limited Live Feed Publication:
+ *    - Rotates round-robin across 6 feeds every 3000 ms (MQTT_TASK_INTERVAL_MS).
+ *    - Suppresses unchanged sensor readings to stay well below the 30 msgs/min Adafruit IO free quota.
+ * 4. Alerts and Periodic Summaries:
+ *    - Publishes clinical and facility threshold alerts to "hospital-events" (rate-limited to 60 s).
+ *    - Publishes aggregated statistical summaries of patient vitals and room conditions every 60000 ms.
+ * 5. Offline Recovery & Buffer Synchronization:
+ *    - safePublish() diverts outgoing payloads to the 64-item offline ring buffer when disconnected.
+ *    - Interleaves replay of buffered records using peek/dequeue operations during network restoration.
+ */
+
 #include "mqtt.h"
 #include "app.h"
 #include "state.h"
@@ -12,13 +35,14 @@
 
 PubSubClient mqttClient(wifiClient);
 
-const uint32_t MQTT_TASK_INTERVAL_MS = 3000;
-const uint32_t MQTT_LOOP_INTERVAL_MS = 50;
-const uint32_t MQTT_INITIAL_RETRY_DELAY_MS = 1000;
-const uint32_t MQTT_MAX_RETRY_DELAY_MS = 30000;
-const uint32_t SUMMARY_INTERVAL_MS = 60000;
-const uint32_t ALERT_PUBLISH_INTERVAL_MS = 60000;
-const uint16_t MQTT_SUMMARY_BUFFER_MARGIN = 64;
+const uint32_t MQTT_TASK_INTERVAL_MS = 3000;          ///< Telemetry dispatch period (3 s = max 20 msgs/min)
+const uint32_t MQTT_LOOP_INTERVAL_MS = 50;            ///< Underlying client loop tick rate (50 ms)
+const uint32_t MQTT_INITIAL_RETRY_DELAY_MS = 1000;    ///< Initial retry delay for exponential backoff (1 s)
+const uint32_t MQTT_MAX_RETRY_DELAY_MS = 30000;       ///< Cap for exponential backoff retry delay (30 s)
+const uint32_t SUMMARY_INTERVAL_MS = 60000;           ///< Aggregated hospital summary reporting cadence (60 s)
+const uint32_t ALERT_PUBLISH_INTERVAL_MS = 60000;     ///< Rate limiter for repeated alert publications (60 s)
+const uint16_t MQTT_SUMMARY_BUFFER_MARGIN = 64;       ///< Additional headroom bytes for PubSubClient packet buffer
+
 
 #define MEDICAL_HEART_RATE_FEED "medical-heart-rate"
 #define MEDICAL_SPO2_FEED "medical-spo2"
@@ -153,17 +177,17 @@ void configureMqttBuffer()
     Serial.println(mqttClient.getBufferSize());
 }
 
-// MQTT TASK SUPPORT
+// MQTT TASK SUPPORT & MESSAGE ROUTING
 // ============================================================================
 
 /**
- * @brief Connects the MQTT client to Adafruit IO using configured credentials.
- *
- * The connection is attempted only after Wi-Fi is available. A failed attempt
- * is reported and the MQTT task retries during its normal periodic loop.
+ * @brief Function pointer type for inbound MQTT subscription payload handlers.
  */
 using MqttMessageHandler = void (*)(const char *, size_t);
 
+/**
+ * @brief Association between an Adafruit IO subscription feed topic and its parser handler.
+ */
 struct MqttMessageRoute {
     const char *topic;
     MqttMessageHandler handler;
@@ -173,6 +197,15 @@ String medicationDosageTopic;
 String samplingRateTopic;
 String bedAngleTopic;
 
+/**
+ * @brief Parses and validates incoming dosage setpoints from "medication-dosage" feed.
+ *
+ * Enforces safety clamping [0.0 - 100.0 mg/hr] and commits requested value into
+ * medicationDosageControl under spinlock critical section.
+ *
+ * @param payload Null-terminated string payload from broker.
+ * @param length Byte length of payload.
+ */
 void handleMedicationDosagePayload(const char *payload, size_t length)
 {
     if (length == 0) {
@@ -192,6 +225,14 @@ void handleMedicationDosagePayload(const char *payload, size_t length)
     Serial.println(" mg/hr");
 }
 
+/**
+ * @brief Parses and clamps doctor dynamic sampling rate commands from "sampling-rate" feed.
+ *
+ * Validates range between 5 and 60 seconds and overwrites the single-element samplingQueue.
+ *
+ * @param payload Null-terminated string payload from broker.
+ * @param length Byte length of payload.
+ */
 void handleSamplingRatePayload(const char *payload, size_t length)
 {
     if (length == 0) {
@@ -208,6 +249,14 @@ void handleSamplingRatePayload(const char *payload, size_t length)
     Serial.println(" s");
 }
 
+/**
+ * @brief Parses and validates clinician bed elevation commands from "bed-angle" feed.
+ *
+ * Overwrites the single-element bedQueue for consumption by bedTask.
+ *
+ * @param payload Null-terminated string payload from broker.
+ * @param length Byte length of payload.
+ */
 void handleBedAnglePayload(const char *payload, size_t length)
 {
     if (length == 0) return;
@@ -223,6 +272,16 @@ MqttMessageRoute mqttRoutes[] = {
     {nullptr, handleBedAnglePayload}
 };
 
+/**
+ * @brief PubSubClient packet reception callback.
+ *
+ * Safely copies payload into local null-terminated buffer and matches topic
+ * against the registered dispatch table in mqttRoutes[].
+ *
+ * @param topic MQTT topic string.
+ * @param payload Raw payload byte buffer.
+ * @param length Byte length of received packet payload.
+ */
 void mqttMessageCallback(char *topic, byte *payload, unsigned int length)
 {
     char payloadBuffer[32];
@@ -240,6 +299,16 @@ void mqttMessageCallback(char *topic, byte *payload, unsigned int length)
     }
 }
 
+/**
+ * @brief Connects MQTT client to Adafruit IO, configures subscriptions, and registers callbacks.
+ *
+ * Connection Preconditions:
+ * - Requires active Wi-Fi link (WiFi.status() == WL_CONNECTED).
+ * - Generates unique client ID based on ESP32 factory eFuse MAC address.
+ * - Subscribes to: medication-dosage, sampling-rate, and bed-angle.
+ *
+ * @return true if successfully connected and subscribed; false otherwise.
+ */
 bool connectMqtt()
 {
     if (WiFi.status() != WL_CONNECTED) {
@@ -269,12 +338,17 @@ bool connectMqtt()
 }
 
 /**
- * @brief Publishes one changed medical or facility live feed value.
+ * @brief Attempts live MQTT publication or diverts to offline ring buffer.
  *
- * Feed names are mapped to the six existing medical and facility Adafruit IO
- * topics. Unchanged values are suppressed, one slot is attempted per MQTT
- * task cycle, and resetLiveFeedPublishState() forces the first value after a
- * connection or reconnection to be sent.
+ * Operational Logic:
+ * - If offline is true: Enqueues directly to offline buffer via enqueueBufferedTelemetry().
+ * - If online: Attempts mqttClient.publish(). If the TCP transport fails, diverts the message
+ *   to the offline buffer to guarantee zero data loss during silent connection drops.
+ *
+ * @param topic Destination Adafruit IO feed topic string.
+ * @param payload Telemetry or event message payload.
+ * @param offline True if Wi-Fi or MQTT broker connection is known to be down.
+ * @return true if published live or successfully buffered; false if offline queue was full.
  */
 bool safePublish(const String& topic, const String& payload, bool offline) {
     if (offline) {

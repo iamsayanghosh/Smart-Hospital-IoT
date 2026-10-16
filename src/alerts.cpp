@@ -1,3 +1,21 @@
+/**
+ * @file alerts.cpp
+ * @brief Implementation of asynchronous medical and facility anomaly event logging.
+ *
+ * Responsibilities:
+ * - Awaits alertSemaphore signaling from telemetry update points (displayTask/updateTelemetry
+ *   for patient vitals and environmentTask for facility anomalies).
+ * - Collects atomic, mutex-protected snapshots of both medical and facility telemetry.
+ * - Logs diagnostic details over Serial for debugging and auditing.
+ *
+ * Hardware & Subsystem Separation:
+ * - This task ONLY performs diagnostic Serial logging.
+ * - Physical alarm hardware (Buzzer, Red/Yellow/Green LEDs) is strictly reserved
+ *   for Task 3 (Medication Dosage Safety) inside outputs.cpp.
+ * - Patient emergency alerts on the cloud are dispatched asynchronously via MQTT
+ *   inside mqtt.cpp (publishMedicalAlertIfNeeded -> "hospital-events").
+ */
+
 #include "alerts.h"
 #include <Arduino.h>
 #include "state.h"
@@ -8,10 +26,14 @@
 /**
  * @brief Responds to newly detected medical or facility abnormal states.
  *
- * Reads protected telemetry snapshots after alertSemaphore is signaled and
- * logs the event. It feeds its watchdog heartbeat after TWDT registration
- * while waiting for alerts, using a 500 ms semaphore wait and 50 ms retry
- * delay.
+ * Execution Flow:
+ * 1. Registers task with ESP32 Task Watchdog Timer (TWDT).
+ * 2. Continuously reports heartbeat to the software watchdog supervisor.
+ * 3. Blocks on alertSemaphore with a 500 ms timeout to ensure regular heartbeat reporting.
+ * 4. When signaled (upon abnormal condition transition), safely copies telemetry snapshots
+ *    under mutex protection and prints vital parameters to Serial.
+ *
+ * @param parameter Unused FreeRTOS task parameter pointer (NULL).
  */
 void alertTask(void *parameter)
 {

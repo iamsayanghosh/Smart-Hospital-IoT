@@ -1,3 +1,18 @@
+/**
+ * @file app.cpp
+ * @brief Core application initialization, FreeRTOS task spawning, and system supervisory implementation.
+ *
+ * Architecture Notes:
+ * - IPC Allocation: Allocates all FreeRTOS queues, mutexes, and semaphores before tasks run.
+ * - Core Pinning: All 12 application tasks are explicitly pinned to Core 1 (xTaskCreatePinnedToCore
+ *   with coreID=1), allowing Core 0 to service Arduino/ESP-IDF system daemons (Wi-Fi driver and timer tasks).
+ * - Priority Hierarchy:
+ *     Priority 4: watchdogTask (highest application priority to guarantee timely health checks)
+ *     Priority 3: vitalTask, ecgTask, medicationTask (high-rate physiological acquisition & safety-critical dosage control)
+ *     Priority 2: temperatureTask, motionTask, mqttTask, alertTask, samplingTask, bedTask, offlineTask (standard processing)
+ *     Priority 1: displayTask (lowest priority background UI rendering)
+ */
+
 #include "app.h"
 #include "watchdog.h"
 #include "display.h"
@@ -17,6 +32,12 @@ extern void mqttTask(void *parameter);
 static const uint32_t TWDT_TIMEOUT_MS = 8000;
 static const uint32_t HEARTBEAT_MUTEX_WAIT_MS = 50;
 
+/**
+ * @brief Retrieves the active sensor acquisition interval for a monitored task.
+ *
+ * @param taskId Monitored task identifier (TASK_TEMP, TASK_VITAL, or TASK_ECG).
+ * @return uint32_t Active period in milliseconds, or 0 if taskId has no dynamic period.
+ */
 uint32_t getSamplePeriodMs(MonitoredTaskId taskId)
 {
     uint32_t periodMs = 0;
@@ -38,6 +59,12 @@ uint32_t getSamplePeriodMs(MonitoredTaskId taskId)
     return periodMs;
 }
 
+/**
+ * @brief Maps a monitored task identifier to its human-readable debug tag.
+ *
+ * @param taskId Monitored task enum identifier.
+ * @return const char* Corresponding name string.
+ */
 const char *taskNameFromId(MonitoredTaskId taskId)
 {
     switch (taskId) {
@@ -68,8 +95,14 @@ const char *taskNameFromId(MonitoredTaskId taskId)
     }
 }
 
-
-
+/**
+ * @brief Halts the system in a safe infinite loop upon critical initialization failure.
+ *
+ * Emits the failure message to Serial and yields with vTaskDelay() to prevent
+ * watchdog starvation or hard faults while holding execution.
+ *
+ * @param message Diagnostic description of the fatal initialization failure.
+ */
 void failSetup(const char *message)
 {
     Serial.println(message);
@@ -78,6 +111,16 @@ void failSetup(const char *message)
     }
 }
 
+/**
+ * @brief Helper function to pin a task to Core 1 and check creation status.
+ *
+ * @param function Entry function for the FreeRTOS task.
+ * @param name Human-readable diagnostic name for the task.
+ * @param priority FreeRTOS task priority (1 = lowest, 4 = highest).
+ * @param taskHandle Output pointer to store the generated FreeRTOS TaskHandle_t.
+ * @param stackSize Stack depth in bytes (defaults to 4096; MQTT uses 8192).
+ * @return true if task creation succeeded; false otherwise.
+ */
 static bool createTask(TaskFunction_t function, const char *name, UBaseType_t priority, TaskHandle_t *taskHandle, uint32_t stackSize = 4096)
 {
     BaseType_t result = xTaskCreatePinnedToCore(
@@ -92,6 +135,17 @@ static bool createTask(TaskFunction_t function, const char *name, UBaseType_t pr
     return true;
 }
 
+/**
+ * @brief Creates all system queues, mutexes, semaphores, and resets baseline state.
+ *
+ * IPC objects created:
+ * - sensorQueue: Queue for decoupling sensor acquisition tasks from displayTask.
+ * - samplingQueue: Single-element queue with overwrite semantics for MQTT rate updates.
+ * - bedQueue: Single-element queue with overwrite semantics for MQTT bed angle commands.
+ * - displayMutex: Protects SSD1306 I2C bus transactions.
+ * - alertSemaphore: Binary semaphore for notifying alertTask of clinical/facility transitions.
+ * - heartbeatMutex: Mutex protecting the monitored task heartbeat timestamp table.
+ */
 void appInit()
 {
     // Create the queue, display mutex, alert semaphore, and heartbeat mutex.
@@ -131,6 +185,13 @@ void appInit()
     medicationDosageControl = MedicationDosageControl();
 }
 
+/**
+ * @brief Configures ESP32 Task Watchdog Timer (TWDT) and launches all FreeRTOS tasks.
+ *
+ * Watchdog timeout is configured for 8000 ms with core 1 idle monitoring enabled
+ * and panic triggered on expiration.
+ * All tasks are pinned to Core 1 with calibrated priorities and stack allocations.
+ */
 void appStartTasks()
 {
     // Configure the ESP Task Watchdog before starting monitored tasks.

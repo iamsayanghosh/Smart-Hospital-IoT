@@ -6,17 +6,32 @@
 #include "freertos/queue.h"
 #include "freertos/semphr.h"
 
+/**
+ * @file state.h
+ * @brief Centralized data structures, FreeRTOS synchronization objects, and state helper declarations.
+ *
+ * This module defines the system-wide shared data representations and concurrency primitives:
+ * - IPC Queues: sensorQueue (sensor messages), samplingQueue (dynamic rate updates), bedQueue (bed angle).
+ * - Mutexes & Semaphores: displayMutex (I2C display protection), heartbeatMutex (watchdog table), alertSemaphore (event notification).
+ * - Spinlock: telemetryMux (atomic critical sections for multi-task telemetry access).
+ *
+ * Subsystem Separation Ground Rules:
+ * - Telemetry vs MedicationDosageControl: Medical patient vitals and medication dosage safety
+ *   are maintained in separate structs and evaluated with completely independent logic.
+ */
+
 // ============================================================================
 // FREERTOS SYNCHRONIZATION OBJECTS
 // ============================================================================
 
-extern QueueHandle_t sensorQueue;
-extern QueueHandle_t samplingQueue;
-extern SemaphoreHandle_t displayMutex;
-extern SemaphoreHandle_t alertSemaphore;
-extern SemaphoreHandle_t heartbeatMutex;
-extern portMUX_TYPE telemetryMux;
-extern QueueHandle_t bedQueue;
+extern QueueHandle_t sensorQueue;         ///< Queue (depth 16) transporting SensorMessage from sensors to displayTask
+extern QueueHandle_t samplingQueue;       ///< Queue (depth 1) delivering doctor sampling rate overrides from MQTT
+extern SemaphoreHandle_t displayMutex;    ///< Mutex serializing I2C transactions to the SSD1306 OLED display
+extern SemaphoreHandle_t alertSemaphore;  ///< Binary semaphore unblocking alertTask on clinical/environmental transitions
+extern SemaphoreHandle_t heartbeatMutex;  ///< Mutex protecting taskHeartbeats[] table modifications
+extern portMUX_TYPE telemetryMux;         ///< Spinlock critical section protecting global telemetry and dosage structures
+extern QueueHandle_t bedQueue;            ///< Queue (depth 1) delivering remote bed angle commands from MQTT
+
 
 // ============================================================================
 // SHARED TELEMETRY STATE
@@ -177,13 +192,91 @@ extern bool facilityAlertStateKnown;
 // HELPER FUNCTIONS
 // ============================================================================
 
+/**
+ * @brief Evaluates whether a patient's vitals violate medical threshold limits.
+ *
+ * Checks heart rate [50 - 110 BPM], SpO2 [>= 92%], and body temperature [35.0 - 38.0 °C].
+ *
+ * @param data Telemetry snapshot to assess.
+ * @return true if any vital is outside safe physiological range; false if normal.
+ */
 bool isAbnormal(const Telemetry &data);
+
+/**
+ * @brief Evaluates whether room environmental parameters breach facility standards.
+ *
+ * Checks room temperature [18.0 - 28.0 °C], oxygen [19.5 - 24.0 %], and AQI [<= 100].
+ *
+ * @param data Facility telemetry snapshot to assess.
+ * @return true if environmental parameters exceed bounds; false if nominal.
+ */
 bool isFacilityAbnormal(const FacilityTelemetry &data);
+
+/**
+ * @brief Retrieves a thread-safe atomic copy of current medication control state.
+ *
+ * @return MedicationDosageControl Snapshot copy.
+ */
 MedicationDosageControl getMedicationDosageSnapshot();
+
+/**
+ * @brief Retrieves a thread-safe atomic copy of current patient medical telemetry.
+ *
+ * @return Telemetry Snapshot copy.
+ */
 Telemetry getTelemetrySnapshot();
+
+/**
+ * @brief Retrieves a thread-safe atomic copy of current facility environmental telemetry.
+ *
+ * @return FacilityTelemetry Snapshot copy.
+ */
 FacilityTelemetry getFacilitySnapshot();
+
+/**
+ * @brief Dispatches a SensorMessage to sensorQueue with a 10 ms wait timeout.
+ *
+ * @param message Sensor reading payload to enqueue.
+ * @param taskName Diagnostic task name string for queue overflow warning logs.
+ * @return true if enqueued; false if queue was full after 10 ms timeout.
+ */
 bool sendSensorMessage(const SensorMessage &message, const char *taskName);
+
+/**
+ * @brief Analyzes patient telemetry and constructs an alert candidate if a threshold is violated.
+ *
+ * Evaluates priority: Critical SpO2 (<88%), Critical HR (<40 or >130), Warning SpO2 (88-91%),
+ * Warning HR, and Body Temperature.
+ *
+ * @param snapshot Evaluated patient vitals snapshot.
+ * @return AlertCandidate Populated candidate descriptor.
+ */
 AlertCandidate evaluateMedicalAlert(const Telemetry &snapshot);
+
+/**
+ * @brief Analyzes room telemetry and constructs an alert candidate if environmental limits fail.
+ *
+ * Evaluates AQI (>100), Room Oxygen (<19.5 or >24 %), and Room Temperature (<18 or >28 °C).
+ *
+ * @param snapshot Evaluated facility telemetry snapshot.
+ * @return AlertCandidate Populated candidate descriptor.
+ */
 AlertCandidate evaluateFacilityAlert(const FacilityTelemetry &snapshot);
+
+/**
+ * @brief Accumulates valid patient vitals into rolling medical statistics window.
+ *
+ * Updates running sums, sample counts, minimum SpO2, and maximum body temperature.
+ *
+ * @param snapshot Current patient telemetry snapshot.
+ */
 void updateMedicalSummaryStats(const Telemetry &snapshot);
+
+/**
+ * @brief Accumulates facility telemetry into rolling environmental statistics window.
+ *
+ * Updates running sums and sample counts for room temperature, oxygen, and AQI.
+ *
+ * @param snapshot Current facility telemetry snapshot.
+ */
 void updateFacilitySummaryStats(const FacilityTelemetry &snapshot);

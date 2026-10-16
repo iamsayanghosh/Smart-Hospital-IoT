@@ -1,3 +1,12 @@
+/**
+ * @file connectivity.cpp
+ * @brief Network configuration and Wi-Fi transport definitions.
+ *
+ * Provides definition of network credentials and broker endpoints.
+ * The active network connection lifecycle, state machine, and exponential backoff
+ * are implemented in mqttTask (src/mqtt.cpp).
+ */
+
 #include "connectivity.h"
 #include "adafruit_io_config.h"
 
@@ -9,5 +18,7 @@ WiFiClient wifiClient;
 
 void setupConnectivity()
 {
-    // Optionally initiate WiFi here, or let mqttTask handle it
+    // The active Wi-Fi connection loop is deliberately deferred to mqttTask
+    // to ensure system startup and local control tasks (medication, bed, watchdog)
+    // begin executing immediately without network blocking delays.
 }

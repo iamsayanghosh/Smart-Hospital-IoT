@@ -1,3 +1,23 @@
+/**
+ * @file bed.cpp
+ * @brief Implementation of Intelligent Remote Bed Elevation (Task 4).
+ *
+ * Responsibilities:
+ * - Controls hospital bed elevation angle via a servo actuator on GPIO 18.
+ * - Enforces automatic-first clinical safety priorities:
+ *     1. Emergency Mode (90°, 5.0°/s): Automatically commanded when any vital reaches critical bounds.
+ *     2. Breathing Support Mode (45°, 1.5°/s): Automatically commanded when SpO2 drops into hypoxia (88-91%).
+ *     3. Sleeping Mode (10°, 1.5°/s): Default rest position for stable vitals or non-critical anomalies.
+ * - Manual Doctor Override:
+ *     Accepts manual angle commands [0°-90°] via bedQueue from MQTT feed "bed-angle".
+ *     Manual override is strictly subordinate to clinical transitions: if the patient's
+ *     clinical condition changes, manual mode is immediately cancelled and the automatic
+ *     clinical position is restored.
+ * - Actuator Safety & Kinematics:
+ *     Runs a 50 Hz control loop (20 ms timestep) to smoothly ramp servo position, preventing
+ *     abrupt physical movement that could distress a patient.
+ */
+
 #include "bed.h"
 #include "state.h"
 #include "watchdog.h"
@@ -5,18 +25,26 @@
 #include "esp_task_wdt.h"
 #include <cmath>
 
-static const int BED_SERVO_PIN = 18;
-static const int BED_SERVO_MIN_PULSE = 500;
-static const int BED_SERVO_MAX_PULSE = 2400;
-static const float BED_SERVO_MAX_ANGLE = 180.0f;
+static const int BED_SERVO_PIN = 18;          ///< GPIO pin connected to bed elevation servo signal line
+static const int BED_SERVO_MIN_PULSE = 500;   ///< Minimum pulse width in microseconds (corresponds to 0°)
+static const int BED_SERVO_MAX_PULSE = 2400;  ///< Maximum pulse width in microseconds (corresponds to 180°)
+static const float BED_SERVO_MAX_ANGLE = 180.0f; ///< Physical servo full travel scale in degrees
 
+/**
+ * @brief Discrete operational modes for hospital bed elevation control.
+ */
 enum BedMode {
-    BED_MODE_SLEEPING,
-    BED_MODE_BREATHING_SUPPORT,
-    BED_MODE_EMERGENCY,
-    BED_MODE_MANUAL
+    BED_MODE_SLEEPING,          ///< Rest angle (10°) during stable condition
+    BED_MODE_BREATHING_SUPPORT, ///< Elevated angle (45°) for respiratory support (SpO2 88-91%)
+    BED_MODE_EMERGENCY,         ///< Upright angle (90°) during acute physiological crises
+    BED_MODE_MANUAL             ///< Clinician-defined angle commanded via dashboard
 };
 
+/**
+ * @brief FreeRTOS task implementing bed elevation kinematic control and clinical arbitration.
+ *
+ * @param parameter Unused FreeRTOS task parameter pointer (NULL).
+ */
 void bedTask(void *parameter)
 {
     (void)parameter;

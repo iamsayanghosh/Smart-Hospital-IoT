@@ -1,12 +1,22 @@
 /**
  * @file main.cpp
- * @brief ESP32 Smart Hospital IoT monitoring prototype.
+ * @brief ESP32 Smart Hospital IoT monitoring system firmware entry point.
  *
- * Implements a FreeRTOS-based concurrent monitoring system with physical
- * DS18B20 temperature and PIR motion inputs; simulated heart rate, SpO2, ECG,
- * room temperature, oxygen, and AQI data; local OLED display; Adafruit IO MQTT
- * communication; alert handling; telemetry aggregation; and task monitoring.
+ * Implements a concurrent, multi-task medical and facility supervisory system
+ * fulfilling all six course tasks:
+ * - Task 1: Multi-Sensor Expansion Using FreeRTOS (DS18B20 temp, PIR motion, PPG vitals, ECG waveform).
+ * - Task 2: Dual-Role IoT Monitoring System (Separate clinical vitals and facility environment feeds).
+ * - Task 3: Smart Medication Dosage Safety (Rate-limited infusion pump with two-factor physical confirmation).
+ * - Task 4: Intelligent Remote Bed Elevation (Automatic emergency/breathing elevation with doctor override).
+ * - Task 5: Smart Dynamic Sampling Rate (60 s stable vs 5 s abnormal adaptive monitoring with doctor slider).
+ * - Task 6: Advanced Offline Detection (Network failure sensing, local queue buffering, and acoustic alerts).
+ *
+ * Architectural Design:
+ * - Core 1 Execution: All application tasks are pinned to Core 1 via FreeRTOS.
+ * - Hardware Watchdog: Protected by ESP32 Task Watchdog Timer (TWDT) with 8-second hardware timeout.
+ * - Minimal Loop: Arduino loop() is dedicated to serial command handling and periodic 1000 ms yields.
  */
+
 
 // ============================================================================
 // LIBRARIES
