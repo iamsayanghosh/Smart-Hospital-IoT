@@ -13,29 +13,27 @@
 // ============================================================================
 
 #include <Arduino.h>
-#include <Wire.h>
-#include <WiFi.h>
 #include <PubSubClient.h>
+#include <WiFi.h>
+#include <Wire.h>
 #include <math.h>
 
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
 
-#include "freertos/semphr.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "freertos/queue.h"
-#include "esp_task_wdt.h"
 #include "adafruit_io_config.h"
-#include "display.h"
-#include "state.h"
-#include "outputs.h"
-#include "medication.h"
-#include "sensors.h"
-#include "environment.h"
 #include "app.h"
+#include "display.h"
+#include "environment.h"
+#include "esp_task_wdt.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/queue.h"
+#include "freertos/semphr.h"
+#include "freertos/task.h"
+#include "medication.h"
+#include "outputs.h"
+#include "sensors.h"
+#include "state.h"
 
 #define OLED_SDA 21
 #define OLED_SCL 22
@@ -50,26 +48,28 @@
  * The sequence is serial, GPIO and sensor setup, I2C/OLED setup, RTOS object
  * creation, telemetry initialization, watchdog configuration, and task start.
  */
-void setup()
-{
-    // Initialize serial communication for startup, sensor, MQTT, and watchdog logs.
-    Serial.begin(115200);
-    vTaskDelay(pdMS_TO_TICKS(500));
-    Serial.println("\n================================");
-    Serial.println("       SMART HOSPITAL IoT       ");
-    Serial.println("================================");
-    Serial.println("[SETUP] Adafruit IO credentials loaded from include/adafruit_io_config.h or include/adafruit_io_config.local.h");
+void setup() {
+  // Initialize serial communication for startup, sensor, MQTT, and watchdog
+  // logs.
+  Serial.begin(115200);
+  vTaskDelay(pdMS_TO_TICKS(500));
+  Serial.println("\n================================");
+  Serial.println("       SMART HOSPITAL IoT       ");
+  Serial.println("================================");
+  Serial.println(
+      "[SETUP] Adafruit IO credentials loaded from "
+      "include/adafruit_io_config.h or include/adafruit_io_config.local.h");
 
-    outputsInit();
-    medicationInit();
-    sensorsInit();
+  outputsInit();
+  medicationInit();
+  sensorsInit();
 
-    // Initialize I2C and the 128x64 OLED at the configured 0x3C address.
-    displayInit(OLED_SDA, OLED_SCL);
+  // Initialize I2C and the 128x64 OLED at the configured 0x3C address.
+  displayInit(OLED_SDA, OLED_SCL);
 
-    appInit();
-    resetSummaryStats();
-    appStartTasks();
+  appInit();
+  resetSummaryStats();
+  appStartTasks();
 }
 
 // ============================================================================
@@ -82,8 +82,7 @@ void setup()
  * The Arduino loop does not handle sensors or MQTT directly; it remains
  * lightweight and yields for 1000 ms after command processing.
  */
-void loop()
-{
-    handleSerialCommands();
-    vTaskDelay(pdMS_TO_TICKS(1000));
+void loop() {
+  handleSerialCommands();
+  vTaskDelay(pdMS_TO_TICKS(1000));
 }
