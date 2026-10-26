@@ -5,7 +5,14 @@
  * Architecture Notes:
  * - IPC Allocation: Allocates all FreeRTOS queues, mutexes, and semaphores before tasks run.
  * - Core Pinning: All 12 application tasks are explicitly pinned to Core 1 (xTaskCreatePinnedToCore
- *   with coreID=1), allowing Core 0 to service Arduino/ESP-IDF system daemons (Wi-Fi driver and timer tasks).
+ *   with coreID=1). In the installed PlatformIO toolchain build configuration (sdkconfig.h), the Wi-Fi
+ *   driver task (CONFIG_ESP_WIFI_TASK_PINNED_TO_CORE_0=1) and lwIP TCP/IP stack (CONFIG_LWIP_TCPIP_TASK_AFFINITY=0x0)
+ *   are configured for Core 0, the FreeRTOS timer service task (CONFIG_FREERTOS_TIMER_SERVICE_TASK_CORE_AFFINITY=0x7FFFFFFF)
+ *   is configured with tskNO_AFFINITY (allowing either core), and Arduino loopTask is configured for Core 1
+ *   (CONFIG_ARDUINO_RUNNING_CORE=1). Dynamic runtime scheduling on physical hardware was not instrumented.
+ *   Pinning application tasks to Core 1 organizes application workload, but does not imply exclusive
+ *   reservation of Core 0, complete network isolation, or immunity from shared bus/cache contention
+ *   and interrupt preemption.
  * - Priority Hierarchy:
  *     Priority 4: watchdogTask (highest application priority to guarantee timely health checks)
  *     Priority 3: vitalTask, ecgTask, medicationTask (high-rate physiological acquisition & safety-critical dosage control)
@@ -188,9 +195,9 @@ void appInit()
 /**
  * @brief Configures ESP32 Task Watchdog Timer (TWDT) and launches all FreeRTOS tasks.
  *
- * Watchdog timeout is configured for 8000 ms with core 1 idle monitoring enabled
- * and panic triggered on expiration.
- * All tasks are pinned to Core 1 with calibrated priorities and stack allocations.
+ * Configures TWDT with an 8000 ms timeout and enables Core 1 idle task monitoring
+ * only (.idle_core_mask = (1 << 1)), with panic triggered on expiration.
+ * All 12 application tasks are explicitly pinned to Core 1 with calibrated priorities and stacks.
  */
 void appStartTasks()
 {

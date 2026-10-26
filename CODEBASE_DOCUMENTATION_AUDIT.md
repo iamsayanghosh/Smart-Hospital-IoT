@@ -13,7 +13,9 @@ Key outcomes of this audit include:
 2. **Resolution of Numerical and Timing Discrepancies:** Reconciled conflicting references to ECG generation cadence (verified as fixed **200 ms / 5 Hz** via `samplingPeriods.ecgMs`), motion sensor sampling (verified as fixed **1000 ms**), and hardware pin definitions.
 3. **Rigorous Offline Buffering Characterization:** Corrected claims regarding offline buffering to reflect the real code: a **bounded 64-item volatile FIFO RAM queue** with an explicit drop-on-full policy during prolonged outages and zero persistence across microcontroller reboots.
 4. **Precise Domain and Hardware Terminology:** Clarified that Task 3 is a **simulated medication dosage controller / infusion rate supervisor** rather than a physical motor pump, and accurately defined its critical threshold mechanism as a **local bedside physical pushbutton confirmation interlock** on GPIO 13.
-5. **Compilation and Integrity Validation:** PlatformIO compilation (`pio run`) succeeded with zero errors (Flash: 79.5%, RAM: 15.1%), and `git diff --check` confirmed zero whitespace or diff format errors.
+5. **Source-Grounding of MQTT Publishing Rates (Nominal 23 msgs/min vs. Account Quotas):** Derived the nominal maximum publishing cadence from source paths: $20\text{ (live/replay)} + 1\text{ (summary)} + 1\text{ (medical alert)} + 1\text{ (facility alert)} = \mathbf{23\text{ msgs/min}}$. Clarified that live telemetry and offline replay share a single 3000 ms slot, while summaries and alerts have independent 60 s timers. Acknowledged intra-cycle consecutive bursts (up to 4 packets) and decoupled local firmware pacing from Adafruit IO's account-wide quota (30 data points/min).
+6. **Rigorous Core Scheduling and Task Pinning Characterization:** Confirmed that all 12 application FreeRTOS tasks created by `appStartTasks()` in `src/app.cpp` are explicitly pinned to **Core 1** (`xTaskCreatePinnedToCore(..., 1)`). Inspected the installed PlatformIO build configuration (`sdkconfig.h`), establishing that the Wi-Fi driver (`CONFIG_ESP_WIFI_TASK_PINNED_TO_CORE_0 = 1`) and lwIP TCP/IP stack (`CONFIG_LWIP_TCPIP_TASK_AFFINITY = 0x0` / `CONFIG_LWIP_TCPIP_TASK_AFFINITY_CPU0 = y`) are configured for Core 0, the FreeRTOS timer service task (`CONFIG_FREERTOS_TIMER_SERVICE_TASK_CORE_AFFINITY = 0x7FFFFFFF`) is configured with `tskNO_AFFINITY` (allowing either core), and Arduino `loopTask` is configured for Core 1 (`CONFIG_ARDUINO_RUNNING_CORE = 1`). Distinguished this build-time affinity configuration from runtime task scheduling, which was not instrumented on physical hardware. Documented that application core pinning does not prove complete network isolation or immunity from Wi-Fi interrupt preemption, and that TWDT `.idle_core_mask = (1 << 1)` monitors only the Core 1 idle task.
+7. **Compilation and Integrity Validation:** PlatformIO compilation (`pio run`) succeeded with zero errors (Flash: 79.5%, RAM: 15.1%), and `git diff --check` confirmed zero whitespace or diff format errors.
 
 ---
 
@@ -82,25 +84,32 @@ c:/Users/sayan/Smart-Hospital-IoT/
 ## 3. Actual Architecture
 
 ### 3.1 FreeRTOS Concurrency, Core Placement, and Priorities
-The ESP32 dual-core environment is utilized with explicit task placement:
-- **Core 0 Execution:** Reserved by default by the Arduino-ESP32 / ESP-IDF framework to execute background system daemons, notably the Wi-Fi MAC/PHY driver task (`wifi`), the TCP/IP stack thread (lwIP), and the FreeRTOS timer daemon (`tiT`).
-- **Core 1 Execution:** All 12 application FreeRTOS tasks are explicitly pinned to **Core 1** using `xTaskCreatePinnedToCore(..., 1)` in `src/app.cpp`.
+The ESP32 dual-core environment is utilized with explicit application task placement:
+- **Framework and System Daemons:** Inspected directly in the installed PlatformIO toolchain build configuration (`platform espressif32 @ 55.03.39`, `framework-arduinoespressif32 @ 3.3.9`, precompiled `framework-arduinoespressif32-libs @ 5.5.4` based on ESP-IDF v5.5.4, header `sdkconfig.h`):
+  - **Wi-Fi Driver Task (`wifi`):** Configured for **Core 0** (`CONFIG_ESP_WIFI_TASK_PINNED_TO_CORE_0 = 1` / `CONFIG_ESP32_WIFI_TASK_PINNED_TO_CORE_0 = 1`). It handles low-level 802.11 MAC management and baseband packet queues.
+  - **lwIP TCP/IP Stack Task (`tcpip`):** Configured for **Core 0** (`CONFIG_LWIP_TCPIP_TASK_AFFINITY_CPU0 = y`, `#define CONFIG_LWIP_TCPIP_TASK_AFFINITY 0x0`). It handles socket processing, TCP/IP state machines, and transport packet flow.
+  - **FreeRTOS Timer Service Task (`tiT` / `Tmr Svc`):** Configured with **`tskNO_AFFINITY`** (`#define CONFIG_FREERTOS_TIMER_SERVICE_TASK_CORE_AFFINITY 0x7FFFFFFF`, mapped to `configTIMER_SERVICE_TASK_CORE_AFFINITY`), allowing the FreeRTOS scheduler to execute timer callbacks on either Core 0 or Core 1 (the legacy ESP-IDF v4 macro `CONFIG_FREERTOS_TIMER_SERVICE_TASK_CORE_ID` is not present in this ESP-IDF v5 framework).
+  - **Arduino `loopTask`:** Configured for **Core 1** (`CONFIG_ARDUINO_RUNNING_CORE = 1`).
+  - **Build-Time Configuration vs. Runtime Scheduling:** While the installed precompiled toolchain configuration explicitly establishes these task affinities, dynamic runtime scheduling, dispatch latency, and CPU core utilization were not instrumented on physical hardware.
+  - **Core 0 Non-Reservation:** Core 0 is not dedicated exclusively to networking by this project. Furthermore, application-level pinning to Core 1 organizes task workloads but does **not** prove complete network isolation, immunity from hardware interrupt preemption (e.g., Wi-Fi MAC/PHY ISRs), or elimination of shared memory bus, flash cache, and spinlock (`telemetryMux`) contention.
+- **Application Task Pinning (Core 1):** Exactly 12 application FreeRTOS tasks created by `appStartTasks()` in `src/app.cpp` are explicitly pinned to **Core 1** by passing argument `1` to `xTaskCreatePinnedToCore()`. No application tasks execute on Core 0 or are left unpinned.
+- **Hardware Task Watchdog (TWDT) Core Monitoring:** Initialized in `src/app.cpp` with `.idle_core_mask = (1 << 1)`, configuring the hardware watchdog to monitor **only the Core 1 idle task (`IDLE1`)**. Core 0's idle task is unmonitored by this watchdog configuration.
 
 #### Verified Application Task Inventory
-| Task Name | Function | Priority | Stack Size | Scheduling / Wakeup Cadence | Primary Responsibility |
-| :--- | :--- | :---: | :---: | :---: | :---: |
-| `Watchdog Task` | `watchdogTask` | **4** | 4,096 B | Periodic ($1000\text{ ms}$) | Highest priority: Audits heartbeat timestamps of all 11 monitored tasks; logs memory leaks & stack high-water marks. |
-| `Medication Task` | `medicationTask` | **3** | 4,096 B | Periodic ($20\text{ ms}$ / 50 Hz) | Safety-critical dosage controller: 50 ms button debounce, $+5\text{ mg/hr/s}$ rate limiting, and output updates. |
-| `Vital Task` | `vitalTask` | **3** | 4,096 B | Hybrid ($500\text{ ms}$ tick, $5\text{ s}-60\text{ s}$ period) | Simulates optical PPG vitals (Heart Rate & $\text{SpO}_2$) and synchronizes facility simulation ticks. |
-| `ECG Task` | `ecgTask` | **3** | 4,096 B | Fixed Periodic ($200\text{ ms}$ / 5 Hz) | Synthesizes continuous mathematical AD8232 PQRST cardiac waveforms using Gaussian superposition. |
-| `Temperature Task` | `temperatureTask` | **2** | 4,096 B | Hybrid ($500\text{ ms}$ tick, $5\text{ s}-60\text{ s}$ period) | Reads Dallas DS18B20 1-Wire sensor on GPIO 4; feeds watchdog every 500 ms. |
-| `Motion Task` | `motionTask` | **2** | 4,096 B | Fixed Periodic ($1000\text{ ms}$) | Samples physical HC-SR501 PIR sensor on GPIO 27. |
-| `MQTT Task` | `mqttTask` | **2** | 8,192 B | Hybrid ($50\text{ ms}$ loop, $3000\text{ ms}$ dispatch) | Services network loop, manages exponential backoff, and publishes rate-limited feeds. |
-| `Sampling Task` | `samplingTask` | **2** | 4,096 B | Periodic ($1000\text{ ms}$) | Evaluates clinical condition; arbitrates dynamic sensor periods ($60\text{ s}$ stable vs $5\text{ s}$ abnormal). |
-| `Bed Task` | `bedTask` | **2** | 4,096 B | Periodic ($20\text{ ms}$ / 50 Hz) | Drives hospital bed elevation servo on GPIO 18 with kinematic velocity limits. |
-| `Offline Task` | `offlineTask` | **2** | 4,096 B | Periodic ($50\text{ ms}$) | Monitors network transport and watchdog health; drives offline buzzer cadences. |
-| `Alert Task` | `alertTask` | **2** | 4,096 B | Event-Driven ($500\text{ ms}$ timeout) | Blocks on `alertSemaphore`; emits diagnostic telemetry snapshots on abnormal transitions. |
-| `Display Task` | `displayTask` | **1** | 4,096 B | Periodic / Consumer ($100\text{ ms}$) | Drains `sensorQueue` into global telemetry; renders medication status on OLED. |
+| Task Name | Function | Priority | Stack Size | Explicit Core | Scheduling / Wakeup Cadence | Primary Responsibility |
+| :--- | :--- | :---: | :---: | :---: | :---: | :---: |
+| `Watchdog Task` | `watchdogTask` | **4** | 4,096 B | **Core 1** | Periodic ($1000\text{ ms}$) | Highest priority: Audits heartbeat timestamps of all 11 monitored tasks; logs memory leaks & stack high-water marks. |
+| `Medication Task` | `medicationTask` | **3** | 4,096 B | **Core 1** | Periodic ($20\text{ ms}$ / 50 Hz) | Safety-critical dosage controller: 50 ms button debounce, $+5\text{ mg/hr/s}$ rate limiting, and output updates. |
+| `Vital Task` | `vitalTask` | **3** | 4,096 B | **Core 1** | Hybrid ($500\text{ ms}$ tick, $5\text{ s}-60\text{ s}$ period) | Simulates optical PPG vitals (Heart Rate & $\text{SpO}_2$) and synchronizes facility simulation ticks. |
+| `ECG Task` | `ecgTask` | **3** | 4,096 B | **Core 1** | Fixed Periodic ($200\text{ ms}$ / 5 Hz) | Synthesizes continuous mathematical AD8232 PQRST cardiac waveforms using Gaussian superposition. |
+| `Temperature Task` | `temperatureTask` | **2** | 4,096 B | **Core 1** | Hybrid ($500\text{ ms}$ tick, $5\text{ s}-60\text{ s}$ period) | Reads Dallas DS18B20 1-Wire sensor on GPIO 4; feeds watchdog every 500 ms. |
+| `Motion Task` | `motionTask` | **2** | 4,096 B | **Core 1** | Fixed Periodic ($1000\text{ ms}$) | Samples physical HC-SR501 PIR sensor on GPIO 27. |
+| `MQTT Task` | `mqttTask` | **2** | 8,192 B | **Core 1** | Hybrid ($50\text{ ms}$ loop, $3000\text{ ms}$ dispatch) | Services network loop, manages exponential backoff, and publishes rate-limited feeds. |
+| `Sampling Task` | `samplingTask` | **2** | 4,096 B | **Core 1** | Periodic ($1000\text{ ms}$) | Evaluates clinical condition; arbitrates dynamic sensor periods ($60\text{ s}$ stable vs $5\text{ s}$ abnormal). |
+| `Bed Task` | `bedTask` | **2** | 4,096 B | **Core 1** | Periodic ($20\text{ ms}$ / 50 Hz) | Drives hospital bed elevation servo on GPIO 18 with kinematic velocity limits. |
+| `Offline Task` | `offlineTask` | **2** | 4,096 B | **Core 1** | Periodic ($50\text{ ms}$) | Monitors network transport and watchdog health; drives offline buzzer cadences. |
+| `Alert Task` | `alertTask` | **2** | 4,096 B | **Core 1** | Event-Driven ($500\text{ ms}$ timeout) | Blocks on `alertSemaphore`; emits diagnostic telemetry snapshots on abnormal transitions. |
+| `Display Task` | `displayTask` | **1** | 4,096 B | **Core 1** | Periodic / Consumer ($100\text{ ms}$) | Drains `sensorQueue` into global telemetry; renders medication status on OLED. |
 
 ---
 
@@ -181,6 +190,39 @@ Verified 1:1 against [`diagram.json`](file:///c:/Users/sayan/Smart-Hospital-IoT/
 | **Piezo Buzzer** | `bz1` | **GPIO 14** | PWM / Tone | Driven at $1200\text{ Hz}$ via Arduino `tone()`; shared transducer |
 | **Pushbutton Switch** | `btn1` | **GPIO 13** | Digital Input | Active-LOW; internal pullup enabled (`INPUT_PULLUP`), debounced |
 | **Bed Elevation Servo** | `servo1` | **GPIO 18** | PWM Servo ($50\text{ Hz}$) | $500\ \mu\text{s}$ ($0^\circ$) to $2400\ \mu\text{s}$ ($180^\circ$ scale), clamped $[0^\circ, 90^\circ]$ |
+
+---
+
+### 3.4 MQTT Telemetry Architecture, Pacing Cadence, and Rate Limits
+
+#### Complete MQTT Publishing Path Inventory
+Every publication operation in the codebase is routed through `safePublish()` in [`src/mqtt.cpp`](file:///c:/Users/sayan/Smart-Hospital-IoT/src/mqtt.cpp) or handled during buffer replay:
+
+| Publishing Path | Destination Topic | Trigger / Cadence | Rate Control Mechanism | Code Reference |
+| :--- | :--- | :--- | :--- | :--- |
+| **Live Telemetry** | 6 feeds (`medical-*`, `facility-*`) | Round-robin, 1 feed every $3000\text{ ms}$ (`MQTT_TASK_INTERVAL_MS`) | Change detection; suppressed if reading unchanged | [`src/mqtt.cpp:L375-L447`](file:///c:/Users/sayan/Smart-Hospital-IoT/src/mqtt.cpp#L375-L447) |
+| **Offline Buffer Replay** | Original buffered feed topic | Shared $3000\text{ ms}$ slot during recovery; alternates via `syncTurn` or takes idle slot | Shared with live slot; FIFO queue peek/dequeue | [`src/mqtt.cpp:L701-L725`](file:///c:/Users/sayan/Smart-Hospital-IoT/src/mqtt.cpp#L701-L725) |
+| **Periodic Summary** | `hospital-events` | Fixed periodic ($60000\text{ ms}$ / `SUMMARY_INTERVAL_MS`) | Timer gating (`now - lastSummary >= 60000`) | [`src/mqtt.cpp:L554-L603`](file:///c:/Users/sayan/Smart-Hospital-IoT/src/mqtt.cpp#L554-L603) |
+| **Medical Alert** | `hospital-events` | Transition to abnormal or recovery status | State change detection + $60\text{ s}$ cooldown (`ALERT_PUBLISH_INTERVAL_MS`) | [`src/mqtt.cpp:L466-L501`](file:///c:/Users/sayan/Smart-Hospital-IoT/src/mqtt.cpp#L466-L501) |
+| **Facility Alert** | `hospital-events` | Transition to abnormal or recovery status | State change detection + $60\text{ s}$ cooldown (`ALERT_PUBLISH_INTERVAL_MS`) | [`src/mqtt.cpp:L510-L545`](file:///c:/Users/sayan/Smart-Hospital-IoT/src/mqtt.cpp#L510-L545) |
+
+#### Nominal Aggregate Publishing Rate Derivation
+Under steady-state operation where sensor values change continually:
+1. **Live Telemetry & Replay:** Because live feeds and buffer replay share the same $3000\text{ ms}$ dispatch window, they strictly cannot exceed:
+   $$\frac{60\text{ s}}{3\text{ s/slot}} = \mathbf{20\text{ messages/minute}}$$
+2. **Periodic Combined Summary:** Dispatched once per 60 seconds:
+   $$\mathbf{1\text{ message/minute}}$$
+3. **Medical Alert:** Rate-limited by a 60-second cooldown (`ALERT_PUBLISH_INTERVAL_MS = 60000`):
+   $$\mathbf{\le 1\text{ message/minute}}$$
+4. **Facility Alert:** Rate-limited by an independent 60-second cooldown (`ALERT_PUBLISH_INTERVAL_MS = 60000`):
+   $$\mathbf{\le 1\text{ message/minute}}$$
+
+$$\text{Nominal Aggregate Rate} = 20 + 1 + 1 + 1 = \mathbf{23\text{ messages/minute}}$$
+
+#### Critical Distinctions and Rate-Limiting Reality
+- **Nominal Pacing vs. Account-Wide Quotas:** The 23 msgs/min figure is a nominal rate derived from the firmware's local scheduling assumptions. Adafruit IO enforces a hard limit of **30 data points per minute across the entire user account**. If additional dashboards, mobile apps, or hardware nodes publish under the same Adafruit IO key, the account-wide quota will be consumed externally regardless of firmware pacing.
+- **Intra-Cycle Burst Hazard:** The firmware does not incorporate an inter-packet delay or a token-bucket rate limiter. If a medical alert, a facility alert, a periodic summary, and a live/replay slot coincide within the same 3000 ms iteration of `mqttTask`, **up to 4 MQTT messages are published consecutively** within that single loop cycle.
+- **Broker Throttling Outcome:** The firmware does not subscribe to the `{username}/throttle` topic or inspect broker throttle headers. In the event that rate limits are exceeded, the exact broker response (e.g., dropping excess packets vs. terminating the TCP connection) and burst durations in microseconds depend on broker-side policies and network transport latency, which cannot be proven by static source inspection alone.
 
 ---
 
@@ -300,7 +342,7 @@ The infusion controller in [`src/medication.cpp`](file:///c:/Users/sayan/Smart-H
 In [`src/offline.cpp`](file:///c:/Users/sayan/Smart-Hospital-IoT/src/offline.cpp) and [`src/mqtt.cpp`](file:///c:/Users/sayan/Smart-Hospital-IoT/src/mqtt.cpp):
 - **Bounded Volatile Buffer:** FreeRTOS queue `offlineBufferQueue` holding up to 64 `BufferedTelemetryMessage` records ($320\text{ bytes}$ each) allocated in ESP32 SRAM.
 - **Drop-on-Full Policy:** If offline duration exceeds buffer capacity (64 messages), newly generated telemetry is dropped with an explicit serial warning (`[OFFLINE] Buffer full, dropping new telemetry`). The buffer is **not** lossless during prolonged disconnections, nor is it persistent across power cycles or reboots.
-- **Interleaved Replay:** When connectivity is restored, `mqttTask` alternates between publishing live telemetry and draining buffered records using `peekBufferedTelemetry()` and `dequeueBufferedTelemetry()`. This ensures live telemetry reaches the cloud while historical data catches up, without exceeding Adafruit IO rate limits.
+- **Interleaved Replay Cadence:** When connectivity is restored, `mqttTask` alternates between publishing live telemetry and draining buffered records using `peekBufferedTelemetry()` and `dequeueBufferedTelemetry()`. Replayed messages share the 3000 ms dispatch slot with live feeds (via `syncTurn` alternating or utilizing idle slots from suppressed unchanged feeds), bounding their combined throughput to at most 20 msgs/min to avoid flooding the broker.
 
 ---
 
@@ -313,7 +355,7 @@ Every maintained `.h` and `.cpp` file was independently re-read from line 1 thro
 | [`include/alerts.h`](file:///c:/Users/sayan/Smart-Hospital-IoT/include/alerts.h) | **Adequate** | Documents asynchronous event logging, semaphore wait, and output separation. |
 | [`src/alerts.cpp`](file:///c:/Users/sayan/Smart-Hospital-IoT/src/alerts.cpp) | **Adequate** | Explains TWDT registration, 500 ms heartbeat loop, and atomic telemetry snapshots. |
 | [`include/app.h`](file:///c:/Users/sayan/Smart-Hospital-IoT/include/app.h) | **Adequate** | Complete inventory of FreeRTOS queues, mutexes, semaphores, TWDT, and task priorities. |
-| [`src/app.cpp`](file:///c:/Users/sayan/Smart-Hospital-IoT/src/app.cpp) | **Adequate** | Details Core 1 pinning of all 12 application tasks, priority hierarchy (4 to 1), stack allocations, and fatal setup halts. |
+| [`src/app.cpp`](file:///c:/Users/sayan/Smart-Hospital-IoT/src/app.cpp) | **Adequate** | Details Core 1 pinning of all 12 application tasks, priority hierarchy (4 to 1), stack allocations, and TWDT Core 1 idle monitoring. |
 | [`include/bed.h`](file:///c:/Users/sayan/Smart-Hospital-IoT/include/bed.h) | **Adequate** | Outlines Servo GPIO 18, angles ($10^\circ, 45^\circ, 90^\circ$), speeds ($1.5^\circ/\text{s}, 5.0^\circ/\text{s}$), and override rules. |
 | [`src/bed.cpp`](file:///c:/Users/sayan/Smart-Hospital-IoT/src/bed.cpp) | **Adequate** | Details 50 Hz kinematic loop ($dt=0.02\text{s}$), microsecond pulse calculation, and clinical transitions. |
 | [`include/connectivity.h`](file:///c:/Users/sayan/Smart-Hospital-IoT/include/connectivity.h) | **Adequate** | Documents network broker endpoints and decoupling of startup from network socket connection. |
@@ -324,10 +366,10 @@ Every maintained `.h` and `.cpp` file was independently re-read from line 1 thro
 | [`src/environment.cpp`](file:///c:/Users/sayan/Smart-Hospital-IoT/src/environment.cpp) | **Adequate** | Documents serial CLI parser, random walk perturbations, and 60 s rolling summary stats resets. |
 | [`include/medication.h`](file:///c:/Users/sayan/Smart-Hospital-IoT/include/medication.h) | **Adequate** | Corrected pin references (Red=25, Yellow=26, Green=33, Buzzer=14); clarified simulated dosage & pushbutton interlock. |
 | [`src/medication.cpp`](file:///c:/Users/sayan/Smart-Hospital-IoT/src/medication.cpp) | **Adequate** | Corrected pin references; documents 50 Hz loop, debounce, slew limiting, and bedside interlock. |
-| [`include/mqtt.h`](file:///c:/Users/sayan/Smart-Hospital-IoT/include/mqtt.h) | **Adequate** | Documents Adafruit IO topic topology, feed subscriptions, round-robin dispatch, and offline drain. |
-| [`src/mqtt.cpp`](file:///c:/Users/sayan/Smart-Hospital-IoT/src/mqtt.cpp) | **Adequate** | Documents packet buffer autosizing, change detection, exponential backoff, and interleaved replay. |
+| [`include/mqtt.h`](file:///c:/Users/sayan/Smart-Hospital-IoT/include/mqtt.h) | **Adequate** | Documents Adafruit IO topic topology, feed subscriptions, shared 3s live/replay dispatch slot, independent 60s summary/alerts, and nominal 23 msgs/min rate. |
+| [`src/mqtt.cpp`](file:///c:/Users/sayan/Smart-Hospital-IoT/src/mqtt.cpp) | **Adequate** | Documents shared 3s live/replay pacing, independent 60s alert/summary timers, nominal 23 msgs/min rate, exponential backoff, and intra-cycle consecutive publishes. |
 | [`include/offline.h`](file:///c:/Users/sayan/Smart-Hospital-IoT/include/offline.h) | **Adequate** | Documents 64-item ring buffer, peek/dequeue semantics, and system health states. |
-| [`src/offline.cpp`](file:///c:/Users/sayan/Smart-Hospital-IoT/src/offline.cpp) | **Adequate** | Details transport polling, drop-on-full buffer policy, and acoustic failure beeping patterns. |
+| [`src/offline.cpp`](file:///c:/Users/sayan/Smart-Hospital-IoT/src/offline.cpp) | **Adequate** | Details transport polling, drop-on-full buffer policy, shared 3s slot replay pacing, and acoustic failure beeping patterns. |
 | [`include/outputs.h`](file:///c:/Users/sayan/Smart-Hospital-IoT/include/outputs.h) | **Adequate** | Accurate pin definitions (25, 26, 33, 14), output ownership, and buzzer priority arbitration. |
 | [`src/outputs.cpp`](file:///c:/Users/sayan/Smart-Hospital-IoT/src/outputs.cpp) | **Adequate** | Documents 1200 Hz tone generator, output states, and medication override of network beeps. |
 | [`include/sampling.h`](file:///c:/Users/sayan/Smart-Hospital-IoT/include/sampling.h) | **Adequate** | Documents adaptive intervals ($60\text{ s}$ vs $5\text{ s}$), manual override, and latency limitations. Corrected fixed cadences (ECG 200 ms, motion 1000 ms). |
@@ -358,6 +400,12 @@ Every maintained `.h` and `.cpp` file was independently re-read from line 1 thro
    - *Correction:* Removed all claims of "lossless" buffering; explicitly described drop-on-full policy and volatile RAM storage.
 6. **Git Diff Trailing Blank Lines:**
    - Stripped trailing blank lines across 15 files, achieving clean exit on `git diff --check`.
+7. **MQTT Rate Limit Wording Reconciliation:**
+   - *Source Reality:* 6 live feeds rotate every 3000 ms; replay shares this slot (max 20 msgs/min); summary and alerts have independent 60 s pacing (1 msg/min each). Nominal derived rate is 23 msgs/min under stated scheduling assumptions. Up to 4 consecutive publishes can occur in one task iteration if timers coincide. Adafruit IO limits are account-wide (30 data points/min).
+   - *Correction:* Updated comments and documentation to describe 23 msgs/min as a nominal derived rate rather than an unconditional guarantee, clarified that live and replay share the 3 s slot, noted intra-cycle consecutive bursts, and removed unsubstantiated broker-throttling assumptions.
+8. **Core Scheduling and Task Watchdog Reconciliation:**
+   - *Source Reality:* Exactly 12 application FreeRTOS tasks created by `appStartTasks()` in `src/app.cpp` pass `1` as `xCoreID`. In `src/app.cpp`, `.idle_core_mask = (1 << 1)` monitors only the Core 1 idle task. In the installed toolchain configuration (`sdkconfig.h`), the Wi-Fi driver task (`CONFIG_ESP_WIFI_TASK_PINNED_TO_CORE_0 = 1`) and lwIP TCP/IP stack (`CONFIG_LWIP_TCPIP_TASK_AFFINITY = 0x0`) are configured for Core 0, the FreeRTOS timer service task (`CONFIG_FREERTOS_TIMER_SERVICE_TASK_CORE_AFFINITY = 0x7FFFFFFF`) is configured with `tskNO_AFFINITY` (allowing either core), and `loopTask` is configured for Core 1 (`CONFIG_ARDUINO_RUNNING_CORE = 1`). Dynamic runtime scheduling on physical hardware was not instrumented. Core 0 is not exclusively reserved by this project, nor does application core pinning guarantee complete network isolation or immunity from Wi-Fi interrupts.
+   - *Correction:* Reconciled comments and documentation in `src/app.cpp`, `include/app.h`, and audit report to cite verified toolchain build configuration and distinguish it from uninstrumented physical hardware scheduling.
 
 ---
 
@@ -369,11 +417,16 @@ Every maintained `.h` and `.cpp` file was independently re-read from line 1 thro
 3. **Core Pinning:** Verified that all 12 application FreeRTOS tasks pass argument `1` to `xTaskCreatePinnedToCore()`.
 4. **Kinematic & Mathematical Models:** Verified $+5.0\text{ mg/hr/sec}$ slew math, Gaussian ECG curve formulas, and 50 Hz servo kinematic step calculations.
 5. **Absence of Secrets:** Verified that real Adafruit IO credentials are not embedded in comments or committed files.
+6. **Task Watchdog Core Mask:** Verified that `idle_core_mask = (1 << 1)`, monitoring only the Core 1 idle task.
+7. **Nominal MQTT Publishing Cadence:** Derived from source constants ($20\text{ live/replay} + 1\text{ summary} + 1\text{ med alert} + 1\text{ fac alert} = 23\text{ msgs/min}$).
 
 ### 8.2 Remaining Uncertainties / Runtime Scope
 1. **Physical Sensor Jitter:** DS18B20 1-Wire physical bus latency under extreme electromagnetic noise is unmodeled in Wokwi.
 2. **Cloud Latency:** Exact round-trip ping times to Adafruit IO MQTT brokers (`io.adafruit.com`) vary dynamically with public Internet conditions.
 3. **Simulation vs. Real Silicon:** Execution was verified via compilation, static analysis, and diff inspection. Physical deployment onto real silicon or interactive Wokwi browser session execution was not performed in this documentation-only task.
+4. **Broker Rate Limiting & Account-Wide Quotas:** Empirical enforcement by Adafruit IO (e.g. packet dropping vs TCP disconnect) and consumption by concurrent external clients cannot be verified from firmware source alone.
+5. **Core 1 Interrupt Preemption & Contention:** Without runtime profiling and platform interrupt routing inspection, the extent of Wi-Fi ISR preemption on Core 1 and shared memory bus latency remains unmeasured.
+6. **Physical Hardware Runtime Scheduling:** While build-time affinity settings are established by the installed toolchain headers (`CONFIG_ESP_WIFI_TASK_PINNED_TO_CORE_0=1`, `CONFIG_LWIP_TCPIP_TASK_AFFINITY=0x0`, `CONFIG_FREERTOS_TIMER_SERVICE_TASK_CORE_AFFINITY=0x7FFFFFFF`, `CONFIG_ARDUINO_RUNNING_CORE=1`), dynamic runtime scheduling metrics (e.g. core migration, scheduler latency, and core utilization) were not empirically instrumented on physical silicon using FreeRTOS runtime hooks (`xTaskGetAffinity()` / `vTaskList()`).
 
 ---
 
@@ -429,3 +482,11 @@ Flash: [========  ]  79.5% (used 1042386 bytes from 1310720 bytes)
 3. The fundamental separation between Patient Medical Vitals and Medication Safety is explicitly articulated throughout the codebase.
 4. Pin definitions, kinematic formulas, rate limits, and IPC mechanisms have been validated 1:1 against the source code and circuit diagram.
 5. PlatformIO clean build (`pio run`, Exit 0) and `git diff --check` (Exit 0) prove syntactic correctness and clean diff boundaries.
+
+### Explicit Targeted Audit Verdicts
+- **MQTT Rate-Limit Claim:** **Verified with qualifications**
+  - *Finding:* The derived nominal aggregate rate of $23\text{ msgs/min}$ ($20\text{ live/replay} + 1\text{ summary} + 1\text{ med alert} + 1\text{ fac alert}$) is below the Adafruit IO free-tier limit of $30\text{ data points/min}$ under stated steady-state scheduling assumptions.
+  - *Qualifications:* The firmware enforces local dispatch pacing rather than an account-wide quota manager; up to 4 consecutive packets can occur intra-cycle without an inter-packet delay; and external clients using the same Adafruit IO key can consume the shared quota.
+- **Core Scheduling Claim:** **Verified with qualifications**
+  - *Finding:* All 12 application FreeRTOS tasks created by `appStartTasks()` in `src/app.cpp` are explicitly pinned to Core 1 (`xTaskCreatePinnedToCore(..., 1)`), and the hardware TWDT is configured with `.idle_core_mask = (1 << 1)` to monitor the Core 1 idle task.
+  - *Qualifications:* Core 0 is not reserved exclusively by this project (the timer service task can execute on either core), dynamic runtime task scheduling was not instrumented on physical hardware, and application-level pinning does not prove complete network isolation, immunity from Wi-Fi interrupt preemption, or elimination of shared memory bus contention.

@@ -10,15 +10,19 @@
  *    - "medication-dosage": Decodes and clamps dosage requests into medicationDosageControl.
  *    - "sampling-rate": Decodes doctor-specified sampling interval [5 - 60 s] and pushes to samplingQueue.
  *    - "bed-angle": Decodes doctor-specified bed angle [0 - 90 deg] and pushes to bedQueue.
- * 3. Rate-Limited Live Feed Publication:
+ * 3. Rate-Limited Live Feed Publication & Offline Replay:
  *    - Rotates round-robin across 6 feeds every 3000 ms (MQTT_TASK_INTERVAL_MS).
- *    - Suppresses unchanged sensor readings to stay well below the 30 msgs/min Adafruit IO free quota.
+ *    - Suppresses unchanged sensor readings; live telemetry and buffer replay share the 3000 ms slot (max 20 msgs/min).
+ *    - Replay alternates via syncTurn or takes idle slots when live readings are unchanged.
  * 4. Alerts and Periodic Summaries:
- *    - Publishes clinical and facility threshold alerts to "hospital-events" (rate-limited to 60 s).
+ *    - Publishes clinical and facility threshold alerts to "hospital-events" (independent 60 s cooldown).
  *    - Publishes aggregated statistical summaries of patient vitals and room conditions every 60000 ms.
+ *    - Nominal aggregate publishing rate is ~23 msgs/min derived from these paths and scheduling assumptions.
+ *    - Note: Multiple publications (up to 4) can occur consecutively in one task iteration if timers coincide;
+ *      firmware pacing targets Adafruit IO's 30 data points/min free quota, but cannot govern account-wide consumption.
  * 5. Offline Recovery & Buffer Synchronization:
- *    - safePublish() diverts outgoing payloads to the 64-item offline ring buffer when disconnected.
- *    - Interleaves replay of buffered records using peek/dequeue operations during network restoration.
+ *    - safePublish() diverts outgoing payloads to the bounded 64-item offline ring buffer when disconnected.
+ *    - Replays buffered records in FIFO order into the 3000 ms dispatch slot upon connection restoration.
  */
 
 #include "mqtt.h"
@@ -35,7 +39,7 @@
 
 PubSubClient mqttClient(wifiClient);
 
-const uint32_t MQTT_TASK_INTERVAL_MS = 3000;          ///< Telemetry dispatch period (3 s = max 20 msgs/min)
+const uint32_t MQTT_TASK_INTERVAL_MS = 3000;          ///< Telemetry and replay dispatch period (3 s = max 20 live/replay slots/min)
 const uint32_t MQTT_LOOP_INTERVAL_MS = 50;            ///< Underlying client loop tick rate (50 ms)
 const uint32_t MQTT_INITIAL_RETRY_DELAY_MS = 1000;    ///< Initial retry delay for exponential backoff (1 s)
 const uint32_t MQTT_MAX_RETRY_DELAY_MS = 30000;       ///< Cap for exponential backoff retry delay (30 s)
@@ -614,7 +618,8 @@ void publishSummaryData(bool offline)
  * facility summaries on hospital-events. Medical and facility feeds provide
  * logical dashboard separation, not staff authentication or authorization.
  * The task services MQTT every 50 ms and schedules telemetry publication every
- * 3 seconds.
+ * 3 seconds. Live feeds and replayed messages share the 3-second slot, while
+ * summaries and alerts have independent pacing (up to 4 consecutive publishes in one iteration).
  */
 void mqttTask(void *parameter)
 {

@@ -8,8 +8,8 @@
  * 2. Telemetry Persistence: Buffers outgoing MQTT messages in a dedicated 64-item FreeRTOS queue
  *    when network connectivity is interrupted.
  * 3. Controlled Drain: When the broker connection is restored, mqttTask reads buffered messages
- *    using peek/dequeue operations, interleaving them with live telemetry to prevent message loss
- *    and avoid tripping Adafruit IO rate-limiting throttles.
+ *    using peek/dequeue operations, sharing the 3000 ms telemetry slot with live feeds (max 20 msgs/min combined)
+ *    to maintain nominal pacing toward Adafruit IO quotas (subject to the 64-item buffer limit).
  * 4. Acoustic Indication: Triggers distinct buzzer cadence patterns when network links fail,
  *    subordinate to medication critical alarms.
  */

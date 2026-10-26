@@ -17,7 +17,11 @@
  *     - Facility Feeds: facility-room-temperature, facility-oxygen, facility-aqi.
  *     - Shared Events: hospital-events (medical alerts, facility alerts, and 60 s combined summaries).
  * - Throttling & Rate-Limiting:
- *     - Limits publication to one changed feed per 3000 ms cycle to comply with Adafruit IO rate limits.
+ *     - Live telemetry and offline replay share a 3000 ms round-robin dispatch slot (max 20 msgs/min).
+ *     - Periodic summaries and event alerts have independent 60 s pacing; nominal aggregate rate is ~23 msgs/min
+ *       under stated scheduling assumptions (targeting Adafruit IO's 30 data points/min free quota).
+ *     - Note: Multiple publications (up to 4) can occur consecutively in one task iteration if timers coincide;
+ *       the firmware enforces local cadence, not account-wide quota governance.
  * - Offline Queue Integration:
  *     - Diverts failed publishes to the 64-slot ring buffer and drains buffered entries upon reconnect.
  */
@@ -30,8 +34,8 @@ extern PubSubClient mqttClient; ///< Global PubSubClient MQTT client instance
  * Running at Priority 2 with an 8192-byte stack:
  * 1. Executes exponential backoff for Wi-Fi and MQTT connection attempts.
  * 2. Services MQTT packet loop (mqttClient.loop()) every 50 ms.
- * 3. Dispatches live sensor telemetry and alerts every 3000 ms.
- * 4. Interleaves offline buffer replay during connection recovery.
+ * 3. Dispatches live sensor telemetry or replayed buffer slot every 3000 ms, and evaluates alerts.
+ * 4. Interleaves offline buffer replay into the 3000 ms slot during connection recovery.
  * 5. Compiles and publishes aggregated medical and facility summaries every 60000 ms.
  * 6. Feeds its watchdog heartbeat.
  *
