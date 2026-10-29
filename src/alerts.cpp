@@ -3,15 +3,15 @@
  * @brief Implementation of asynchronous medical and facility anomaly event logging.
  *
  * Responsibilities:
- * - Awaits alertSemaphore signaling from telemetry update points (displayTask/updateTelemetry
- *   for patient vitals and environmentTask for facility anomalies).
+ * - Awaits alertSemaphore signaling from telemetry update points (updateTelemetry
+ *   for patient vitals and updateFacilityTelemetry called from vitalTask for facility anomalies).
  * - Collects atomic, mutex-protected snapshots of both medical and facility telemetry.
  * - Logs diagnostic details over Serial for debugging and auditing.
  *
  * Hardware & Subsystem Separation:
  * - This task ONLY performs diagnostic Serial logging.
- * - Physical alarm hardware (Buzzer, Red/Yellow/Green LEDs) is strictly reserved
- *   for Task 3 (Medication Dosage Safety) inside outputs.cpp.
+ * - Physical alarm hardware (Buzzer, Red/Yellow/Green LEDs) is managed by
+ *   Task 3 (Medication Dosage Safety) and Task 6 (Offline Detection) inside outputs.cpp.
  * - Patient emergency alerts on the cloud are dispatched asynchronously via MQTT
  *   inside mqtt.cpp (publishMedicalAlertIfNeeded -> "hospital-events").
  */

@@ -16,8 +16,9 @@
  *   COMPLETELY INDEPENDENT subsystems.
  * - Abnormal patient vitals do NOT alter medication dosage or trigger medication alarms.
  * - Medication dosage status does NOT alter patient telemetry, sampling rate, or bed angle.
- * - The physical LEDs (Red/Yellow/Green) and Buzzer are owned EXCLUSIVELY by this medication
- *   safety subsystem, reflecting infusion dosage risk rather than patient medical vitals.
+ * - The physical LEDs (Red/Yellow/Green) reflect infusion dosage risk rather than patient medical vitals.
+ * - The acoustic buzzer is shared with Task 6 (Offline network cadences) via priority arbitration;
+ *   medication critical alarms take absolute priority over offline signals.
  */
 
 /**

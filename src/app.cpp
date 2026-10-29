@@ -29,8 +29,7 @@
 #include "alerts.h"
 #include "sampling.h"
 
-// Forward declare tasks from main.cpp that will be moved in later phases
-extern void mqttTask(void *parameter);
+#include "mqtt.h"
 
 #include "medication.h"
 #include "bed.h"

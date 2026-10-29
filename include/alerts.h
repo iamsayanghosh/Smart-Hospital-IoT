@@ -13,8 +13,8 @@
  * Scope and Separation:
  * - Subsystem: Patient clinical and facility anomaly event logging.
  * - Independence: This task handles Serial event logging. Physical warning
- *   hardware (LEDs and buzzer) is owned exclusively by outputControlTask
- *   (Task 3: Medication Dosage Safety) and is NOT driven by this task.
+ *   hardware (LEDs and buzzer) is managed by medicationTask (Task 3) and
+ *   offlineTask (Task 6) via priority arbitration, and is NOT driven by this task.
  */
 
 /**

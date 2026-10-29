@@ -8,8 +8,8 @@
  *    bolus shock, while dosage decreases apply immediately for rapid emergency mitigation.
  * 3. Bedside Pushbutton Interlock: Any requested dose > 80.0 mg/hr is held at 80.0 mg/hr until
  *    a nurse or physician physically presses the confirmation pushbutton (GPIO 13).
- * 4. Hardware Outputs Ownership: Exclusively manages the status LEDs (Red=25, Yellow=26, Green=33)
- *    and acoustic alarm buzzer (GPIO 14).
+ * 4. Hardware Outputs Ownership: Manages the status LEDs (Red=25, Yellow=26, Green=33)
+ *    and drives the acoustic alarm buzzer (GPIO 14) via priority arbitration (shared with Task 6).
  *
  * SUBSYSTEM INDEPENDENCE:
  * - This module operates completely independently of patient medical vitals (heart rate, SpO2, temp).

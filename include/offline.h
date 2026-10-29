@@ -15,7 +15,7 @@
  *
  * SYSTEM HEALTH VS. PATIENT HEALTH DISTINCTION:
  * - SystemHealthState reflects hardware, transport, and runtime task health.
- * - Patient medical state (Telemtry.alertActive) reflects clinical vitals.
+ * - Patient medical state (Telemetry.alertActive) reflects clinical vitals.
  * - These two state machines are completely decoupled.
  */
 
