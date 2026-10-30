@@ -10,7 +10,8 @@
  * 3. Alert Triggering: Detects rising-edge clinical abnormalities (abnormal && !wasAbnormal)
  *    and gives alertSemaphore to awaken alertTask.
  * 4. UI Ownership: Exclusively displays Task 3 Medication Dosage status (applied dose,
- *    safety label, confirmation prompt) or Task 6 offline logging banner. Patient vitals
+ *    safety label, confirmation prompt) plus, when offline, the Task 6 logging banner on the
+ *    bottom row (debounced; never replaces the dose). Patient vitals
  *    are intentionally NOT rendered on this display.
  */
 
@@ -24,10 +25,63 @@
 #include "app.h" // For failSetup
 #include <DallasTemperature.h>
 #include "offline.h"
+#include "offline_banner_gate.h"
 
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
+
+// Offline banner: one inverted 10 px bar on the bottom row (y 54..63).
+// Medication content never goes below y = 44, so both are always visible together.
+#define OFFLINE_BANNER_HOLD_MS 5000UL  ///< Link must be down this long before the banner appears
+#define BOOT_GRACE_MS 10000UL          ///< No banner during the first seconds after power-up
+#define BANNER_BAR_Y 54
+#define BANNER_BAR_H 10
+
+/** @brief Draws the Task 3 medication screen (dose, status, confirmation prompt). */
+static void drawMedicationScreen(const MedicationDosageControl &dose)
+{
+    display.setTextColor(SSD1306_WHITE);
+    display.setTextSize(1);
+    if (dose.criticalConfirmationPending) {
+        display.setCursor(0, 0);
+        display.println("CRITICAL REQUEST");
+        display.setCursor(0, 11);
+        display.print("Req: ");
+        display.print(dose.requested, 1);
+        display.println(" mg/hr");
+        display.setCursor(0, 22);
+        display.print("Now: ");
+        display.print(dose.applied, 1);
+        display.println(" mg/hr");
+        display.setCursor(0, 36);
+        display.println("PRESS BUTTON");
+    } else {
+        display.setCursor(0, 0);
+        display.print("Dose: ");
+        display.print(dose.applied, 1);
+        display.println(" mg/hr");
+        display.setCursor(0, 12);
+        display.print("Status: ");
+        if (dose.criticalConfirmed) {
+            display.println("CRITICAL");
+            display.setCursor(0, 24);
+            display.println("CONFIRMED");
+        } else {
+            display.println(getMedicationSafetyLabel(dose.applied));
+        }
+    }
+}
+
+/** @brief Draws the Task 6 "LOGGING OFFLINE" banner as an inverted bar on the bottom row. */
+static void drawOfflineBanner()
+{
+    display.fillRect(0, BANNER_BAR_Y, SCREEN_WIDTH, BANNER_BAR_H, SSD1306_WHITE);
+    display.setTextColor(SSD1306_BLACK);
+    display.setTextSize(1);
+    display.setCursor(2, BANNER_BAR_Y + 1);
+    display.print("LOGGING OFFLINE");
+}
 
 /**
  * @brief Configures I2C bus clock and initializes SSD1306 display hardware.
@@ -107,6 +161,7 @@ void displayTask(void *parameter)
     Serial.println("[WATCHDOG] DISPLAY task registered with TWDT");
 
     SensorMessage message;
+    OfflineBannerGate bannerGate(OFFLINE_BANNER_HOLD_MS, BOOT_GRACE_MS);
     while (true) {
         if (xQueueReceive(sensorQueue, &message, pdMS_TO_TICKS(100)) == pdTRUE) {
             updateTelemetry(message);
@@ -116,48 +171,12 @@ void displayTask(void *parameter)
         }
 
         MedicationDosageControl dosageSnapshot = getMedicationDosageSnapshot();
+        bool showOfflineBanner = bannerGate.update(getSystemHealthState() == SYSTEM_OFFLINE, millis());
         if (xSemaphoreTake(displayMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
-            SystemHealthState health = getSystemHealthState();
-            if (health == SYSTEM_OFFLINE) {
-                display.clearDisplay();
-                display.setTextColor(SSD1306_WHITE);
-                display.setTextSize(1);
-                display.setCursor(0, 0);
-                display.println("LOGGING OFFLINE");
-            } else {
-                display.clearDisplay();
-                display.setTextColor(SSD1306_WHITE);
-                display.setTextSize(1);
-                if (dosageSnapshot.criticalConfirmationPending) {
-                    display.setCursor(0, 0);
-                    display.println("CRITICAL REQUEST");
-                    display.setCursor(0, 12);
-                    display.print("Req: ");
-                    display.print(dosageSnapshot.requested, 1);
-                    display.println(" mg/hr");
-                    display.setCursor(0, 30);
-                    display.print("Now: ");
-                    display.print(dosageSnapshot.applied, 1);
-                    display.println(" mg/hr");
-                    display.setCursor(0, 45);
-                    display.println("PRESS BUTTON");
-                } else {
-                    display.setCursor(0, 0);
-                    display.print("Dose: ");
-                    display.print(dosageSnapshot.applied, 1);
-                    display.println(" mg/hr");
-                    display.setCursor(0, 12);
-                    display.print("Status: ");
-                    if (dosageSnapshot.criticalConfirmed) {
-                        display.println("CRITICAL");
-                    } else {
-                        display.println(getMedicationSafetyLabel(dosageSnapshot.applied));
-                    }
-                    if (dosageSnapshot.criticalConfirmed) {
-                        display.setCursor(0, 24);
-                        display.println("CONFIRMED");
-                    }
-                }
+            display.clearDisplay();
+            drawMedicationScreen(dosageSnapshot); // always visible, online or offline
+            if (showOfflineBanner) {
+                drawOfflineBanner();
             }
             display.display();
             xSemaphoreGive(displayMutex);

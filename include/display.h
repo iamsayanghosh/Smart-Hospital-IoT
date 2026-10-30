@@ -14,8 +14,9 @@
  * - The OLED display is dedicated to:
  *     1. Task 3 Medication Dosage Safety: current applied dosage, safety status label,
  *        "CRITICAL REQUEST" interlock prompts, and "PRESS BUTTON" confirmation cues.
- *     2. Task 6 Offline Logging State: displays "LOGGING OFFLINE" banner when connectivity
- *        is lost and telemetry is diverted to the circular RAM buffer.
+ *        The medication UI is permanently visible regardless of network connectivity.
+ *     2. Task 6 Offline Logging State: displays a debounced, inverted "LOGGING OFFLINE" banner
+ *        on the bottom row (y=54..63) when connectivity is lost, without obscuring dosage.
  */
 
 /**
