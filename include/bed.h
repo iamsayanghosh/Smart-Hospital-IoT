@@ -15,7 +15,7 @@
  * - Hardware: Drives servo on GPIO 18 (50 Hz PWM, 500-2400 us pulse width).
  * - Startup: Starts at 0° until initial vitals and ECG are processed.
  * - Automatic Clinical Modes:
- *     - Emergency (90°, 5.0°/s): Critical vitals (HR <60 or >100, SpO2 <88%, ECG <50 or >110, Temp <34°C or >39.5°C).
+ *     - Emergency (90°, 5.0°/s): Critical vitals (HR <50 or >100, SpO2 <88%, ECG <50 or >110, Temp <34°C or >39.5°C).
  *     - Breathing Support (45°, 1.5°/s): Hypoxia support (SpO2 88-91%).
  *     - Sleeping (10°, 1.5°/s): Normal stable vitals or non-critical anomalies.
  * - Manual Override: Ingests manual angle targets [0°-90°] via bedQueue from MQTT feed "bed-angle".

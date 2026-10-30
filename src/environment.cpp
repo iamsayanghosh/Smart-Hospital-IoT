@@ -11,7 +11,7 @@
  *     Updates facilityTelemetry protected by telemetryMux spinlock critical sections.
  * - Alerting:
  *     Checks isFacilityAbnormal() and signals alertSemaphore when environmental thresholds
- *     are breached (Room Temp <19 or >27 °C, O2 <19.5 or >23.5 %, AQI >100).
+ *     are breached (Room Temp <18 or >28 °C, O2 <19.5 or >24.0 %, AQI >100).
  * - Diagnostic Command Interface:
  *     Processes interactive UART commands for testing boundary conditions in Wokwi simulator.
  */

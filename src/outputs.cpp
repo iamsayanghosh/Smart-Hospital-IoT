@@ -16,9 +16,9 @@
 
 #include "outputs.h"
 
-#define RED_LED_PIN 25     ///< Red indicator LED pin (Critical / Warning dosage)
-#define YELLOW_LED_PIN 26  ///< Yellow indicator LED pin (Warning dosage)
-#define GREEN_LED_PIN 33   ///< Green indicator LED pin (Normal safe dosage)
+#define RED_LED_PIN 25     ///< Red indicator LED pin (Critical dosage >80 mg/hr)
+#define YELLOW_LED_PIN 26  ///< Yellow indicator LED pin (Warning dosage 80 mg/hr)
+#define GREEN_LED_PIN 33   ///< Green indicator LED pin (Normal safe dosage 0-79 mg/hr)
 #define BUZZER_PIN 14      ///< Piezo buzzer pin (driven via Arduino tone at 1200 Hz)
 
 /**

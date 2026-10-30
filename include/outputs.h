@@ -9,9 +9,9 @@
  * @brief Physical indicator LEDs and acoustic buzzer actuator driver declarations.
  *
  * Hardware Assignments:
- * - Red LED:    GPIO 25 (Medication Dosage Safety - Critical / Warning / Blinking)
- * - Yellow LED: GPIO 26 (Medication Dosage Safety - Warning)
- * - Green LED:  GPIO 33 (Medication Dosage Safety - Normal Infusion)
+ * - Red LED:    GPIO 25 (Medication Dosage Safety - Critical [>80 mg/hr] Solid / Blinking)
+ * - Yellow LED: GPIO 26 (Medication Dosage Safety - Warning [80 mg/hr] Solid)
+ * - Green LED:  GPIO 33 (Medication Dosage Safety - Normal Infusion [0-79 mg/hr] Solid)
  * - Buzzer:     GPIO 14 (Shared acoustic transducer driven at 1200 Hz)
  *
  * Subsystem Boundaries & Priority Arbitration:
