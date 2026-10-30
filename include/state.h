@@ -84,7 +84,7 @@ struct ThresholdRange {
 struct MedicalThresholdConfig {
     ThresholdRange heartRate = {50.0f, 110.0f};
     ThresholdRange spo2 = {92.0f, 100.0f};
-    ThresholdRange bodyTemperature = {35.0f, 38.0f};
+    ThresholdRange bodyTemperature = {36.0f, 38.0f};
 };
 
 struct FacilityThresholdConfig {
@@ -195,7 +195,7 @@ extern bool facilityAlertStateKnown;
 /**
  * @brief Evaluates whether a patient's vitals violate medical threshold limits.
  *
- * Checks heart rate [50 - 110 BPM], SpO2 [>= 92%], and body temperature [35.0 - 38.0 °C].
+ * Checks heart rate [50 - 110 BPM], SpO2 [>= 92%], and body temperature [36.0 - 38.0 °C].
  *
  * @param data Telemetry snapshot to assess.
  * @return true if any vital is outside safe physiological range; false if normal.
