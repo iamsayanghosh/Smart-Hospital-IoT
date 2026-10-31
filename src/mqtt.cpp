@@ -47,16 +47,10 @@ constexpr uint32_t ALERT_ESCALATION_COOLDOWN_MS = 2000;
 
 void setSimulateOfflineWifi(bool enable) {
     simForceWifiOffline = enable;
-    if (enable) {
-        WiFi.disconnect();
-    }
 }
 
 void setSimulateOfflineMqtt(bool enable) {
     simForceMqttOffline = enable;
-    if (enable && mqttClient.connected()) {
-        mqttClient.disconnect();
-    }
 }
 
 bool isSimulateOfflineWifi() {

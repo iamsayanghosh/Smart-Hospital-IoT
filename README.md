@@ -135,7 +135,7 @@ pio run --target upload
 ```
 
 ### Automated Unit Testing
-Unit tests are implemented under `test/test_main.cpp` covering strict numeric string parsers (24 edge cases including NaN, Inf, float integers, negative boundary handling) and medication dosage safety clamping.
+Unit tests are implemented under `test/test_main.cpp` with 15 unit tests covering strict numeric string parsers (NaN, Inf, float integers, negative boundary handling) and medication dosage safety clamping.
 ```bash
 pio test -e esp32dev
 ```

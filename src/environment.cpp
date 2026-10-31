@@ -66,6 +66,8 @@ void handleSerialCommands()
             lineBuffer[lineLength] = '\0';
             String command(lineBuffer);
             lineLength = 0;
+            command.trim();
+            command.toUpperCase();
 
             if (command.startsWith("SET_ROOM ")) {
                 String arg = command.substring(9);
