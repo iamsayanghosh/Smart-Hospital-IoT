@@ -56,8 +56,15 @@ enum MonitoredTaskId {
     TASK_SAMPLING,
     TASK_BED,
     TASK_OFFLINE,
+    TASK_ENVIRONMENT,
     TASK_MONITORED_COUNT
 };
+
+// Named clinical threshold constants
+constexpr float HEART_RATE_CRITICAL_LOW = 45.0f;
+constexpr float HEART_RATE_CRITICAL_HIGH = 120.0f;
+constexpr float ECG_RATE_CRITICAL_LOW = 45.0f;
+constexpr float ECG_RATE_CRITICAL_HIGH = 120.0f;
 
 enum AlertSeverity {
     ALERT_SEVERITY_NORMAL = 0,

@@ -26,6 +26,7 @@
 #include "esp_task_wdt.h"
 
 #include "sensors.h"
+#include "environment.h"
 #include "alerts.h"
 #include "sampling.h"
 
@@ -96,6 +97,8 @@ const char *taskNameFromId(MonitoredTaskId taskId)
             return "BED";
         case TASK_OFFLINE:
             return "OFFLINE";
+        case TASK_ENVIRONMENT:
+            return "ENVIRONMENT";
         default:
             return "UNKNOWN";
     }
@@ -238,6 +241,7 @@ void appStartTasks()
         createTask(samplingTask, "Sampling Task", 2, &monitoredHandles[TASK_SAMPLING]) &&
         createTask(bedTask, "Bed Task", 2, &monitoredHandles[TASK_BED]) &&
         createTask(offlineTask, "Offline Task", 2, &monitoredHandles[TASK_OFFLINE]) &&
+        createTask(environmentTask, "Environment Task", 2, &monitoredHandles[TASK_ENVIRONMENT]) &&
         createTask(displayTask, "Display Task", 1, &monitoredHandles[TASK_DISPLAY]);
     if (!tasksStarted) {
         failSetup("[SETUP] One or more tasks failed to start");

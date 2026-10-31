@@ -56,7 +56,7 @@ float clampMedicationDosage(float value)
  * @brief Categorizes dosage rate into discrete safety levels.
  *
  * @param dosage Current infusion rate in mg/hr.
- * @return MedicationSafetyLevel NORMAL (0-79), WARNING (80), or CRITICAL (>80).
+ * @return MedicationSafetyLevel NORMAL (<80), WARNING (80), or CRITICAL (>80).
  */
 MedicationSafetyLevel getMedicationSafetyLevel(float dosage)
 {
@@ -197,7 +197,7 @@ static void handleMedicationConfirmationButton()
  * - Critical Pending (>80 mg/hr unconfirmed): Red LED and Buzzer flash synchronously at 1 Hz (500 ms period).
  * - Critical Confirmed (>80 mg/hr confirmed): Solid Red LED ON, Buzzer OFF.
  * - Warning (80.0 mg/hr): Solid Yellow LED ON, Buzzer OFF.
- * - Normal (0.0 - 79.0 mg/hr): Solid Green LED ON, Buzzer OFF.
+ * - Normal (0.0 - 79.9 mg/hr): Solid Green LED ON, Buzzer OFF.
  *
  * NOTE: These outputs are dedicated solely to medication infusion safety and never indicate patient vitals.
  */
@@ -214,7 +214,7 @@ static void updateMedicationSafetyOutputs()
     bool desiredBuzzerOn = false;
 
     if (criticalPending) {
-        const bool redBlinkOn = ((now / 500U) % 2U) == 0U;
+        const bool redBlinkOn = ((now / 150U) % 2U) == 0U; // Rapid ~3.3 Hz blink per Task 3 spec
         redLedOn = redBlinkOn;
         desiredBuzzerOn = redBlinkOn;
     } else if (state.criticalConfirmed || getMedicationSafetyLevel(state.applied) == MEDICATION_SAFETY_CRITICAL) {

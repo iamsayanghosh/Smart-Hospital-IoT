@@ -97,9 +97,10 @@ void bedTask(void *parameter)
         BedMode currentAutoMode = BED_MODE_SLEEPING;
 
         // CRITICAL CONDITION -> EMERGENCY (90°)
-        if (data.heartRate < medicalThresholds.heartRate.low || data.heartRate > medicalThresholds.heartRate.high ||
+        // Critical conditions: Severe bradycardia (<45) or severe tachycardia (>120), severe hypoxia (<88%), or extreme temp (<34 or >39.5)
+        if (data.heartRate < HEART_RATE_CRITICAL_LOW || data.heartRate > HEART_RATE_CRITICAL_HIGH ||
             data.spo2 < 88 ||
-            data.ecgRate < 50 || data.ecgRate > 110 ||
+            data.ecgRate < ECG_RATE_CRITICAL_LOW || data.ecgRate > ECG_RATE_CRITICAL_HIGH ||
             (data.temperatureValid && (data.temperature < 34.0f || data.temperature > 39.5f))) {
             currentAutoMode = BED_MODE_EMERGENCY;
         } 

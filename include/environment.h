@@ -32,6 +32,12 @@ void handleSerialCommands();
 void simulateFacilityData();
 
 /**
+ * @brief FreeRTOS task running dedicated facility environment simulation at 1 Hz.
+ * @param parameter Unused FreeRTOS task parameter pointer (NULL).
+ */
+void environmentTask(void *parameter);
+
+/**
  * @brief Resets rolling statistics accumulators for medical and facility summary payloads.
  *
  * Clears sample counts, running sums, and resets minimum SpO2 tracking to 100%.

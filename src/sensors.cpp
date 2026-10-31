@@ -26,6 +26,38 @@
 #include "app.h"
 #include "environment.h"
 
+static volatile int simOverrideHeartRate = -1;
+static volatile int simOverrideSpo2 = -1;
+static volatile float simOverrideTemperature = -999.0f;
+
+void setSimulatedHeartRate(int hr) {
+    simOverrideHeartRate = hr;
+    Serial.print("[SIM CLI] Forced Heart Rate: ");
+    Serial.print(hr);
+    Serial.println(" BPM");
+}
+
+void setSimulatedSpo2(int spo2) {
+    simOverrideSpo2 = spo2;
+    Serial.print("[SIM CLI] Forced SpO2: ");
+    Serial.print(spo2);
+    Serial.println(" %");
+}
+
+void setSimulatedTemperature(float temp) {
+    simOverrideTemperature = temp;
+    Serial.print("[SIM CLI] Forced Temperature: ");
+    Serial.print(temp, 1);
+    Serial.println(" C");
+}
+
+void resetSimulatedVitals() {
+    simOverrideHeartRate = -1;
+    simOverrideSpo2 = -1;
+    simOverrideTemperature = -999.0f;
+    Serial.println("[SIM CLI] Restored nominal random vitals simulation");
+}
+
 #define DS18B20_PIN 4  ///< GPIO pin assigned to 1-Wire data bus for DS18B20
 #define PIR_PIN 27     ///< GPIO pin assigned to digital output of PIR motion sensor
 
@@ -72,7 +104,11 @@ void temperatureTask(void *parameter)
             temperatureSensor.requestTemperatures();
             SensorMessage message = {};
             message.type = TEMP_DATA;
-            message.temperature = temperatureSensor.getTempCByIndex(0);
+            if (simOverrideTemperature > -100.0f) {
+                message.temperature = simOverrideTemperature;
+            } else {
+                message.temperature = temperatureSensor.getTempCByIndex(0);
+            }
             sendSensorMessage(message, "TEMP TASK");
 
             Serial.print("[TEMP TASK] Temperature: ");
@@ -111,6 +147,7 @@ void motionTask(void *parameter)
 
         Serial.print("[MOTION TASK] Motion: ");
         Serial.println(message.motion ? "DETECTED" : "NO MOTION");
+        
         reportTaskHeartbeat(TASK_MOTION);
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
@@ -149,8 +186,8 @@ void vitalTask(void *parameter)
             lastSampleMs = now;
             SensorMessage message = {};
             message.type = VITAL_DATA;
-            message.heartRate = random(68, 81);
-            message.spo2 = random(95, 99);
+            message.heartRate = (simOverrideHeartRate >= 0) ? simOverrideHeartRate : random(68, 81);
+            message.spo2 = (simOverrideSpo2 >= 0) ? simOverrideSpo2 : random(95, 99);
             sendSensorMessage(message, "VITAL TASK");
 
             Serial.print("[VITAL TASK] HR: ");
@@ -158,8 +195,6 @@ void vitalTask(void *parameter)
             Serial.print(" BPM | SpO2: ");
             Serial.print(message.spo2);
             Serial.println(" %");
-
-            simulateFacilityData();
         }
         reportTaskHeartbeat(TASK_VITAL);
         vTaskDelay(pdMS_TO_TICKS(500));

@@ -77,7 +77,7 @@ bool isAbnormal(const Telemetry &data)
            data.heartRate < medicalThresholds.heartRate.low ||
            data.heartRate > medicalThresholds.heartRate.high ||
            data.spo2 < medicalThresholds.spo2.low ||
-           data.ecgRate < 50 || data.ecgRate > 110;
+           data.ecgRate < medicalThresholds.heartRate.low || data.ecgRate > medicalThresholds.heartRate.high;
 }
 
 
@@ -171,7 +171,8 @@ AlertCandidate evaluateMedicalAlert(const Telemetry &snapshot)
         candidate.parameter = "heartRate";
         candidate.value = static_cast<float>(snapshot.heartRate);
         candidate.message = snapshot.heartRate < medicalThresholds.heartRate.low ? "Low heart rate" : "High heart rate";
-        candidate.severity = ALERT_SEVERITY_CRITICAL;
+        candidate.severity = (snapshot.heartRate < HEART_RATE_CRITICAL_LOW || snapshot.heartRate > HEART_RATE_CRITICAL_HIGH) 
+                             ? ALERT_SEVERITY_CRITICAL : ALERT_SEVERITY_WARNING;
         return candidate;
     }
 
@@ -184,12 +185,13 @@ AlertCandidate evaluateMedicalAlert(const Telemetry &snapshot)
         return candidate;
     }
 
-    if (snapshot.ecgRate < 50 || snapshot.ecgRate > 110) {
+    if (snapshot.ecgRate < medicalThresholds.heartRate.low || snapshot.ecgRate > medicalThresholds.heartRate.high) {
         candidate.active = true;
         candidate.parameter = "ecgRate";
         candidate.value = static_cast<float>(snapshot.ecgRate);
-        candidate.message = snapshot.ecgRate < 50 ? "Low ECG rate" : "High ECG rate";
-        candidate.severity = ALERT_SEVERITY_CRITICAL;
+        candidate.message = snapshot.ecgRate < medicalThresholds.heartRate.low ? "Low ECG rate" : "High ECG rate";
+        candidate.severity = (snapshot.ecgRate < ECG_RATE_CRITICAL_LOW || snapshot.ecgRate > ECG_RATE_CRITICAL_HIGH) 
+                             ? ALERT_SEVERITY_CRITICAL : ALERT_SEVERITY_WARNING;
         return candidate;
     }
 

@@ -51,11 +51,34 @@ void motionTask(void *parameter);
  * @brief FreeRTOS task generating simulated SpO2 and Heart Rate physiological vitals.
  *
  * Operates on adaptive schedule (5 s - 60 s) with a 500 ms heartbeat polling cadence.
- * Also invokes simulateFacilityData() to advance ambient room conditions in lockstep.
+ * Simulates optical PPG vitals (Heart Rate and SpO2) adaptively.
  *
  * @param parameter Unused FreeRTOS task parameter pointer (NULL).
  */
 void vitalTask(void *parameter);
+
+/**
+ * @brief Overrides simulated heart rate for interactive testing/demonstration in Wokwi/CLI.
+ * @param hr Forced heart rate in BPM, or -1 to restore random simulation.
+ */
+void setSimulatedHeartRate(int hr);
+
+/**
+ * @brief Overrides simulated blood oxygen saturation for interactive testing in Wokwi/CLI.
+ * @param spo2 Forced SpO2 percentage [0-100], or -1 to restore random simulation.
+ */
+void setSimulatedSpo2(int spo2);
+
+/**
+ * @brief Overrides simulated patient body temperature for interactive testing in Wokwi/CLI.
+ * @param temp Forced temperature in deg C, or -999.0f to restore physical/simulated sensor.
+ */
+void setSimulatedTemperature(float temp);
+
+/**
+ * @brief Resets all simulated vitals back to nominal random ranges.
+ */
+void resetSimulatedVitals();
 
 /**
  * @brief FreeRTOS task synthesizing continuous diagnostic PQRST ECG waveform data.

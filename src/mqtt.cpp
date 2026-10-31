@@ -39,6 +39,13 @@
 
 PubSubClient mqttClient(wifiClient);
 
+static volatile bool mqttConnectedFlag = false;
+constexpr uint32_t ALERT_ESCALATION_COOLDOWN_MS = 2000;
+
+bool isMqttClientConnected() {
+    return mqttConnectedFlag;
+}
+
 const uint32_t MQTT_TASK_INTERVAL_MS = 3000;          ///< Telemetry and replay dispatch period (3 s = max 20 live/replay slots/min)
 const uint32_t MQTT_LOOP_INTERVAL_MS = 50;            ///< Underlying client loop tick rate (50 ms)
 const uint32_t MQTT_INITIAL_RETRY_DELAY_MS = 1000;    ///< Initial retry delay for exponential backoff (1 s)
@@ -216,7 +223,12 @@ void handleMedicationDosagePayload(const char *payload, size_t length)
         return;
     }
 
-    const float parsedDosage = strtof(payload, nullptr);
+    char *endptr = nullptr;
+    const float parsedDosage = strtof(payload, &endptr);
+    if (endptr == payload || !isfinite(parsedDosage)) {
+        Serial.println("[MQTT TASK] Invalid medication-dosage string payload ignored");
+        return;
+    }
     const float clampedDosage = clampMedicationDosage(parsedDosage);
 
     portENTER_CRITICAL(&telemetryMux);
@@ -243,7 +255,12 @@ void handleSamplingRatePayload(const char *payload, size_t length)
         return;
     }
     
-    uint32_t rate = strtoul(payload, nullptr, 10);
+    char *endptr = nullptr;
+    uint32_t rate = strtoul(payload, &endptr, 10);
+    if (endptr == payload) {
+        Serial.println("[MQTT TASK] Invalid sampling-rate string payload ignored");
+        return;
+    }
     if (rate < 5) rate = 5;
     if (rate > 60) rate = 60;
     
@@ -264,7 +281,12 @@ void handleSamplingRatePayload(const char *payload, size_t length)
 void handleBedAnglePayload(const char *payload, size_t length)
 {
     if (length == 0) return;
-    float angle = strtof(payload, nullptr);
+    char *endptr = nullptr;
+    float angle = strtof(payload, &endptr);
+    if (endptr == payload) {
+        Serial.println("[MQTT TASK] Invalid bed-angle string payload ignored");
+        return;
+    }
     xQueueOverwrite(bedQueue, &angle);
     Serial.print("[MQTT TASK] bed-angle received: ");
     Serial.println(angle);
@@ -487,11 +509,20 @@ void publishMedicalAlertIfNeeded(const Telemetry &snapshot, bool offline)
         return;
     }
 
+    const bool isMedicalEscalation = (candidate.severity == ALERT_SEVERITY_CRITICAL &&
+                                      (!medicalAlertPublished || lastMedicalAlertSeverity != ALERT_SEVERITY_CRITICAL));
+
     if (medicalAlertPublished && lastMedicalAlertParameter == candidate.parameter && lastMedicalAlertSeverity == candidate.severity) {
         return;
     }
-    if (medicalAlertStateKnown && now - lastMedicalAlertPublishMs < ALERT_PUBLISH_INTERVAL_MS) {
-        return;
+    if (medicalAlertStateKnown) {
+        if (isMedicalEscalation) {
+            if (now - lastMedicalAlertPublishMs < ALERT_ESCALATION_COOLDOWN_MS) {
+                return; // rate limit on escalation bursts
+            }
+        } else if (now - lastMedicalAlertPublishMs < ALERT_PUBLISH_INTERVAL_MS) {
+            return;
+        }
     }
 
     String alertPayload = buildAlertPayload("MEDICAL", candidate.parameter, candidate.value, candidate.severity, candidate.message);
@@ -531,11 +562,20 @@ void publishFacilityAlertIfNeeded(const FacilityTelemetry &snapshot, bool offlin
         return;
     }
 
+    const bool isFacilityEscalation = (candidate.severity == ALERT_SEVERITY_CRITICAL &&
+                                       (!facilityAlertPublished || lastFacilityAlertSeverity != ALERT_SEVERITY_CRITICAL));
+
     if (facilityAlertPublished && lastFacilityAlertParameter == candidate.parameter && lastFacilityAlertSeverity == candidate.severity) {
         return;
     }
-    if (facilityAlertStateKnown && now - lastFacilityAlertPublishMs < ALERT_PUBLISH_INTERVAL_MS) {
-        return;
+    if (facilityAlertStateKnown) {
+        if (isFacilityEscalation) {
+            if (now - lastFacilityAlertPublishMs < ALERT_ESCALATION_COOLDOWN_MS) {
+                return; // rate limit on escalation bursts
+            }
+        } else if (now - lastFacilityAlertPublishMs < ALERT_PUBLISH_INTERVAL_MS) {
+            return;
+        }
     }
 
     String alertPayload = buildAlertPayload("FACILITY", candidate.parameter, candidate.value, candidate.severity, candidate.message);
@@ -680,9 +720,11 @@ void mqttTask(void *parameter)
             }
         }
 
+        mqttConnectedFlag = mqttClient.connected();
+
         if (now - lastPublishMs >= MQTT_TASK_INTERVAL_MS) {
             lastPublishMs = now;
-            bool offline = (WiFi.status() != WL_CONNECTED || !mqttClient.connected());
+            bool offline = (WiFi.status() != WL_CONNECTED || !mqttConnectedFlag);
             
             Telemetry snapshot = getTelemetrySnapshot();
             FacilityTelemetry facilitySnapshot = getFacilitySnapshot();

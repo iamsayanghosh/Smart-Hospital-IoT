@@ -52,8 +52,8 @@ float clampMedicationDosage(float value);
  * @brief Classifies an applied dosage into its clinical risk tier.
  *
  * Thresholds:
- * - Normal:   0.0 to 79.0 mg/hr (inclusive)
- * - Warning:  80.0 mg/hr
+ * - Normal:   0.0 to 79.9 mg/hr
+ * - Warning:  80.0 mg/hr (exact boundary)
  * - Critical: > 80.0 mg/hr
  *
  * @param dosage Infusion rate in mg/hr.

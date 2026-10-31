@@ -33,8 +33,6 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 
 // Offline banner: one inverted 10 px bar on the bottom row (y 54..63).
 // Medication content never goes below y = 44, so both are always visible together.
-#define OFFLINE_BANNER_HOLD_MS 5000UL  ///< Link must be down this long before the banner appears
-#define BOOT_GRACE_MS 10000UL          ///< No banner during the first seconds after power-up
 #define BANNER_BAR_Y 54
 #define BANNER_BAR_H 10
 
@@ -161,7 +159,6 @@ void displayTask(void *parameter)
     Serial.println("[WATCHDOG] DISPLAY task registered with TWDT");
 
     SensorMessage message;
-    OfflineBannerGate bannerGate(OFFLINE_BANNER_HOLD_MS, BOOT_GRACE_MS);
     while (true) {
         if (xQueueReceive(sensorQueue, &message, pdMS_TO_TICKS(100)) == pdTRUE) {
             updateTelemetry(message);
@@ -171,7 +168,7 @@ void displayTask(void *parameter)
         }
 
         MedicationDosageControl dosageSnapshot = getMedicationDosageSnapshot();
-        bool showOfflineBanner = bannerGate.update(getSystemHealthState() == SYSTEM_OFFLINE, millis());
+        bool showOfflineBanner = isOfflineAlertConfirmed();
         if (xSemaphoreTake(displayMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
             display.clearDisplay();
             drawMedicationScreen(dosageSnapshot); // always visible, online or offline

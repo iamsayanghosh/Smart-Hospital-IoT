@@ -20,9 +20,15 @@
 #include "watchdog.h"
 #include "mqtt.h"
 #include "esp_task_wdt.h"
+#include "offline_banner_gate.h"
 
 static SystemHealthState currentHealth = SYSTEM_ONLINE;       ///< Current overall system infrastructure status
 static OfflineBuzzerMode currentBuzzer = BUZZER_MODE_NORMAL; ///< Current acoustic cadence demanded by network state
+static volatile bool offlineAlertConfirmed = false;
+
+bool isOfflineAlertConfirmed() {
+    return offlineAlertConfirmed;
+}
 static QueueHandle_t offlineBufferQueue = NULL;              ///< Thread-safe FreeRTOS queue storing buffered outbound telemetry
 
 /**
@@ -158,14 +164,20 @@ void offlineTask(void *parameter) {
     esp_task_wdt_add(NULL);
     Serial.println("[WATCHDOG] OFFLINE task registered with TWDT");
 
+    OfflineBannerGate buzzerGate(5000UL, 10000UL); // 5s debounce, 10s boot grace
+
     while (true) {
         bool wifi = (WiFi.status() == WL_CONNECTED);
-        bool mqtt = mqttClient.connected();
+        bool mqtt = isMqttClientConnected();
         bool healthy = isSystemHealthy();
         
         updateSystemHealth(wifi, mqtt, healthy);
         
-        updateOfflineBuzzer(currentBuzzer);
+        // Suppress buzzer and banner during initial boot grace (10s) and transient hiccups (<5s)
+        offlineAlertConfirmed = buzzerGate.update(!wifi || !mqtt, millis());
+        OfflineBuzzerMode effectiveBuzzer = offlineAlertConfirmed ? currentBuzzer : BUZZER_MODE_NORMAL;
+        
+        updateOfflineBuzzer(effectiveBuzzer);
         
         reportTaskHeartbeat(TASK_OFFLINE);
         vTaskDelay(pdMS_TO_TICKS(50));

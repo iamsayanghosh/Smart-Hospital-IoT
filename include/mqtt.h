@@ -29,6 +29,15 @@
 extern PubSubClient mqttClient; ///< Global PubSubClient MQTT client instance
 
 /**
+ * @brief Thread-safe query of MQTT client connection status.
+ *
+ * Updated solely within mqttTask to avoid cross-task socket access on PubSubClient.
+ *
+ * @return true if MQTT client is currently connected to broker.
+ */
+bool isMqttClientConnected();
+
+/**
  * @brief FreeRTOS task managing MQTT lifecycle, message routing, and publication scheduling.
  *
  * Running at Priority 2 with an 8192-byte stack:

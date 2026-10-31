@@ -19,6 +19,26 @@
 #include "environment.h"
 #include <Arduino.h>
 #include "state.h"
+#include "sensors.h"
+#include "watchdog.h"
+#include "esp_task_wdt.h"
+
+static volatile float simOverrideRoomTemp = -999.0f;
+static volatile float simOverrideOxygen = -999.0f;
+static volatile int simOverrideAqi = -1;
+
+void environmentTask(void *parameter)
+{
+    (void)parameter;
+    esp_task_wdt_add(NULL);
+    Serial.println("[WATCHDOG] ENVIRONMENT task registered with TWDT");
+
+    while (true) {
+        simulateFacilityData();
+        reportTaskHeartbeat(TASK_ENVIRONMENT);
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
+}
 
 /**
  * @brief Processes serial commands for facility telemetry simulation/testing.
@@ -46,42 +66,79 @@ void handleSerialCommands()
             lineLength = 0;
 
             if (command.startsWith("SET_ROOM ")) {
-                String value = command.substring(9);
-                portENTER_CRITICAL(&telemetryMux);
-                facilityTelemetry.roomTemperature = value.toFloat();
-                const float roomTemperature = facilityTelemetry.roomTemperature;
-                portEXIT_CRITICAL(&telemetryMux);
-                Serial.print("[SIM] Room temperature set to ");
-                Serial.println(roomTemperature, 1);
+                char *endptr = nullptr;
+                float val = strtof(command.substring(9).c_str(), &endptr);
+                if (endptr == command.substring(9).c_str() || !isfinite(val) || val < 15.0f || val > 40.0f) {
+                    Serial.println("[SIM CLI] Error: Room temperature must be a valid float between 15.0 and 40.0 C");
+                } else {
+                    simOverrideRoomTemp = val;
+                    simulateFacilityData();
+                    Serial.print("[SIM CLI] Room temperature overridden to ");
+                    Serial.print(val, 1);
+                    Serial.println(" C (persists until RESET_FACILITY)");
+                }
             } else if (command.startsWith("SET_OXYGEN ")) {
-                String value = command.substring(11);
-                const float oxygenLevel = constrain(value.toFloat(), 16.0f, 25.0f);
-                portENTER_CRITICAL(&telemetryMux);
-                facilityTelemetry.oxygenLevel = oxygenLevel;
-                portEXIT_CRITICAL(&telemetryMux);
-                Serial.print("[SIM] Oxygen set to ");
-                Serial.println(oxygenLevel, 1);
+                char *endptr = nullptr;
+                float val = strtof(command.substring(11).c_str(), &endptr);
+                if (endptr == command.substring(11).c_str() || !isfinite(val) || val < 18.0f || val > 25.0f) {
+                    Serial.println("[SIM CLI] Error: Facility oxygen must be a valid float between 18.0 and 25.0 %");
+                } else {
+                    simOverrideOxygen = val;
+                    simulateFacilityData();
+                    Serial.print("[SIM CLI] Facility oxygen overridden to ");
+                    Serial.print(val, 1);
+                    Serial.println(" % (persists until RESET_FACILITY)");
+                }
             } else if (command.startsWith("SET_AQI ")) {
-                String value = command.substring(8);
-                const int aqi = constrain(value.toInt(), 0, 250);
-                portENTER_CRITICAL(&telemetryMux);
-                facilityTelemetry.aqi = aqi;
-                portEXIT_CRITICAL(&telemetryMux);
-                Serial.print("[SIM] AQI set to ");
-                Serial.println(aqi);
+                char *endptr = nullptr;
+                long val = strtol(command.substring(8).c_str(), &endptr, 10);
+                if (endptr == command.substring(8).c_str() || val < 0 || val > 300) {
+                    Serial.println("[SIM CLI] Error: AQI must be an integer between 0 and 300");
+                } else {
+                    simOverrideAqi = static_cast<int>(val);
+                    simulateFacilityData();
+                    Serial.print("[SIM CLI] AQI overridden to ");
+                    Serial.print(val);
+                    Serial.println(" (persists until RESET_FACILITY)");
+                }
             } else if (command == "RESET_FACILITY") {
-                portENTER_CRITICAL(&telemetryMux);
-                facilityTelemetry.roomTemperature = 22.0f;
-                facilityTelemetry.oxygenLevel = 20.8f;
-                facilityTelemetry.aqi = 35;
-                portEXIT_CRITICAL(&telemetryMux);
-                Serial.println("[SIM] Facility simulation reset to normal range");
+                simOverrideRoomTemp = -999.0f;
+                simOverrideOxygen = -999.0f;
+                simOverrideAqi = -1;
+                simulateFacilityData();
+                Serial.println("[SIM CLI] Facility overrides cleared; restored nominal facility simulation");
+            } else if (command.startsWith("SET_HR ")) {
+                char *endptr = nullptr;
+                long val = strtol(command.substring(7).c_str(), &endptr, 10);
+                if (endptr == command.substring(7).c_str() || val < 40 || val > 140) {
+                    Serial.println("[SIM CLI] Error: Heart rate must be an integer between 40 and 140 BPM");
+                } else {
+                    setSimulatedHeartRate(static_cast<int>(val));
+                }
+            } else if (command.startsWith("SET_SPO2 ")) {
+                char *endptr = nullptr;
+                long val = strtol(command.substring(9).c_str(), &endptr, 10);
+                if (endptr == command.substring(9).c_str() || val < 80 || val > 100) {
+                    Serial.println("[SIM CLI] Error: SpO2 must be an integer between 80 and 100 %");
+                } else {
+                    setSimulatedSpo2(static_cast<int>(val));
+                }
+            } else if (command.startsWith("SET_TEMP ")) {
+                char *endptr = nullptr;
+                float val = strtof(command.substring(9).c_str(), &endptr);
+                if (endptr == command.substring(9).c_str() || !isfinite(val) || val < 34.0f || val > 42.0f) {
+                    Serial.println("[SIM CLI] Error: Body temperature must be a valid float between 34.0 and 42.0 C");
+                } else {
+                    setSimulatedTemperature(val);
+                }
+            } else if (command == "RESET_VITALS") {
+                resetSimulatedVitals();
             } else if (command == "SHOW_TASK2") {
                 Serial.println("[TASK2] Medical feeds: medical-heart-rate | medical-spo2 | medical-body-temperature");
                 Serial.println("[TASK2] Facility feeds: facility-room-temperature | facility-oxygen | facility-aqi");
                 Serial.println("[TASK2] Event feed: hospital-events (alerts + summaries + status)");
             } else {
-                Serial.println("[SIM] Commands: SET_ROOM <C>, SET_OXYGEN <percent>, SET_AQI <value>, RESET_FACILITY, SHOW_TASK2");
+                Serial.println("[SIM CLI] Commands: SET_ROOM <15-40>, SET_OXYGEN <18-25>, SET_AQI <0-300>, RESET_FACILITY, SET_HR <40-140>, SET_SPO2 <80-100>, SET_TEMP <34-42>, RESET_VITALS, SHOW_TASK2");
             }
             continue;
         }
@@ -106,9 +163,23 @@ void simulateFacilityData()
     const float oxygenDelta = random(-3, 3) * 0.2f;
     const int aqiDelta = random(-12, 18);
 
-    nextState.roomTemperature = constrain(22.0f + roomDelta, 18.0f, 30.0f);
-    nextState.oxygenLevel = constrain(20.8f + oxygenDelta, 18.0f, 24.0f);
-    nextState.aqi = constrain(35 + aqiDelta, 0, 200);
+    if (simOverrideRoomTemp > -100.0f) {
+        nextState.roomTemperature = simOverrideRoomTemp;
+    } else {
+        nextState.roomTemperature = constrain(22.0f + roomDelta, 18.0f, 30.0f);
+    }
+
+    if (simOverrideOxygen > 0.0f) {
+        nextState.oxygenLevel = simOverrideOxygen;
+    } else {
+        nextState.oxygenLevel = constrain(20.8f + oxygenDelta, 18.0f, 24.0f);
+    }
+
+    if (simOverrideAqi >= 0) {
+        nextState.aqi = simOverrideAqi;
+    } else {
+        nextState.aqi = constrain(35 + aqiDelta, 0, 200);
+    }
 
     portENTER_CRITICAL(&telemetryMux);
     facilityTelemetry = nextState;

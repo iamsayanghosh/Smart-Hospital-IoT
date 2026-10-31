@@ -39,10 +39,13 @@ enum OfflineBuzzerMode {
 
 /**
  * @brief Fixed-size container for buffering outbound telemetry messages during offline periods.
+ *
+ * Sized to 512 bytes to accommodate full 60-second hospital summary reports (~340-400 bytes)
+ * without truncation during offline queue storage and replay.
  */
 struct BufferedTelemetryMessage {
-    char topic[64];    ///< Destination Adafruit IO feed topic string
-    char payload[256];  ///< Formatted telemetry or alert payload string
+    char topic[64];     ///< Destination Adafruit IO feed topic string
+    char payload[512];  ///< Formatted telemetry, alert, or full hospital summary payload
 };
 
 /**
@@ -51,6 +54,15 @@ struct BufferedTelemetryMessage {
  * @return SystemHealthState ONLINE, DEGRADED, or OFFLINE.
  */
 SystemHealthState getSystemHealthState();
+
+/**
+ * @brief Queries whether the system is confirmed offline after boot grace (10s) and debounce hold (5s).
+ *
+ * Single canonical gate shared by both the buzzer (offline.cpp) and OLED banner (display.cpp).
+ *
+ * @return true if offline status is confirmed and active.
+ */
+bool isOfflineAlertConfirmed();
 
 /**
  * @brief Evaluates transport and task watchdog inputs to update system health and buzzer cadence.
