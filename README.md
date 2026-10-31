@@ -16,17 +16,17 @@ All application worker tasks are pinned to **Core 1**, dedicating **Core 0** to 
  ┌────────────────────────────────┐       ┌─────────────────────────────────────────┐
  │ • Espressif Wi-Fi MAC / PHY    │       │ P4: watchdogTask (Auditor, 1000 ms)     │
  │ • lwIP TCP/IP Stack            │       │ P3: medicationTask (50 Hz / 20 ms)      │
- │ • FreeRTOS System Timers       │       │ P3: bedTask (50 Hz / 20 ms)             │
- └────────────────────────────────┘       │ P3: vitalTask (Adaptive 5s - 60s)       │
-                                          │ P3: ecgTask (Fixed 5 Hz / 200 ms)       │
+ │ • FreeRTOS System Timers       │       │ P3: vitalTask (Adaptive 5s - 60s)       │
+ └────────────────────────────────┘       │ P3: ecgTask (Fixed 5 Hz / 200 ms)       │
                                           │ P2: temperatureTask (Adapt 5s - 60s)    │
                                           │ P2: motionTask (Fixed 1000 ms)          │
                                           │ P2: environmentTask (Fixed 1000 ms)     │
+                                          │ P2: bedTask (50 Hz / 20 ms)             │
                                           │ P2: mqttTask (Round-robin 3000 ms)      │
-                                          │ P2: samplingTask (Supervisory 1000ms)   │
+                                          │ P2: samplingTask (Supervisory 1000 ms)  │
                                           │ P2: alertTask (Event Semaphore)         │
-                                          │ P2: offlineTask (Cadence & Health 50ms) │
-                                          │ P1: displayTask (OLED & Aggregator 100ms│
+                                          │ P2: offlineTask (Cadence & Health 50 ms)│
+                                          │ P1: displayTask (OLED & Aggregator 100ms)│
                                           └─────────────────────────────────────────┘
 ```
 
@@ -113,9 +113,9 @@ The firmware includes an interactive Serial Command Line Interface (115200 baud)
 * `SHOW_TASK2`: Print MQTT topic mappings in the console.
 
 ### Offline & Replay Simulation Commands (Task 6 in Wokwi):
-* SIM_OFFLINE WIFI (or SIM_OFFLINE): Simulates a Wi-Fi link drop (WiFi.disconnect()), activating the rapid double-pip acoustic cadence (BUZZER_MODE_WIFI_FAIL), top OLED warning banner, and routing outbound telemetry into the 64-record FIFO RAM buffer.
-* SIM_OFFLINE MQTT: Simulates an MQTT broker disconnect while maintaining Wi-Fi association, activating the slow single-beep cadence (BUZZER_MODE_MQTT_FAIL), OLED warning banner, and FIFO RAM buffering.
-* SIM_ONLINE: Restores network connectivity, allowing background re-registration and orderly FIFO replay of all buffered records to Adafruit IO.
+* `SIM_OFFLINE WIFI` (or `SIM_OFFLINE`): Simulates a Wi-Fi link drop (`WiFi.disconnect()`), activating the rapid double-pip acoustic cadence (`BUZZER_MODE_WIFI_FAIL`), bottom OLED warning banner (`LOGGING OFFLINE`), and routing outbound telemetry into the 64-record FIFO RAM buffer.
+* `SIM_OFFLINE MQTT`: Simulates an MQTT broker disconnect while maintaining Wi-Fi association, activating the slow single-beep cadence (`BUZZER_MODE_MQTT_FAIL`), bottom OLED warning banner, and FIFO RAM buffering.
+* `SIM_ONLINE`: Restores network connectivity, allowing background re-registration and orderly FIFO replay of all buffered records to Adafruit IO.
 
 ---
 
@@ -163,7 +163,7 @@ pio test -e esp32dev
 
 ## 7. Credentials Safety & Distribution Note
 
-When distributing or submitting the project archive, **never include** `include/aadafruit_io_config.local.h`.
+When distributing or submitting the project archive, **never include** `include/adafruit_io_config.local.h`.
 The build system in `include/adafruit_io_config.h` automatically detects whether the local configuration file exists:
 - If present: loads private credentials.
 - If absent: falls back cleanly to placeholder values, keeping the repository safe and buildable without leaking secrets.
@@ -174,9 +174,9 @@ The build system in `include/adafruit_io_config.h` automatically detects whether
 ## 8. Running in Browser Wokwi (wokwi.com)
 
 1. Open **[wokwi.com](https://wokwi.com)** and create a new **ESP32** Arduino project.
-2. **Main Sketch:** Paste src/main.cpp into the sketch.ino tab.
-3. **Hardware Schematic:** Paste diagram.json into the diagram.json tab.
-4. **Library Manifest:** Create a new tab named libraries.txt and paste the contents of libraries.txt.
-5. **Add Source Modules:** Upload or paste all remaining .cpp and .h files into the project (placed flat next to sketch.ino).
-6. **Credentials (Private):** Add an optional tab named adafruit_io_config.local.h with your Adafruit IO username and key to stream live to your dashboard.
-7. **Interactive Task 6 Demo:** In the Serial Monitor, type SIM_OFFLINE WIFI (tests double-pip cadence) or SIM_OFFLINE MQTT (tests single-beep cadence), let data accumulate in the buffer, then type SIM_ONLINE to watch the FIFO replay drain to the broker!
+2. **Main Sketch:** Paste `src/main.cpp` into the `sketch.ino` tab.
+3. **Hardware Schematic:** Paste `diagram.json` into the `diagram.json` tab.
+4. **Library Manifest:** Create a new tab named `libraries.txt` and paste the contents of `libraries.txt`.
+5. **Add Source Modules:** Upload or paste all remaining `.cpp` and `.h` files into the project (placed flat next to `sketch.ino`).
+6. **Credentials (Private):** Add an optional tab named `adafruit_io_config.local.h` with your Adafruit IO username and key to stream live to your dashboard.
+7. **Interactive Task 6 Demo:** In the Serial Monitor, type `SIM_OFFLINE WIFI` (tests double-pip cadence) or `SIM_OFFLINE MQTT` (tests single-beep cadence), let data accumulate in the buffer, then type `SIM_ONLINE` to watch the FIFO replay drain to the broker!
