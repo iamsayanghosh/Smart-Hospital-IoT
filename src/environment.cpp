@@ -29,6 +29,11 @@ static volatile float simOverrideRoomTemp = -999.0f;
 static volatile float simOverrideOxygen = -999.0f;
 static volatile int simOverrideAqi = -1;
 
+/**
+ * @brief FreeRTOS task running dedicated facility environment simulation at 1 Hz.
+ *
+ * @param parameter Unused FreeRTOS task parameter pointer (NULL).
+ */
 void environmentTask(void *parameter)
 {
     (void)parameter;
@@ -43,14 +48,24 @@ void environmentTask(void *parameter)
 }
 
 /**
- * @brief Processes serial commands for facility telemetry simulation/testing.
+ * @brief Parses and executes UART commands for testing facility telemetry in simulation.
  *
  * Supported commands:
- * - SET_ROOM <C>        : Forces simulated room temperature in degrees Celsius
- * - SET_OXYGEN <percent>: Forces simulated room oxygen percentage [16.0 - 25.0 %]
- * - SET_AQI <value>     : Forces simulated air quality index [0 - 250]
- * - RESET_FACILITY      : Restores default nominal facility parameters
- * - SHOW_TASK2          : Prints topic mapping for Task 2 dual-role monitoring
+ * - Facility Simulation:
+ *     - SET_ROOM <15-40>        : Force ambient room temperature in °C
+ *     - SET_OXYGEN <18-25>      : Force ambient oxygen percentage
+ *     - SET_AQI <0-300>         : Force Air Quality Index
+ *     - RESET_FACILITY          : Restore nominal room parameters (22°C, 20.8% O2, 35 AQI)
+ * - Patient Vitals Simulation:
+ *     - SET_HR <40-140>         : Force heart rate in BPM
+ *     - SET_SPO2 <80-100>       : Force blood oxygen saturation %
+ *     - SET_TEMP <34-42>        : Force body temperature in °C
+ *     - RESET_VITALS            : Restore nominal random physiological vitals
+ * - Offline & Replay Simulation (Task 6):
+ *     - SIM_OFFLINE [WIFI|MQTT] : Force Wi-Fi or MQTT drop, activate buzzer cadence & RAM buffering
+ *     - SIM_ONLINE              : Restore network link and replay buffered FIFO records
+ * - Diagnostics:
+ *     - SHOW_TASK2              : Print Dual-Role MQTT feed mappings
  */
 void handleSerialCommands()
 {

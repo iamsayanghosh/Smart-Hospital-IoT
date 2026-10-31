@@ -45,8 +45,8 @@
 #include "sensors.h"
 #include "state.h"
 
-#define OLED_SDA 21
-#define OLED_SCL 22
+#define OLED_SDA 21 ///< I2C Data line for SSD1306 OLED display
+#define OLED_SCL 22 ///< I2C Clock line for SSD1306 OLED display
 
 // ============================================================================
 // SETUP

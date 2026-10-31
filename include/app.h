@@ -23,7 +23,7 @@
  * - alertSemaphore (binary semaphore)
  * - heartbeatMutex (standard mutex)
  *
- * Also initializes the offline circular ring buffer and resets baseline telemetry structs.
+ * Also initializes the offline FIFO queue and resets baseline telemetry structs.
  * Halts the system via failSetup() if any IPC allocation fails.
  */
 void appInit();
@@ -34,7 +34,7 @@ void appInit();
  * Sets up the 8-second TWDT configuration and creates:
  * - watchdogTask (priority 4)
  * - vitalTask, ecgTask, medicationTask (priority 3)
- * - temperatureTask, motionTask, mqttTask, alertTask, samplingTask, bedTask, offlineTask (priority 2)
+ * - temperatureTask, motionTask, mqttTask, alertTask, samplingTask, bedTask, offlineTask, environmentTask (priority 2)
  * - displayTask (priority 1)
  */
 void appStartTasks();

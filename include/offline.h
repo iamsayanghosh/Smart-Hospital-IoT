@@ -88,7 +88,7 @@ void updateSystemHealth(bool wifiConnected, bool mqttConnected, bool systemHealt
 OfflineBuzzerMode getOfflineBuzzerMode();
 
 /**
- * @brief Enqueues an outgoing telemetry message into the offline ring buffer.
+ * @brief Enqueues an outgoing telemetry message into the offline FIFO queue.
  *
  * If the buffer (queue depth 64) is full, the message is dropped and an error logged,
  * preserving existing stored records.

@@ -21,7 +21,7 @@
  *    - Note: Multiple publications (up to 4) can occur consecutively in one task iteration if timers coincide;
  *      firmware pacing targets Adafruit IO's 30 data points/min free quota, but cannot govern account-wide consumption.
  * 5. Offline Recovery & Buffer Synchronization:
- *    - safePublish() diverts outgoing payloads to the bounded 64-item offline ring buffer when disconnected.
+ *    - safePublish() diverts outgoing payloads to the bounded 64-item offline FreeRTOS FIFO queue when disconnected.
  *    - Replays buffered records in FIFO order into the 3000 ms dispatch slot upon connection restoration.
  */
 
@@ -45,10 +45,26 @@ static volatile bool simForceWifiOffline = false;
 static volatile bool simForceMqttOffline = false;
 constexpr uint32_t ALERT_ESCALATION_COOLDOWN_MS = 2000;
 
+/**
+ * @brief Sets simulated Wi-Fi disconnect flag for Task 6 demonstration in Wokwi.
+ *
+ * This function only mutates the atomic flag; actual link disconnect and buffering
+ * are handled within mqttTask to preserve thread safety.
+ *
+ * @param enable True to simulate Wi-Fi disconnect; false to restore normal operation.
+ */
 void setSimulateOfflineWifi(bool enable) {
     simForceWifiOffline = enable;
 }
 
+/**
+ * @brief Sets simulated MQTT broker disconnect flag for Task 6 demonstration in Wokwi.
+ *
+ * This function only mutates the atomic flag; actual broker teardown and buffering
+ * are handled within mqttTask to preserve thread safety.
+ *
+ * @param enable True to simulate broker disconnect; false to restore normal operation.
+ */
 void setSimulateOfflineMqtt(bool enable) {
     simForceMqttOffline = enable;
 }
@@ -379,7 +395,7 @@ bool connectMqtt()
 }
 
 /**
- * @brief Attempts live MQTT publication or diverts to offline ring buffer.
+ * @brief Attempts live MQTT publication or diverts to offline FIFO queue.
  *
  * Operational Logic:
  * - If offline is true: Enqueues directly to offline buffer via enqueueBufferedTelemetry().

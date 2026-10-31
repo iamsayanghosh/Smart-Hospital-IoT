@@ -4,7 +4,7 @@
  *
  * Responsibilities:
  * - Awaits alertSemaphore signaling from telemetry update points (updateTelemetry
- *   for patient vitals and updateFacilityTelemetry called from vitalTask for facility anomalies).
+ *   for patient vitals and simulateFacilityData called from environmentTask for facility anomalies).
  * - Collects atomic, mutex-protected snapshots of both medical and facility telemetry.
  * - Logs diagnostic details over Serial for debugging and auditing.
  *
