@@ -21,7 +21,7 @@
  * - Manual Override: Ingests manual angle targets [0°-90°] via bedQueue from MQTT feed "bed-angle".
  *   Manual override is preserved ONLY until the patient's clinical state changes. Any change in
  *   auto mode immediately cancels manual override and restores clinical automatic angle.
- * - Kinematic Smoothing: Updates at 50 Hz (20 ms dt) with velocity-clamped increments.
+ * - Kinematic Smoothing: Updates at 50 Hz (20 ms dt) with velocity-clamped increments (max 1.0° per 20 ms step = 50.0°/s maximum slew rate) to guarantee smooth, non-abrupt motion for patient comfort.
  *
  * @param parameter Unused FreeRTOS task parameter pointer (NULL).
  */

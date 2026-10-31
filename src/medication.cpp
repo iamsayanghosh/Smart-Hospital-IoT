@@ -186,7 +186,7 @@ static void handleMedicationConfirmationButton()
  * @brief Drives physical LEDs and buzzer according to current medication dosage safety state.
  *
  * Visual & Acoustic Signaling Rules:
- * - Critical Pending (>80 mg/hr unconfirmed): Red LED and Buzzer flash synchronously at 1 Hz (500 ms period).
+ * - Critical Pending (>80 mg/hr unconfirmed): Red LED and Buzzer flash synchronously at rapid ~3.3 Hz (150 ms period).
  * - Critical Confirmed (>80 mg/hr confirmed): Solid Red LED ON, Buzzer OFF.
  * - Warning (80.0 mg/hr): Solid Yellow LED ON, Buzzer OFF.
  * - Normal (0.0 - 79.9 mg/hr): Solid Green LED ON, Buzzer OFF.

@@ -14,11 +14,21 @@
  * @brief Parses and executes UART commands for testing facility telemetry in simulation.
  *
  * Supported commands:
- * - SET_ROOM <temp_C>       : Force room temperature
- * - SET_OXYGEN <percent>    : Force ambient oxygen percentage
- * - SET_AQI <index>         : Force Air Quality Index
- * - RESET_FACILITY          : Reset facility parameters to baseline normal values
- * - SHOW_TASK2              : Print feed layout for Dual-Role monitoring system
+ * - Facility Simulation:
+ *     - SET_ROOM <15-40>        : Force ambient room temperature in °C
+ *     - SET_OXYGEN <18-25>      : Force ambient oxygen percentage
+ *     - SET_AQI <0-300>         : Force Air Quality Index
+ *     - RESET_FACILITY          : Restore nominal room parameters (22°C, 20.8% O2, 35 AQI)
+ * - Patient Vitals Simulation:
+ *     - SET_HR <40-140>         : Force heart rate in BPM
+ *     - SET_SPO2 <80-100>       : Force blood oxygen saturation %
+ *     - SET_TEMP <34-42>        : Force body temperature in °C
+ *     - RESET_VITALS            : Restore nominal random physiological vitals
+ * - Offline & Replay Simulation (Task 6):
+ *     - SIM_OFFLINE [WIFI|MQTT] : Force Wi-Fi or MQTT drop, activate buzzer cadence & RAM buffering
+ *     - SIM_ONLINE              : Restore network link and replay buffered FIFO records
+ * - Diagnostics:
+ *     - SHOW_TASK2              : Print Dual-Role MQTT feed mappings
  */
 void handleSerialCommands();
 

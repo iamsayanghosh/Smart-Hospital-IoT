@@ -23,7 +23,7 @@
  *     - Note: Multiple publications (up to 4) can occur consecutively in one task iteration if timers coincide;
  *       the firmware enforces local cadence, not account-wide quota governance.
  * - Offline Queue Integration:
- *     - Diverts failed publishes to the 64-slot ring buffer and drains buffered entries upon reconnect.
+ *     - Diverts failed publishes to the 64-slot FreeRTOS FIFO queue (drops newest incoming entries when full to preserve initial failure state) and drains buffered entries upon reconnect.
  */
 
 extern PubSubClient mqttClient; ///< Global PubSubClient MQTT client instance

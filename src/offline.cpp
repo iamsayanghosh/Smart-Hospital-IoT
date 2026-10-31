@@ -173,7 +173,9 @@ void offlineTask(void *parameter) {
         
         updateSystemHealth(wifi, mqtt, healthy);
         
-        // Suppress buzzer and banner during initial boot grace (10s) and transient hiccups (<5s)
+        // Dual-layer filter via OfflineBannerGate:
+        // 1. Initial boot grace (10s / OFFLINE_BOOT_GRACE_MS) prevents false alarms during Wi-Fi association.
+        // 2. Persistent hold debounce (5s / OFFLINE_HOLD_DEBOUNCE_MS) filters out transient transport blips.
         offlineAlertConfirmed = buzzerGate.update(!wifi || !mqtt, millis());
         OfflineBuzzerMode effectiveBuzzer = offlineAlertConfirmed ? currentBuzzer : BUZZER_MODE_NORMAL;
         

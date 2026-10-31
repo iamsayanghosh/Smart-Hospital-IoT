@@ -44,8 +44,11 @@ enum OfflineBuzzerMode {
 /**
  * @brief Fixed-size container for buffering outbound telemetry messages during offline periods.
  *
- * Sized to 512 bytes to accommodate full 60-second hospital summary reports (~340-400 bytes)
- * without truncation during offline queue storage and replay.
+ * Buffer Memory Footprint:
+ * - Each item occupies 64 + 512 = 576 bytes.
+ * - 64-item FreeRTOS queue depth requires exactly 64 * 576 = 36,864 bytes (~36.8 KB SRAM).
+ * - Sized to accommodate full 60-second hospital summary reports (~340-400 bytes)
+ *   without truncation during offline queue storage and FIFO replay.
  */
 struct BufferedTelemetryMessage {
     char topic[64];     ///< Destination Adafruit IO feed topic string

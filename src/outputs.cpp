@@ -6,7 +6,7 @@
  * - Controls GPIO 25 (Red), 26 (Yellow), and 33 (Green) indicator LEDs.
  * - Drives GPIO 14 acoustic buzzer with 1200 Hz tone.
  * - Enforces Strict Priority Arbitration on Buzzer:
- *     Priority 1 (Highest): Medication critical alarm (continuous or 1 Hz pulse for unconfirmed request).
+ *     Priority 1 (Highest): Medication critical alarm (rapid ~3.3 Hz pulse for unconfirmed request, solid once confirmed).
  *     Priority 2 (Lower): Offline connectivity failure cadences (Wi-Fi fail or MQTT fail beeps).
  *
  * Separation Note:
