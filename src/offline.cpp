@@ -167,7 +167,7 @@ void offlineTask(void *parameter) {
     OfflineBannerGate buzzerGate(OFFLINE_HOLD_DEBOUNCE_MS, OFFLINE_BOOT_GRACE_MS);
 
     while (true) {
-        bool wifi = (WiFi.status() == WL_CONNECTED);
+        bool wifi = (WiFi.status() == WL_CONNECTED) && !isSimulateOfflineWifi();
         bool mqtt = isMqttClientConnected();
         bool healthy = isSystemHealthy();
         

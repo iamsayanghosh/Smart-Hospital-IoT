@@ -38,7 +38,7 @@ All application worker tasks are pinned to **Core 1**, dedicating **Core 0** to 
 * **Physical Temperature:** Dallas DS18B20 on 1-Wire bus (`GPIO 4`).
 * **Physical Motion:** HC-SR501 PIR sensor on `GPIO 27`.
 * **Simulated Photoplethysmogram (PPG):** Optical Heart Rate (`50 - 100 BPM`) and $\text{SpO}_2$ (`92 - 100 %`).
-* **Simulated Electrocardiogram (ECG):** Real-time Gaussian superposition model generating P/Q/R/S/T cardiac waveform at 5 Hz (200 ms).
+* **Simulated Electrocardiogram (ECG):** Illustrative real-time Gaussian superposition model simulating cardiac cycle morphology at 5 Hz (200 ms).
 * **Supervision:** Dual-tier watchdog coupling ESP-IDF Task Watchdog Timer (TWDT, 8000 ms) with an application heartbeat auditor (`watchdogTask`, 6000 ms).
 
 ### Task 2: Dual-Role Cloud IoT Monitoring (Role-Based Dashboards)
@@ -112,6 +112,11 @@ The firmware includes an interactive Serial Command Line Interface (115200 baud)
 * `RESET_FACILITY`: Restore default room parameters (22.0 °C, 20.8% O2, 35 AQI).
 * `SHOW_TASK2`: Print MQTT topic mappings in the console.
 
+### Offline & Replay Simulation Commands (Task 6 in Wokwi):
+* SIM_OFFLINE WIFI (or SIM_OFFLINE): Simulates a Wi-Fi link drop (WiFi.disconnect()), activating the rapid double-pip acoustic cadence (BUZZER_MODE_WIFI_FAIL), top OLED warning banner, and routing outbound telemetry into the 64-record FIFO RAM buffer.
+* SIM_OFFLINE MQTT: Simulates an MQTT broker disconnect while maintaining Wi-Fi association, activating the slow single-beep cadence (BUZZER_MODE_MQTT_FAIL), OLED warning banner, and FIFO RAM buffering.
+* SIM_ONLINE: Restores network connectivity, allowing background re-registration and orderly FIFO replay of all buffered records to Adafruit IO.
+
 ---
 
 ## 5. How to Build & Run
@@ -130,7 +135,7 @@ pio run --target upload
 ```
 
 ### Automated Unit Testing
-Unit tests are implemented under `test/test_main.cpp` covering numeric boundary parsers, medication safety clamps, and multi-tier clinical alert evaluations.
+Unit tests are implemented under `test/test_main.cpp` covering strict numeric string parsers (24 edge cases including NaN, Inf, float integers, negative boundary handling) and medication dosage safety clamping.
 ```bash
 pio test -e esp32dev
 ```
@@ -142,18 +147,36 @@ pio test -e esp32dev
 1. **Task Watchdog & SYSTEM_DEGRADED Visibility:**
    `SYSTEM_DEGRADED` indicates an internal FreeRTOS worker task has starved its heartbeat while Wi-Fi and MQTT transport remain intact. In practice, the ESP-IDF Task Watchdog Timer (TWDT) is configured with an 8000 ms panic threshold; if a task hangs permanently, the chip will intentionally reset ~2 seconds after entering `SYSTEM_DEGRADED` to guarantee fail-safe recovery in medical environments.
 2. **Bounded FIFO Queue Behavior:**
-   The offline buffer utilizes a fixed-capacity FreeRTOS queue holding up to 64 records (~32 KB SRAM). To avoid dropping high-priority initial failure states, it drops newest incoming entries when full rather than overwriting historical telemetry.
+   The offline buffer utilizes a fixed-capacity FreeRTOS queue holding up to 64 records of 576 bytes each (~36.8 KB SRAM). To avoid dropping high-priority initial failure states, it drops newest incoming entries when full rather than overwriting historical telemetry.
 3. **Adafruit IO Free Quota Optimization:**
    Adafruit IO limits accounts to 30 data points per minute. The firmware paces telemetry round-robin at 3-second intervals and coordinates replayed messages to stay safely below this global ceiling.
 4. **Wokwi Environmental Sensing:**
    In the Wokwi simulation environment, ambient room parameters (Room Temp, Oxygen %, AQI) and vitals (PPG, ECG) are generated via simulated algorithms with persistent UART CLI overrides (`SET_ROOM`, `SET_OXYGEN`, `SET_AQI`, `SET_HR`, `SET_SPO2`, `SET_TEMP`).
+5. **Adafruit IO 10-Feed Limit on Free Tier:**
+   Due to Adafruit IO's 10-feed restriction on standard accounts, all clinical alerts, facility alerts, and 60-second summary reports are multiplexed onto the single shared hospital-events feed.
+6. **Replayed Telemetry Timestamps:**
+   Replayed offline records carry the timestamp of broker reconnection/receipt rather than historic capture time due to Adafruit IO's standard MQTT format and absence of an onboard battery-backed RTC.
+7. **Logical Role Separation:**
+   The separation between Medical Staff and Facility Management is logical (dedicated feeds and dashboard views) rather than cryptographic Role-Based Access Control (RBAC).
 
 ---
 
 ## 7. Credentials Safety & Distribution Note
 
-When distributing or submitting the project archive, **never include** `include/adafruit_io_config.local.h`.
+When distributing or submitting the project archive, **never include** `include/aadafruit_io_config.local.h`.
 The build system in `include/adafruit_io_config.h` automatically detects whether the local configuration file exists:
 - If present: loads private credentials.
 - If absent: falls back cleanly to placeholder values, keeping the repository safe and buildable without leaking secrets.
 
+
+---
+
+## 8. Running in Browser Wokwi (wokwi.com)
+
+1. Open **[wokwi.com](https://wokwi.com)** and create a new **ESP32** Arduino project.
+2. **Main Sketch:** Paste src/main.cpp into the sketch.ino tab.
+3. **Hardware Schematic:** Paste diagram.json into the diagram.json tab.
+4. **Library Manifest:** Create a new tab named libraries.txt and paste the contents of libraries.txt.
+5. **Add Source Modules:** Upload or paste all remaining .cpp and .h files into the project (placed flat next to sketch.ino).
+6. **Credentials (Private):** Add an optional tab named adafruit_io_config.local.h with your Adafruit IO username and key to stream live to your dashboard.
+7. **Interactive Task 6 Demo:** In the Serial Monitor, type SIM_OFFLINE WIFI (tests double-pip cadence) or SIM_OFFLINE MQTT (tests single-beep cadence), let data accumulate in the buffer, then type SIM_ONLINE to watch the FIFO replay drain to the broker!
