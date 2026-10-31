@@ -60,11 +60,21 @@ enum MonitoredTaskId {
     TASK_MONITORED_COUNT
 };
 
-// Named clinical threshold constants
+// Named clinical critical threshold constants
 constexpr float HEART_RATE_CRITICAL_LOW = 45.0f;
 constexpr float HEART_RATE_CRITICAL_HIGH = 120.0f;
 constexpr float ECG_RATE_CRITICAL_LOW = 45.0f;
 constexpr float ECG_RATE_CRITICAL_HIGH = 120.0f;
+constexpr float SPO2_CRITICAL_LOW = 88.0f;
+constexpr float BODY_TEMP_CRITICAL_LOW = 34.0f;
+constexpr float BODY_TEMP_CRITICAL_HIGH = 39.5f;
+
+// Named facility critical threshold constants
+constexpr float ROOM_TEMP_CRITICAL_LOW = 16.0f;
+constexpr float ROOM_TEMP_CRITICAL_HIGH = 30.0f;
+constexpr float OXYGEN_CRITICAL_LOW = 18.0f;
+constexpr float OXYGEN_CRITICAL_HIGH = 24.5f;
+constexpr float AQI_CRITICAL_HIGH = 150.0f;
 
 enum AlertSeverity {
     ALERT_SEVERITY_NORMAL = 0,
@@ -83,21 +93,27 @@ struct TaskHeartbeat {
     bool active = false;
 };
 
-struct ThresholdRange {
-    float low = 0.0f;
-    float high = 0.0f;
+struct TieredThreshold {
+    float low = 0.0f;           ///< Nominal/Warning lower boundary (< triggers warning)
+    float high = 0.0f;          ///< Nominal/Warning upper boundary (> triggers warning)
+    float criticalLow = 0.0f;   ///< Critical lower boundary (< triggers critical)
+    float criticalHigh = 0.0f;  ///< Critical upper boundary (> triggers critical)
 };
 
+// Alias for backwards compatibility
+using ThresholdRange = TieredThreshold;
+
 struct MedicalThresholdConfig {
-    ThresholdRange heartRate = {50.0f, 100.0f};
-    ThresholdRange spo2 = {92.0f, 100.0f};
-    ThresholdRange bodyTemperature = {36.0f, 38.0f};
+    TieredThreshold heartRate = {50.0f, 100.0f, HEART_RATE_CRITICAL_LOW, HEART_RATE_CRITICAL_HIGH};
+    TieredThreshold ecgRate = {50.0f, 100.0f, ECG_RATE_CRITICAL_LOW, ECG_RATE_CRITICAL_HIGH};
+    TieredThreshold spo2 = {92.0f, 100.0f, SPO2_CRITICAL_LOW, 100.0f};
+    TieredThreshold bodyTemperature = {36.0f, 38.0f, BODY_TEMP_CRITICAL_LOW, BODY_TEMP_CRITICAL_HIGH};
 };
 
 struct FacilityThresholdConfig {
-    ThresholdRange roomTemperature = {18.0f, 28.0f};
-    ThresholdRange oxygen = {19.5f, 24.0f};
-    ThresholdRange aqi = {0.0f, 100.0f};
+    TieredThreshold roomTemperature = {18.0f, 28.0f, ROOM_TEMP_CRITICAL_LOW, ROOM_TEMP_CRITICAL_HIGH};
+    TieredThreshold oxygen = {19.5f, 24.0f, OXYGEN_CRITICAL_LOW, OXYGEN_CRITICAL_HIGH};
+    TieredThreshold aqi = {0.0f, 100.0f, 0.0f, AQI_CRITICAL_HIGH};
 };
 
 struct SensorMessage {

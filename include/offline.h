@@ -19,6 +19,10 @@
  * - These two state machines are completely decoupled.
  */
 
+// Offline debounce hold and boot grace timing constants
+constexpr uint32_t OFFLINE_HOLD_DEBOUNCE_MS = 5000UL;
+constexpr uint32_t OFFLINE_BOOT_GRACE_MS = 10000UL;
+
 /**
  * @brief Infrastructure operational health states.
  */

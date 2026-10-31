@@ -70,6 +70,7 @@ DallasTemperature temperatureSensor(&oneWire);
 void sensorsInit() {
     pinMode(PIR_PIN, INPUT);
     temperatureSensor.begin();
+    temperatureSensor.setWaitForConversion(false);
 }
 
 /**
@@ -77,7 +78,10 @@ void sensorsInit() {
  *
  * Concurrency & Adaptive Timing:
  * - Sampling Cadence: Determined dynamically by getSamplePeriodMs(TASK_TEMP) [5 s to 60 s].
- * - Watchdog Polling: Runs an internal 500 ms evaluation tick to regularly report task heartbeats
+ * - Non-blocking conversion: Two-step state machine (TEMP_IDLE -> TEMP_CONVERTING) ensures
+ *   750 ms 12-bit DS18B20 thermal conversion does not block FreeRTOS scheduler or starve TWDT.
+ * - Startup Guard: Rejects power-on reset scratchpad reading (+85.0 C) and DEVICE_DISCONNECTED_C.
+ * - Watchdog Polling: Runs an internal 100 ms evaluation tick to regularly report task heartbeats
  *   to TWDT even when the temperature acquisition interval is stretched to 60 seconds.
  * - IPC: Dispatches TEMP_DATA messages via sendSensorMessage() into sensorQueue.
  *
@@ -94,29 +98,54 @@ void temperatureTask(void *parameter)
     }
     Serial.println("[WATCHDOG] TEMP task registered with TWDT");
 
+    enum TempReadState { TEMP_IDLE, TEMP_CONVERTING };
+    TempReadState tempState = TEMP_IDLE;
     uint32_t lastSampleMs = 0;
+    uint32_t requestStartMs = 0;
+
     while (true) {
         uint32_t now = millis();
         uint32_t period = getSamplePeriodMs(TASK_TEMP);
         
-        if (now - lastSampleMs >= period || lastSampleMs == 0) {
+        if (tempState == TEMP_IDLE && (now - lastSampleMs >= period || lastSampleMs == 0)) {
             lastSampleMs = now;
-            temperatureSensor.requestTemperatures();
-            SensorMessage message = {};
-            message.type = TEMP_DATA;
             if (simOverrideTemperature > -100.0f) {
+                SensorMessage message = {};
+                message.type = TEMP_DATA;
                 message.temperature = simOverrideTemperature;
-            } else {
-                message.temperature = temperatureSensor.getTempCByIndex(0);
-            }
-            sendSensorMessage(message, "TEMP TASK");
+                sendSensorMessage(message, "TEMP TASK");
 
-            Serial.print("[TEMP TASK] Temperature: ");
-            Serial.print(message.temperature, 1);
-            Serial.println(" C");
+                Serial.print("[TEMP TASK] Temperature (override): ");
+                Serial.print(message.temperature, 1);
+                Serial.println(" C");
+            } else {
+                temperatureSensor.requestTemperatures(); // Non-blocking: returns in <1 ms
+                requestStartMs = now;
+                tempState = TEMP_CONVERTING;
+            }
+        } else if (tempState == TEMP_CONVERTING && (now - requestStartMs >= 800)) {
+            tempState = TEMP_IDLE;
+            float rawTemp = simOverrideTemperature > -100.0f ? simOverrideTemperature : temperatureSensor.getTempCByIndex(0);
+
+            // Filter out sensor disconnects (-127 C) and default uninitialized power-on scratchpad (+85.0 C)
+            if (rawTemp != DEVICE_DISCONNECTED_C && rawTemp > -55.0f && rawTemp <= 125.0f && abs(rawTemp - 85.0f) > 0.05f) {
+                SensorMessage message = {};
+                message.type = TEMP_DATA;
+                message.temperature = rawTemp;
+                sendSensorMessage(message, "TEMP TASK");
+
+                Serial.print("[TEMP TASK] Temperature: ");
+                Serial.print(message.temperature, 1);
+                Serial.println(" C");
+            } else if (rawTemp == DEVICE_DISCONNECTED_C) {
+                Serial.println("[TEMP TASK] Warning: DS18B20 disconnected");
+            } else if (abs(rawTemp - 85.0f) <= 0.05f) {
+                Serial.println("[TEMP TASK] Ignored DS18B20 power-on reset scratchpad reading (85.0 C)");
+            }
         }
+
         reportTaskHeartbeat(TASK_TEMP);
-        vTaskDelay(pdMS_TO_TICKS(500));
+        vTaskDelay(pdMS_TO_TICKS(100));
     }
 }
 

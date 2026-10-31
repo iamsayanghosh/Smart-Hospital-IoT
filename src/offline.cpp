@@ -164,7 +164,7 @@ void offlineTask(void *parameter) {
     esp_task_wdt_add(NULL);
     Serial.println("[WATCHDOG] OFFLINE task registered with TWDT");
 
-    OfflineBannerGate buzzerGate(5000UL, 10000UL); // 5s debounce, 10s boot grace
+    OfflineBannerGate buzzerGate(OFFLINE_HOLD_DEBOUNCE_MS, OFFLINE_BOOT_GRACE_MS);
 
     while (true) {
         bool wifi = (WiFi.status() == WL_CONNECTED);

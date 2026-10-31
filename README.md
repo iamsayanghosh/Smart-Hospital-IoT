@@ -70,12 +70,12 @@ All application worker tasks are pinned to **Core 1**, dedicating **Core 0** to 
 * **Manual Slider Override:** Doctor can adjust sampling interval (5 s to 60 s) via `sampling-rate`. Shifts in patient status take precedence.
 
 ### Task 6: Fault-Tolerant Offline Detection & Buffering
-* **Three Health States:** `SYSTEM_ONLINE`, `SYSTEM_DEGRADED` (task heartbeat loss), and `SYSTEM_OFFLINE` (Wi-Fi or MQTT down).
+* **Three Health States:** `SYSTEM_ONLINE`, `SYSTEM_DEGRADED` (detected when transport is online but a worker task misses its watchdog heartbeat), and `SYSTEM_OFFLINE` (Wi-Fi or MQTT disconnected).
 * **Unified Quiet Bootup & Debounce:** An `OfflineBannerGate` suppresses the offline banner and buzzer during the first 10 seconds of power-up and ignores transient network hiccups under 5 seconds.
 * **Non-Clobbering OLED Banner:** When offline, an inverted ticker bar (`LOGGING OFFLINE`) renders on the bottom row (`y = 54..63`) while medication dosage remains visible.
 * **Acoustic Cadences:** Distinct failure cadences for Wi-Fi failure (rapid double-pip) vs. MQTT broker failure (slow beep). Medication critical alarms take absolute priority over network beeps.
-* **Offline SRAM Buffer:** Outgoing telemetry packets are diverted to a 64-item ring buffer (sized up to 512 bytes per packet).
-* **Reconnection Replay:** Replays missed records in FIFO order, sharing the 3000 ms round-robin slot to remain safely within Adafruit IO's 30 msgs/min quota.
+* **Offline SRAM Buffer:** Outgoing telemetry packets are diverted to a 64-item **bounded FIFO queue** (sized up to 512 bytes per packet). If network disconnection persists beyond 64 messages (~3.2 minutes of continuous telemetry), the queue preserves earlier historical data and drops newest incoming entries until reconnection.
+* **Reconnection Replay:** Replays missed records in strict FIFO order, sharing the 3000 ms round-robin slot to remain safely within Adafruit IO's 30 msgs/min quota.
 
 ---
 
@@ -129,7 +129,31 @@ The compiled binaries will be output to:
 pio run --target upload
 ```
 
-### Credentials Safety Note
-Before sharing or zipping this repository, **do not include** `include/adafruit_io_config.local.h`.
-Use the provided `include/adafruit_io_config.local.h.example` template for distribution.
+### Automated Unit Testing
+Unit tests are implemented under `test/test_main.cpp` covering numeric boundary parsers, medication safety clamps, and multi-tier clinical alert evaluations.
+```bash
+pio test -e esp32dev
+```
+
+---
+
+## 6. Known Architectural Limitations & Design Notes
+
+1. **Task Watchdog & SYSTEM_DEGRADED Visibility:**
+   `SYSTEM_DEGRADED` indicates an internal FreeRTOS worker task has starved its heartbeat while Wi-Fi and MQTT transport remain intact. In practice, the ESP-IDF Task Watchdog Timer (TWDT) is configured with an 8000 ms panic threshold; if a task hangs permanently, the chip will intentionally reset ~2 seconds after entering `SYSTEM_DEGRADED` to guarantee fail-safe recovery in medical environments.
+2. **Bounded FIFO Queue Behavior:**
+   The offline buffer utilizes a fixed-capacity FreeRTOS queue holding up to 64 records (~32 KB SRAM). To avoid dropping high-priority initial failure states, it drops newest incoming entries when full rather than overwriting historical telemetry.
+3. **Adafruit IO Free Quota Optimization:**
+   Adafruit IO limits accounts to 30 data points per minute. The firmware paces telemetry round-robin at 3-second intervals and coordinates replayed messages to stay safely below this global ceiling.
+4. **Wokwi Environmental Sensing:**
+   In the Wokwi simulation environment, ambient room parameters (Room Temp, Oxygen %, AQI) and vitals (PPG, ECG) are generated via simulated algorithms with persistent UART CLI overrides (`SET_ROOM`, `SET_OXYGEN`, `SET_AQI`, `SET_HR`, `SET_SPO2`, `SET_TEMP`).
+
+---
+
+## 7. Credentials Safety & Distribution Note
+
+When distributing or submitting the project archive, **never include** `include/adafruit_io_config.local.h`.
+The build system in `include/adafruit_io_config.h` automatically detects whether the local configuration file exists:
+- If present: loads private credentials.
+- If absent: falls back cleanly to placeholder values, keeping the repository safe and buildable without leaking secrets.
 

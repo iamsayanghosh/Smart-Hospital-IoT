@@ -171,7 +171,7 @@ AlertCandidate evaluateMedicalAlert(const Telemetry &snapshot)
         candidate.parameter = "heartRate";
         candidate.value = static_cast<float>(snapshot.heartRate);
         candidate.message = snapshot.heartRate < medicalThresholds.heartRate.low ? "Low heart rate" : "High heart rate";
-        candidate.severity = (snapshot.heartRate < HEART_RATE_CRITICAL_LOW || snapshot.heartRate > HEART_RATE_CRITICAL_HIGH) 
+        candidate.severity = (snapshot.heartRate < medicalThresholds.heartRate.criticalLow || snapshot.heartRate > medicalThresholds.heartRate.criticalHigh) 
                              ? ALERT_SEVERITY_CRITICAL : ALERT_SEVERITY_WARNING;
         return candidate;
     }
@@ -181,7 +181,7 @@ AlertCandidate evaluateMedicalAlert(const Telemetry &snapshot)
         candidate.parameter = "spo2";
         candidate.value = static_cast<float>(snapshot.spo2);
         candidate.message = "Low SpO2";
-        candidate.severity = snapshot.spo2 < 88 ? ALERT_SEVERITY_CRITICAL : ALERT_SEVERITY_WARNING;
+        candidate.severity = snapshot.spo2 < medicalThresholds.spo2.criticalLow ? ALERT_SEVERITY_CRITICAL : ALERT_SEVERITY_WARNING;
         return candidate;
     }
 
@@ -190,7 +190,7 @@ AlertCandidate evaluateMedicalAlert(const Telemetry &snapshot)
         candidate.parameter = "ecgRate";
         candidate.value = static_cast<float>(snapshot.ecgRate);
         candidate.message = snapshot.ecgRate < medicalThresholds.heartRate.low ? "Low ECG rate" : "High ECG rate";
-        candidate.severity = (snapshot.ecgRate < ECG_RATE_CRITICAL_LOW || snapshot.ecgRate > ECG_RATE_CRITICAL_HIGH) 
+        candidate.severity = (snapshot.ecgRate < medicalThresholds.ecgRate.criticalLow || snapshot.ecgRate > medicalThresholds.ecgRate.criticalHigh) 
                              ? ALERT_SEVERITY_CRITICAL : ALERT_SEVERITY_WARNING;
         return candidate;
     }
@@ -201,7 +201,7 @@ AlertCandidate evaluateMedicalAlert(const Telemetry &snapshot)
             candidate.parameter = "bodyTemperature";
             candidate.value = snapshot.temperature;
             candidate.message = snapshot.temperature < medicalThresholds.bodyTemperature.low ? "Low body temperature" : "High body temperature";
-            candidate.severity = snapshot.temperature < 34.0f || snapshot.temperature > 39.5f ? ALERT_SEVERITY_CRITICAL : ALERT_SEVERITY_WARNING;
+            candidate.severity = (snapshot.temperature < medicalThresholds.bodyTemperature.criticalLow || snapshot.temperature > medicalThresholds.bodyTemperature.criticalHigh) ? ALERT_SEVERITY_CRITICAL : ALERT_SEVERITY_WARNING;
             return candidate;
         }
     }
@@ -223,7 +223,7 @@ AlertCandidate evaluateFacilityAlert(const FacilityTelemetry &snapshot)
         candidate.parameter = "roomTemperature";
         candidate.value = snapshot.roomTemperature;
         candidate.message = snapshot.roomTemperature < facilityThresholds.roomTemperature.low ? "Low room temperature" : "High room temperature";
-        candidate.severity = snapshot.roomTemperature < 16.0f || snapshot.roomTemperature > 30.0f ? ALERT_SEVERITY_CRITICAL : ALERT_SEVERITY_WARNING;
+        candidate.severity = (snapshot.roomTemperature < facilityThresholds.roomTemperature.criticalLow || snapshot.roomTemperature > facilityThresholds.roomTemperature.criticalHigh) ? ALERT_SEVERITY_CRITICAL : ALERT_SEVERITY_WARNING;
         return candidate;
     }
 
@@ -232,7 +232,7 @@ AlertCandidate evaluateFacilityAlert(const FacilityTelemetry &snapshot)
         candidate.parameter = "oxygenLevel";
         candidate.value = snapshot.oxygenLevel;
         candidate.message = snapshot.oxygenLevel < facilityThresholds.oxygen.low ? "Low oxygen level" : "High oxygen level";
-        candidate.severity = snapshot.oxygenLevel < 18.0f || snapshot.oxygenLevel > 24.5f ? ALERT_SEVERITY_CRITICAL : ALERT_SEVERITY_WARNING;
+        candidate.severity = (snapshot.oxygenLevel < facilityThresholds.oxygen.criticalLow || snapshot.oxygenLevel > facilityThresholds.oxygen.criticalHigh) ? ALERT_SEVERITY_CRITICAL : ALERT_SEVERITY_WARNING;
         return candidate;
     }
 
@@ -241,7 +241,7 @@ AlertCandidate evaluateFacilityAlert(const FacilityTelemetry &snapshot)
         candidate.parameter = "aqi";
         candidate.value = static_cast<float>(snapshot.aqi);
         candidate.message = snapshot.aqi > facilityThresholds.aqi.high ? "AQI elevated" : "AQI unusually low";
-        candidate.severity = snapshot.aqi > 150 ? ALERT_SEVERITY_CRITICAL : ALERT_SEVERITY_WARNING;
+        candidate.severity = snapshot.aqi > facilityThresholds.aqi.criticalHigh ? ALERT_SEVERITY_CRITICAL : ALERT_SEVERITY_WARNING;
         return candidate;
     }
 

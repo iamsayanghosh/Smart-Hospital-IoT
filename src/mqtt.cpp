@@ -28,6 +28,7 @@
 #include "mqtt.h"
 #include "app.h"
 #include "state.h"
+#include "parser_utils.h"
 #include "medication.h"
 #include "connectivity.h"
 #include "watchdog.h"
@@ -223,9 +224,8 @@ void handleMedicationDosagePayload(const char *payload, size_t length)
         return;
     }
 
-    char *endptr = nullptr;
-    const float parsedDosage = strtof(payload, &endptr);
-    if (endptr == payload || !isfinite(parsedDosage)) {
+    float parsedDosage = 0.0f;
+    if (!parseFloatStrict(payload, 0.0f, 500.0f, parsedDosage)) {
         Serial.println("[MQTT TASK] Invalid medication-dosage string payload ignored");
         return;
     }
@@ -255,15 +255,13 @@ void handleSamplingRatePayload(const char *payload, size_t length)
         return;
     }
     
-    char *endptr = nullptr;
-    uint32_t rate = strtoul(payload, &endptr, 10);
-    if (endptr == payload) {
+    long parsedRate = 0;
+    if (!parseLongStrict(payload, 5, 60, parsedRate)) {
         Serial.println("[MQTT TASK] Invalid sampling-rate string payload ignored");
         return;
     }
-    if (rate < 5) rate = 5;
-    if (rate > 60) rate = 60;
     
+    uint32_t rate = static_cast<uint32_t>(parsedRate);
     xQueueOverwrite(samplingQueue, &rate);
     Serial.print("[MQTT TASK] sampling-rate received: ");
     Serial.print(rate);
@@ -281,9 +279,8 @@ void handleSamplingRatePayload(const char *payload, size_t length)
 void handleBedAnglePayload(const char *payload, size_t length)
 {
     if (length == 0) return;
-    char *endptr = nullptr;
-    float angle = strtof(payload, &endptr);
-    if (endptr == payload) {
+    float angle = 0.0f;
+    if (!parseFloatStrict(payload, 0.0f, 90.0f, angle)) {
         Serial.println("[MQTT TASK] Invalid bed-angle string payload ignored");
         return;
     }
