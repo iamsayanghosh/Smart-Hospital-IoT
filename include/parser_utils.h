@@ -1,6 +1,5 @@
 #pragma once
 
-#include <Arduino.h>
 #include <ctype.h>
 #include <math.h>
 #include <stdlib.h>
@@ -108,3 +107,4 @@ inline bool parseLongStrict(const char *str, long minVal, long maxVal, long &out
     outVal = val;
     return true;
 }
+

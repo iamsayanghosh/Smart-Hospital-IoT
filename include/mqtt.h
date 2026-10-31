@@ -38,6 +38,20 @@ extern PubSubClient mqttClient; ///< Global PubSubClient MQTT client instance
 bool isMqttClientConnected();
 
 /**
+ * @brief Controls simulated offline mode for Task 6 demonstration in Wokwi simulator.
+ *
+ * @param enable True to force network drop and buffer accumulation; false to restore online replay.
+ */
+void setSimulateOffline(bool enable);
+
+/**
+ * @brief Returns whether simulated offline mode is currently enforced.
+ *
+ * @return true if simulated offline mode is active.
+ */
+bool isSimulateOffline();
+
+/**
  * @brief FreeRTOS task managing MQTT lifecycle, message routing, and publication scheduling.
  *
  * Running at Priority 2 with an 8192-byte stack:

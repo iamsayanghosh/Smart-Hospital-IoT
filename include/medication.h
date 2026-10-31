@@ -38,6 +38,9 @@ void medicationInit();
  */
 void medicationTask(void *parameter);
 
+constexpr float MEDICATION_DOSAGE_MIN = 0.0f;                    ///< Minimum valid dosage (0 mg/hr = infusion stopped)
+constexpr float MEDICATION_DOSAGE_MAX = 100.0f;                  ///< Maximum hardware delivery limit (100 mg/hr)
+
 /**
  * @brief Constrains a requested dosage value to the valid infusion scale [0.0 - 100.0 mg/hr].
  *
@@ -46,7 +49,16 @@ void medicationTask(void *parameter);
  * @param value Raw dosage input in mg/hr.
  * @return float Clamped dosage in mg/hr within [0.0, 100.0].
  */
-float clampMedicationDosage(float value);
+inline float clampMedicationDosage(float value)
+{
+    if (!isfinite(value) || value < MEDICATION_DOSAGE_MIN) {
+        return MEDICATION_DOSAGE_MIN;
+    }
+    if (value > MEDICATION_DOSAGE_MAX) {
+        return MEDICATION_DOSAGE_MAX;
+    }
+    return value;
+}
 
 /**
  * @brief Classifies an applied dosage into its clinical risk tier.

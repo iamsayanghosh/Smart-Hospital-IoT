@@ -41,10 +41,19 @@
 PubSubClient mqttClient(wifiClient);
 
 static volatile bool mqttConnectedFlag = false;
+static volatile bool simForceOffline = false;
 constexpr uint32_t ALERT_ESCALATION_COOLDOWN_MS = 2000;
 
+void setSimulateOffline(bool enable) {
+    simForceOffline = enable;
+}
+
+bool isSimulateOffline() {
+    return simForceOffline;
+}
+
 bool isMqttClientConnected() {
-    return mqttConnectedFlag;
+    return mqttConnectedFlag && !simForceOffline;
 }
 
 const uint32_t MQTT_TASK_INTERVAL_MS = 3000;          ///< Telemetry and replay dispatch period (3 s = max 20 live/replay slots/min)
@@ -685,7 +694,13 @@ void mqttTask(void *parameter)
 
     while (true) {
         const uint32_t now = millis();
-        if (WiFi.status() != WL_CONNECTED) {
+        if (simForceOffline) {
+            if (mqttClient.connected()) {
+                mqttClient.disconnect();
+                Serial.println("[MQTT TASK] Disconnected by SIM_OFFLINE; buffering activated");
+            }
+            mqttConnectedFlag = false;
+        } else if (WiFi.status() != WL_CONNECTED) {
             if (now >= nextWifiRetryMs) {
                 Serial.println("[MQTT TASK] WiFi unavailable; retrying...");
                 WiFi.disconnect();
@@ -717,7 +732,7 @@ void mqttTask(void *parameter)
             }
         }
 
-        mqttConnectedFlag = mqttClient.connected();
+        mqttConnectedFlag = mqttClient.connected() && !simForceOffline;
 
         if (now - lastPublishMs >= MQTT_TASK_INTERVAL_MS) {
             lastPublishMs = now;

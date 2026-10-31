@@ -23,8 +23,6 @@
 #include <math.h>
 #include "esp_task_wdt.h"
 
-static constexpr float MEDICATION_DOSAGE_MIN = 0.0f;                    ///< Minimum valid dosage (0 mg/hr = infusion stopped)
-static constexpr float MEDICATION_DOSAGE_MAX = 100.0f;                  ///< Maximum permissible dosage (100 mg/hr)
 static constexpr float MEDICATION_CRITICAL_DOSAGE_THRESHOLD = 80.0f;    ///< Boundary above which physical confirmation is mandatory
 static constexpr float MEDICATION_RATE_LIMIT_STEP_MG_PER_SEC = 5.0f;   ///< Maximum allowable dosage slew rate (+5.0 mg/hr per second)
 static constexpr uint32_t MEDICATION_BUTTON_DEBOUNCE_MS = 50;           ///< Pushbutton contact debounce interval in milliseconds
@@ -44,13 +42,7 @@ void medicationInit()
  * @param value Desired dosage in mg/hr.
  * @return float Clamped value between 0.0 and 100.0 mg/hr (non-finite values return 0.0).
  */
-float clampMedicationDosage(float value)
-{
-    if (!isfinite(value)) {
-        return MEDICATION_DOSAGE_MIN;
-    }
-    return constrain(value, MEDICATION_DOSAGE_MIN, MEDICATION_DOSAGE_MAX);
-}
+// clampMedicationDosage is inlined in medication.h
 
 /**
  * @brief Categorizes dosage rate into discrete safety levels.

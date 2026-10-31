@@ -23,6 +23,7 @@
 #include "watchdog.h"
 #include "esp_task_wdt.h"
 #include "parser_utils.h"
+#include "mqtt.h"
 
 static volatile float simOverrideRoomTemp = -999.0f;
 static volatile float simOverrideOxygen = -999.0f;
@@ -130,12 +131,18 @@ void handleSerialCommands()
                 }
             } else if (command == "RESET_VITALS") {
                 resetSimulatedVitals();
+            } else if (command == "SIM_OFFLINE") {
+                setSimulateOffline(true);
+                Serial.println("[SIM CLI] SIM_OFFLINE: Network disconnected; offline buffering activated");
+            } else if (command == "SIM_ONLINE") {
+                setSimulateOffline(false);
+                Serial.println("[SIM CLI] SIM_ONLINE: Network restored; replaying buffered telemetry");
             } else if (command == "SHOW_TASK2") {
                 Serial.println("[TASK2] Medical feeds: medical-heart-rate | medical-spo2 | medical-body-temperature");
                 Serial.println("[TASK2] Facility feeds: facility-room-temperature | facility-oxygen | facility-aqi");
                 Serial.println("[TASK2] Event feed: hospital-events (alerts + summaries + status)");
             } else {
-                Serial.println("[SIM CLI] Commands: SET_ROOM <15-40>, SET_OXYGEN <18-25>, SET_AQI <0-300>, RESET_FACILITY, SET_HR <40-140>, SET_SPO2 <80-100>, SET_TEMP <34-42>, RESET_VITALS, SHOW_TASK2");
+                Serial.println("[SIM CLI] Commands: SET_ROOM <15-40>, SET_OXYGEN <18-25>, SET_AQI <0-300>, RESET_FACILITY, SET_HR <40-140>, SET_SPO2 <80-100>, SET_TEMP <34-42>, RESET_VITALS, SIM_OFFLINE, SIM_ONLINE, SHOW_TASK2");
             }
             continue;
         }

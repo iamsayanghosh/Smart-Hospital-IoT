@@ -68,7 +68,7 @@ void setup() {
   Serial.println("================================");
   Serial.println(
       "[SETUP] Adafruit IO credentials loaded from "
-      "include/adafruit_io_config.h or include/adafruit_io_config.local.h");
+      "adafruit_io_config.h or adafruit_io_config.local.h");
 
   outputsInit();
   medicationInit();

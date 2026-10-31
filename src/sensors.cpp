@@ -127,8 +127,16 @@ void temperatureTask(void *parameter)
             tempState = TEMP_IDLE;
             float rawTemp = simOverrideTemperature > -100.0f ? simOverrideTemperature : temperatureSensor.getTempCByIndex(0);
 
-            // Filter out sensor disconnects (-127 C) and default uninitialized power-on scratchpad (+85.0 C)
-            if (rawTemp != DEVICE_DISCONNECTED_C && rawTemp > -55.0f && rawTemp <= 125.0f && abs(rawTemp - 85.0f) > 0.05f) {
+            // Filter out default uninitialized power-on scratchpad (+85.0 C)
+            if (abs(rawTemp - 85.0f) <= 0.05f) {
+                Serial.println("[TEMP TASK] Ignored DS18B20 power-on reset scratchpad reading (85.0 C)");
+            } else if (rawTemp == DEVICE_DISCONNECTED_C || rawTemp <= -55.0f || rawTemp > 125.0f) {
+                Serial.println("[TEMP TASK] Warning: DS18B20 disconnected");
+                SensorMessage message = {};
+                message.type = TEMP_DATA;
+                message.temperature = DEVICE_DISCONNECTED_C;
+                sendSensorMessage(message, "TEMP TASK");
+            } else {
                 SensorMessage message = {};
                 message.type = TEMP_DATA;
                 message.temperature = rawTemp;
@@ -137,10 +145,6 @@ void temperatureTask(void *parameter)
                 Serial.print("[TEMP TASK] Temperature: ");
                 Serial.print(message.temperature, 1);
                 Serial.println(" C");
-            } else if (rawTemp == DEVICE_DISCONNECTED_C) {
-                Serial.println("[TEMP TASK] Warning: DS18B20 disconnected");
-            } else if (abs(rawTemp - 85.0f) <= 0.05f) {
-                Serial.println("[TEMP TASK] Ignored DS18B20 power-on reset scratchpad reading (85.0 C)");
             }
         }
 
