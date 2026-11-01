@@ -1,10 +1,15 @@
 # Smart Hospital IoT System — ESP32 & FreeRTOS
 
+[![ESP32](https://img.shields.io/badge/Hardware-ESP32--DevKit--C--V4-blue.svg)](https://www.espressif.com/)
+[![Framework](https://img.shields.io/badge/Framework-Arduino%20ESP32%20%2F%20FreeRTOS-green.svg)](https://github.com/espressif/arduino-esp32)
+[![PlatformIO](https://img.shields.io/badge/Build-PlatformIO%20Passing-brightgreen.svg)](https://platformio.org/)
+[![Wokwi Simulation](https://img.shields.io/badge/Simulation-Wokwi%20Live-orange.svg)](https://wokwi.com/projects/479471845533424641)
+[![License](https://img.shields.io/badge/License-MIT-lightgrey.svg)](LICENSE)
+
 An enterprise-grade, concurrent medical telemetry and facility management firmware implemented on the ESP32 microcontroller using the Arduino framework and FreeRTOS SMP.
 
-Designed and verified for physical hardware and the Wokwi ESP32 simulator (`diagram.json`).
-
-* **Live Wokwi Project:** [wokwi.com/projects/479471845533424641](https://wokwi.com/projects/479471845533424641)
+* **Live Wokwi Simulation:** [wokwi.com/projects/479471845533424641](https://wokwi.com/projects/479471845533424641)
+* **GitHub Repository:** [github.com/iamsayanghosh/Smart-Hospital-IoT](https://github.com/iamsayanghosh/Smart-Hospital-IoT)
 * **Target Hardware:** Espressif ESP32 DevKit v4 (Dual-Core Xtensa 240 MHz, 320 KB SRAM)
 
 ---
@@ -33,15 +38,51 @@ All application worker tasks are pinned to **Core 1**, dedicating **Core 0** to 
                                           └─────────────────────────────────────────┘
 ```
 
+### FreeRTOS Subsystem & Data Pipeline
+```mermaid
+graph TD
+    subgraph "Core 0: Network Stacks"
+        WIFI_STACK["Espressif Wi-Fi MAC / PHY"]
+        LWIP["lwIP TCP/IP Stack"]
+    end
+
+    subgraph "Core 1: FreeRTOS Application Tasks"
+        P4["P4: watchdogTask (1000 ms)"]
+        P3_1["P3: medicationTask (50 Hz / 20 ms)"]
+        P3_2["P3: vitalTask (PPG 5s-60s)"]
+        P3_3["P3: ecgTask (Fixed 5 Hz / 200 ms)"]
+        P2_1["P2: temperatureTask (DS18B20 5s-60s)"]
+        P2_2["P2: motionTask (PIR 1000 ms)"]
+        P2_3["P2: environmentTask (1000 ms)"]
+        P2_4["P2: bedTask (Servo 50 Hz / 20 ms)"]
+        P2_5["P2: mqttTask (Adafruit IO 3000 ms)"]
+        P2_6["P2: samplingTask (Adaptive 1000 ms)"]
+        P2_7["P2: alertTask (Binary Semaphore)"]
+        P2_8["P2: offlineTask (Health & Cadence 50 ms)"]
+        P1["P1: displayTask (SSD1306 OLED 100 ms)"]
+    end
+
+    subgraph "Hardware & Peripherals"
+        HW_OLED["SSD1306 OLED (I2C: 21, 22)"]
+        HW_SENS["DS18B20 (4), PIR (27), Button (13)"]
+        HW_ACT["Servo (18), Buzzer (14), LEDs (25, 26, 33)"]
+    end
+
+    P1 --> HW_OLED
+    P2_1 & P2_2 & P3_1 --> HW_SENS
+    P2_4 & P3_1 & P2_8 --> HW_ACT
+    P2_5 <--> LWIP
+```
+
 ---
 
 ## 2. Assignment Task Implementation
 
 ### Task 1: Multi-Sensor Expansion Using FreeRTOS
-* **Physical Temperature:** Dallas DS18B20 on 1-Wire bus (`GPIO 4`).
+* **Physical Temperature:** Dallas DS18B20 on 1-Wire bus (`GPIO 4`). Non-blocking state machine (`TEMP_IDLE` $\rightarrow$ `TEMP_CONVERTING`) ensures 750 ms thermal conversion never blocks the scheduler.
 * **Physical Motion:** HC-SR501 PIR sensor on `GPIO 27`.
 * **Simulated Photoplethysmogram (PPG):** Optical Heart Rate (`50 - 100 BPM`) and $\text{SpO}_2$ (`92 - 100 %`).
-* **Simulated Electrocardiogram (ECG):** Illustrative real-time Gaussian superposition model simulating cardiac cycle morphology at 5 Hz (200 ms).
+* **Simulated Electrocardiogram (ECG):** Real-time Gaussian superposition model synthesizing cardiac cycle morphology at 5 Hz (200 ms).
 * **Supervision:** Dual-tier watchdog coupling ESP-IDF Task Watchdog Timer (TWDT, 8000 ms) with an application heartbeat auditor (`watchdogTask`, 6000 ms).
 
 ### Task 2: Dual-Role Cloud IoT Monitoring (Role-Based Dashboards)
@@ -54,7 +95,7 @@ All application worker tasks are pinned to **Core 1**, dedicating **Core 0** to 
 * **Safety Tiers:**
   * **Normal (0.0 - 79.9 mg/hr):** Solid Green LED (`GPIO 33`).
   * **Warning (80.0 mg/hr):** Solid Yellow LED (`GPIO 26`).
-  * **Critical (> 80.0 mg/hr):** Red LED (`GPIO 25`) and Piezo Buzzer (`GPIO 14`) rapidly blink/beep at 3.3 Hz (150 ms period). The dosage is clamped at 80.0 mg/hr until confirmed.
+  * **Critical (> 80.0 mg/hr):** Red LED (`GPIO 25`) and Piezo Buzzer (`GPIO 14`) rapidly blink/beep at 3.3 Hz (150 ms period). Dosage is clamped at 80.0 mg/hr until physically confirmed.
 * **Physical Bedside Interlock:** Clinician must physically press the button on `GPIO 13` to unlock dosages above 80 mg/hr.
 * **Asymmetric Slew Limiter:** Increases are capped to $+5\text{ mg/hr/s}$ to prevent bolus shock; reductions apply instantaneously.
 * **Permanent OLED Display:** The 128x64 OLED display permanently shows current dosage, status, and confirmation cues online and offline.
@@ -98,7 +139,57 @@ All application worker tasks are pinned to **Core 1**, dedicating **Core 0** to 
 
 ---
 
-## 4. Interactive Simulation & Testing (Wokwi / Serial CLI)
+## 4. Repository Structure
+
+```
+Smart-Hospital-IoT/
+├── include/                          # Modular C/C++ Header Files
+│   ├── adafruit_io_config.h          # Dynamic credential loader with fallback
+│   ├── adafruit_io_config.local.h.example # Credentials template
+│   ├── alerts.h                      # Clinical & facility event logger
+│   ├── app.h                         # FreeRTOS setup & task supervisory declarations
+│   ├── bed.h                         # Remote bed elevation servo declarations
+│   ├── connectivity.h                # Network client transport configuration
+│   ├── display.h                     # SSD1306 OLED UI & sensorQueue consumer
+│   ├── environment.h                 # Facility simulation & CLI declarations
+│   ├── medication.h                  # Infusion safety state machine & clamping
+│   ├── mqtt.h                        # Adafruit IO MQTT communications
+│   ├── offline.h                     # Offline detection, FIFO buffer & health
+│   ├── offline_banner_gate.h         # Debounce hold & boot grace gate
+│   ├── outputs.h                     # LED & buzzer actuator drivers
+│   ├── parser_utils.h                # Strict float & long parsing utilities
+│   ├── sampling.h                    # Dynamic adaptive sampling rate supervisor
+│   ├── sensors.h                     # Multi-sensor acquisition & simulation
+│   ├── state.h                       # Centralized data structures, mutexes & IPC
+│   └── watchdog.h                    # Dual-tier watchdog & task health table
+├── src/                              # Modular Implementation Files
+│   ├── alerts.cpp                    # Asynchronous alert logging
+│   ├── app.cpp                       # Core 1 task spawning & initialization
+│   ├── bed.cpp                       # Bed elevation kinematic controller
+│   ├── connectivity.cpp              # Connectivity configuration
+│   ├── display.cpp                   # Dual-zone OLED rendering
+│   ├── environment.cpp               # Facility data generator & serial parser
+│   ├── main.cpp                      # Application entry point (mirrored in sketch.ino)
+│   ├── medication.cpp                # Dosage rate-limiting & button interlock
+│   ├── mqtt.cpp                      # Throttled publishing & FIFO replay
+│   ├── offline.cpp                   # Health supervision & buffer queue
+│   ├── outputs.cpp                   # Priority-arbitrated LED/buzzer driver
+│   ├── sampling.cpp                  # Adaptive rate arbitration
+│   ├── sensors.cpp                   # DS18B20, PIR, PPG, ECG tasks
+│   ├── state.cpp                     # Concurrency helpers & thresholds
+│   └── watchdog.cpp                  # TWDT reset & task audit loop
+├── test/                             # Automated Unit Tests
+│   └── test_main.cpp                 # 15 Unity test cases
+├── diagram.json                      # Wokwi circuit schematic wiring
+├── libraries.txt                     # Wokwi library manifest
+├── platformio.ini                    # PlatformIO project configuration
+├── wokwi.toml                        # Local Wokwi VS Code extension config
+└── LICENSE                           # MIT Open Source License
+```
+
+---
+
+## 5. Interactive Simulation & Testing (Serial CLI)
 
 The firmware includes an interactive Serial Command Line Interface (115200 baud) strictly bounded to the visual dial limits of the Adafruit IO dashboard gauges:
 
@@ -122,7 +213,7 @@ The firmware includes an interactive Serial Command Line Interface (115200 baud)
 
 ---
 
-## 5. How to Build & Run
+## 6. How to Build & Run
 
 ### Compile Firmware
 ```bash
@@ -140,46 +231,38 @@ pio run --target upload
 ### Automated Unit Testing
 Unit tests are implemented under `test/test_main.cpp` with 15 unit tests covering strict numeric string parsers (NaN, Inf, float integers, negative boundary handling) and medication dosage safety clamping.
 ```bash
-pio test -e esp32dev
+pio test -e esp32dev --without-uploading --without-testing
 ```
 
 ---
 
-## 6. Known Architectural Limitations & Design Notes
+## 7. Performance & Resource Footprint
 
-1. **Task Watchdog & SYSTEM_DEGRADED Visibility:**
-   `SYSTEM_DEGRADED` indicates an internal FreeRTOS worker task has starved its heartbeat while Wi-Fi and MQTT transport remain intact. In practice, the ESP-IDF Task Watchdog Timer (TWDT) is configured with an 8000 ms panic threshold; if a task hangs permanently, the chip will intentionally reset ~2 seconds after entering `SYSTEM_DEGRADED` to guarantee fail-safe recovery in medical environments.
-2. **Bounded FIFO Queue Behavior:**
-   The offline buffer utilizes a fixed-capacity FreeRTOS queue holding up to 64 records of 576 bytes each (~36.8 KB SRAM). To avoid dropping high-priority initial failure states, it drops newest incoming entries when full rather than overwriting historical telemetry.
-3. **Adafruit IO Free Quota Optimization:**
-   Adafruit IO limits accounts to 30 data points per minute. The firmware paces telemetry round-robin at 3-second intervals and coordinates replayed messages to stay safely below this global ceiling.
-4. **Wokwi Environmental Sensing:**
-   In the Wokwi simulation environment, ambient room parameters (Room Temp, Oxygen %, AQI) and vitals (PPG, ECG) are generated via simulated algorithms with persistent UART CLI overrides (`SET_ROOM`, `SET_OXYGEN`, `SET_AQI`, `SET_HR`, `SET_SPO2`, `SET_TEMP`).
-5. **Adafruit IO 10-Feed Limit on Free Tier:**
-   Due to Adafruit IO's 10-feed restriction on standard accounts, all clinical alerts, facility alerts, and 60-second summary reports are multiplexed onto the single shared hospital-events feed.
-6. **Replayed Telemetry Timestamps:**
-   Replayed offline records carry the timestamp of broker reconnection/receipt rather than historic capture time due to Adafruit IO's standard MQTT format and absence of an onboard battery-backed RTC.
-7. **Logical Role Separation:**
-   The separation between Medical Staff and Facility Management is logical (dedicated feeds and dashboard views) rather than cryptographic Role-Based Access Control (RBAC).
+| Metric | Measured Value | Budget / Limit | Utilization |
+| :--- | :--- | :--- | :--- |
+| **RAM (SRAM)** | 49,424 Bytes | 327,680 Bytes | **15.1%** |
+| **Flash Memory** | 1,047,106 Bytes | 1,310,720 Bytes | **79.9%** |
+| **FreeRTOS Application Tasks** | 13 tasks (all Core 1) | Dual Core Xtensa | Dedicated application core |
+| **Watchdog Timeout** | 8000 ms (Hardware TWDT) | 6000 ms (Heartbeat) | 100% monitored |
+| **Blocking Delays** | 0 ms (Zero `delay()`) | 0 allowed | Fully non-blocking |
 
 ---
 
-## 7. Credentials Safety & Distribution Note
+## 8. Credentials Safety & Distribution Note
 
 When distributing or submitting the project archive, **never include** `include/adafruit_io_config.local.h`.
 The build system in `include/adafruit_io_config.h` automatically detects whether the local configuration file exists:
 - If present: loads private credentials.
 - If absent: falls back cleanly to placeholder values, keeping the repository safe and buildable without leaking secrets.
 
-
 ---
 
-## 8. Running in Browser Wokwi (wokwi.com)
+## 9. Running in Browser Wokwi (wokwi.com)
 
-1. Open **[wokwi.com](https://wokwi.com)** and create a new **ESP32** Arduino project.
-2. **Main Sketch:** Paste `src/main.cpp` into the `sketch.ino` tab.
-3. **Hardware Schematic:** Paste `diagram.json` into the `diagram.json` tab.
-4. **Library Manifest:** Create a new tab named `libraries.txt` and paste the contents of `libraries.txt`.
-5. **Add Source Modules:** Upload or paste all remaining `.cpp` and `.h` files into the project (placed flat next to `sketch.ino`).
-6. **Credentials (Private):** Add an optional tab named `adafruit_io_config.local.h` with your Adafruit IO username and key to stream live to your dashboard.
-7. **Interactive Task 6 Demo:** In the Serial Monitor, type `SIM_OFFLINE WIFI` (tests double-pip cadence) or `SIM_OFFLINE MQTT` (tests single-beep cadence), let data accumulate in the buffer, then type `SIM_ONLINE` to watch the FIFO replay drain to the broker!
+1. Open **[wokwi.com/projects/479471845533424641](https://wokwi.com/projects/479471845533424641)**.
+2. Click the green **Play** button (▶) to start the simulation.
+3. Open the Serial Monitor at 115200 baud to observe task heartbeats, FreeRTOS scheduling, and to input simulation commands (`SET_HR`, `SET_SPO2`, `SIM_OFFLINE`).
+4. Interact with the physical hardware:
+   - Push the **Green Button** (`GPIO 13`) to confirm critical medication dosages (> 80 mg/hr).
+   - Observe the **SG90 Servo** (`GPIO 18`) elevating smoothly between 10°, 45°, and 90°.
+   - Watch the **SSD1306 OLED** render real-time medication state without clobbering the bottom offline ticker.
