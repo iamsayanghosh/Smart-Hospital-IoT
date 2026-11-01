@@ -69,14 +69,31 @@ void setSimulateOfflineMqtt(bool enable) {
     simForceMqttOffline = enable;
 }
 
+/**
+ * @brief Queries whether simulated Wi-Fi disconnect flag is set.
+ *
+ * @return true if simulated Wi-Fi drop is active; false otherwise.
+ */
 bool isSimulateOfflineWifi() {
     return simForceWifiOffline;
 }
 
+/**
+ * @brief Queries whether simulated MQTT disconnect flag is set.
+ *
+ * @return true if simulated MQTT drop is active; false otherwise.
+ */
 bool isSimulateOfflineMqtt() {
     return simForceMqttOffline;
 }
 
+/**
+ * @brief Thread-safe query of active MQTT connection status.
+ *
+ * Reflects broker connection status filtered through simulation override flags.
+ *
+ * @return true if connected to broker and not in simulated offline mode.
+ */
 bool isMqttClientConnected() {
     return mqttConnectedFlag && !simForceMqttOffline && !simForceWifiOffline;
 }

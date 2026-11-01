@@ -38,13 +38,31 @@ extern PubSubClient mqttClient; ///< Global PubSubClient MQTT client instance
 bool isMqttClientConnected();
 
 /**
- * @brief Controls simulated offline modes for Task 6 demonstration in Wokwi simulator.
+ * @brief Sets simulated Wi-Fi disconnect flag for Task 6 demonstration in Wokwi.
  *
- * @param enable True to force network drop and buffer accumulation; false to restore online replay.
+ * @param enable True to force Wi-Fi drop; false to restore online replay.
  */
 void setSimulateOfflineWifi(bool enable);
+
+/**
+ * @brief Sets simulated MQTT broker disconnect flag for Task 6 demonstration in Wokwi.
+ *
+ * @param enable True to force MQTT broker drop; false to restore online replay.
+ */
 void setSimulateOfflineMqtt(bool enable);
+
+/**
+ * @brief Queries whether simulated Wi-Fi offline mode is active.
+ *
+ * @return true if simulated Wi-Fi drop is enabled; false otherwise.
+ */
 bool isSimulateOfflineWifi();
+
+/**
+ * @brief Queries whether simulated MQTT broker offline mode is active.
+ *
+ * @return true if simulated MQTT drop is enabled; false otherwise.
+ */
 bool isSimulateOfflineMqtt();
 
 /**

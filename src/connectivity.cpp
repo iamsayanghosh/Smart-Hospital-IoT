@@ -16,6 +16,13 @@ const uint16_t mqttPort = AIO_MQTT_PORT;
 
 WiFiClient wifiClient;
 
+/**
+ * @brief Pre-initialization hook for network connectivity.
+ *
+ * The active Wi-Fi connection loop is deliberately deferred to mqttTask
+ * to ensure system startup and local control tasks (medication, bed, watchdog)
+ * begin executing immediately without network blocking delays.
+ */
 void setupConnectivity()
 {
     // The active Wi-Fi connection loop is deliberately deferred to mqttTask

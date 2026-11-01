@@ -22,6 +22,12 @@ struct OfflineBannerGate {
     bool tracking;
     bool graceDone;
 
+    /**
+     * @brief Constructor configuring debounce hold duration and initial boot grace period.
+     *
+     * @param hold Milliseconds the link must remain down before triggering offline banner (5000 ms).
+     * @param grace Milliseconds after boot before offline status may be confirmed (10000 ms).
+     */
     OfflineBannerGate(uint32_t hold, uint32_t grace)
         : holdMs(hold), bootGraceMs(grace), offlineSinceMs(0), tracking(false), graceDone(false) {}
 

@@ -30,6 +30,11 @@ static volatile int simOverrideHeartRate = -1;
 static volatile int simOverrideSpo2 = -1;
 static volatile float simOverrideTemperature = -999.0f;
 
+/**
+ * @brief Overrides simulated heart rate for interactive testing/demonstration in Wokwi/CLI.
+ *
+ * @param hr Forced heart rate in BPM, or -1 to restore random simulation.
+ */
 void setSimulatedHeartRate(int hr) {
     simOverrideHeartRate = hr;
     Serial.print("[SIM CLI] Forced Heart Rate: ");
@@ -37,6 +42,11 @@ void setSimulatedHeartRate(int hr) {
     Serial.println(" BPM");
 }
 
+/**
+ * @brief Overrides simulated blood oxygen saturation for interactive testing in Wokwi/CLI.
+ *
+ * @param spo2 Forced SpO2 percentage [0-100], or -1 to restore random simulation.
+ */
 void setSimulatedSpo2(int spo2) {
     simOverrideSpo2 = spo2;
     Serial.print("[SIM CLI] Forced SpO2: ");
@@ -44,6 +54,11 @@ void setSimulatedSpo2(int spo2) {
     Serial.println(" %");
 }
 
+/**
+ * @brief Overrides simulated patient body temperature for interactive testing in Wokwi/CLI.
+ *
+ * @param temp Forced temperature in deg C, or -999.0f to restore sensor simulation.
+ */
 void setSimulatedTemperature(float temp) {
     simOverrideTemperature = temp;
     Serial.print("[SIM CLI] Forced Temperature: ");
@@ -51,6 +66,9 @@ void setSimulatedTemperature(float temp) {
     Serial.println(" C");
 }
 
+/**
+ * @brief Restores nominal physiological vitals simulation, clearing all active overrides.
+ */
 void resetSimulatedVitals() {
     simOverrideHeartRate = -1;
     simOverrideSpo2 = -1;

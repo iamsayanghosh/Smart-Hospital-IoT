@@ -97,6 +97,11 @@ bool isFacilityAbnormal(const FacilityTelemetry &data)
            data.aqi > facilityThresholds.aqi.high;
 }
 
+/**
+ * @brief Retrieves a thread-safe atomic copy of current medication control state.
+ *
+ * @return MedicationDosageControl Snapshot copy.
+ */
 MedicationDosageControl getMedicationDosageSnapshot()
 {
     MedicationDosageControl snapshot;

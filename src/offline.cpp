@@ -26,6 +26,13 @@ static SystemHealthState currentHealth = SYSTEM_ONLINE;       ///< Current overa
 static OfflineBuzzerMode currentBuzzer = BUZZER_MODE_NORMAL; ///< Current acoustic cadence demanded by network state
 static volatile bool offlineAlertConfirmed = false;
 
+/**
+ * @brief Queries whether offline status is confirmed after boot grace (10s) and debounce hold (5s).
+ *
+ * Single canonical gate shared by both the buzzer (offline.cpp) and OLED banner (display.cpp).
+ *
+ * @return true if offline status is confirmed and active.
+ */
 bool isOfflineAlertConfirmed() {
     return offlineAlertConfirmed;
 }

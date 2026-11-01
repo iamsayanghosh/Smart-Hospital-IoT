@@ -199,7 +199,7 @@ void appInit()
  *
  * Configures TWDT with an 8000 ms timeout and enables Core 1 idle task monitoring
  * only (.idle_core_mask = (1 << 1)), with panic triggered on expiration.
- * All 12 application tasks are explicitly pinned to Core 1 with calibrated priorities and stacks.
+ * All 13 application tasks are explicitly pinned to Core 1 with calibrated priorities and stacks.
  */
 void appStartTasks()
 {
