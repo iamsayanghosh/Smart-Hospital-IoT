@@ -6,9 +6,21 @@
 !.vscode/extensions.json
 !.vscode/tasks.json
 !.vscode/launch.json
+compile_commands.json
 
-# Local credentials
+# Local credentials & private secrets
 include/adafruit_io_config.local.h
 
 # PlatformIO-generated metadata
 .cache/
+
+# Local archives and packages
+*.zip
+*.tar.gz
+
+# OS-generated metadata
+.DS_Store
+Thumbs.db
+
+# Local temporary notes
+Build all internship tasks in a singl.css

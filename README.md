@@ -4,6 +4,9 @@ An enterprise-grade, concurrent medical telemetry and facility management firmwa
 
 Designed and verified for physical hardware and the Wokwi ESP32 simulator (`diagram.json`).
 
+* **Live Wokwi Project:** [wokwi.com/projects/479471845533424641](https://wokwi.com/projects/479471845533424641)
+* **Target Hardware:** Espressif ESP32 DevKit v4 (Dual-Core Xtensa 240 MHz, 320 KB SRAM)
+
 ---
 
 ## 1. System Architecture & Concurrency Model
