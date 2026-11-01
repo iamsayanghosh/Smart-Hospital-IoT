@@ -22,5 +22,8 @@ include/adafruit_io_config.local.h
 .DS_Store
 Thumbs.db
 
-# Local temporary notes
+# Local temporary notes and root screenshots
 Build all internship tasks in a singl.css
+*.png
+*.jpg
+*.jpeg
