@@ -268,9 +268,9 @@ bool sendSensorMessage(const SensorMessage &message, const char *taskName);
 /**
  * @brief Analyzes patient telemetry and constructs an alert candidate if a threshold is violated.
  *
- * Evaluates physiological parameters in priority order: Heart Rate (<50 or >100 BPM Critical),
- * SpO2 (<88% Critical, 88-91% Warning), ECG Rate (<50 or >110 BPM Critical), and
- * Body Temperature (<34°C or >39.5°C Critical, 34-36°C or 38-39.5°C Warning).
+ * Evaluates physiological parameters in priority order: Heart Rate (<45 or >120 BPM Critical,
+ * 45-49 or 101-120 BPM Warning), SpO2 (<88% Critical, 88-91% Warning), ECG Rate (<45 or >120 BPM Critical,
+ * 45-49 or 101-120 BPM Warning), and Body Temperature (<34°C or >39.5°C Critical, 34-36°C or 38-39.5°C Warning).
  *
  * @param snapshot Evaluated patient vitals snapshot.
  * @return AlertCandidate Populated candidate descriptor.

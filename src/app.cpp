@@ -228,7 +228,7 @@ void appStartTasks()
     }
 
     // Pin every task to Core 1. Actual priorities are watchdog 4, vital/ECG/
-    // medication 3, temperature/motion/MQTT/alert 2, and display 1.
+    // medication 3, temperature/motion/MQTT/alert/sampling/bed/offline/environment 2, and display 1.
     bool tasksStarted =
         createTask(watchdogTask, "Watchdog Task", 4, &watchdogHandle) &&
         createTask(vitalTask, "Vital Task", 3, &monitoredHandles[TASK_VITAL]) &&
