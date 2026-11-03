@@ -201,7 +201,7 @@ Smart-Hospital-IoT/
 
 ## 5. Interactive Simulation & Testing (Serial CLI)
 
-The firmware includes an interactive Serial Command Line Interface (115200 baud) strictly bounded to the visual dial limits of the Adafruit IO dashboard gauges:
+The firmware includes an interactive Serial Command Line Interface (115200 baud) strictly bounded to the visual dial limits of the Adafruit IO dashboard gauges. CLI overrides trigger an immediate sample (<0.5 s); the nominal autonomous 60 s / 5 s adaptive cadence is unchanged.
 
 ### Patient Vitals Simulation Commands:
 * `SET_HR <40-140>`: Force patient heart rate (e.g. `SET_HR 105` for Warning, `SET_HR 130` for Emergency).

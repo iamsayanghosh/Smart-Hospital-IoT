@@ -29,6 +29,8 @@
 static volatile int simOverrideHeartRate = -1;
 static volatile int simOverrideSpo2 = -1;
 static volatile float simOverrideTemperature = -999.0f;
+static volatile bool simImmediateVitalSample = false;
+static volatile bool simImmediateTempSample = false;
 
 /**
  * @brief Overrides simulated heart rate for interactive testing/demonstration in Wokwi/CLI.
@@ -37,6 +39,7 @@ static volatile float simOverrideTemperature = -999.0f;
  */
 void setSimulatedHeartRate(int hr) {
     simOverrideHeartRate = hr;
+    simImmediateVitalSample = true;
     Serial.print("[SIM CLI] Forced Heart Rate: ");
     Serial.print(hr);
     Serial.println(" BPM");
@@ -49,6 +52,7 @@ void setSimulatedHeartRate(int hr) {
  */
 void setSimulatedSpo2(int spo2) {
     simOverrideSpo2 = spo2;
+    simImmediateVitalSample = true;
     Serial.print("[SIM CLI] Forced SpO2: ");
     Serial.print(spo2);
     Serial.println(" %");
@@ -61,6 +65,7 @@ void setSimulatedSpo2(int spo2) {
  */
 void setSimulatedTemperature(float temp) {
     simOverrideTemperature = temp;
+    simImmediateTempSample = true;
     Serial.print("[SIM CLI] Forced Temperature: ");
     Serial.print(temp, 1);
     Serial.println(" C");
@@ -73,6 +78,8 @@ void resetSimulatedVitals() {
     simOverrideHeartRate = -1;
     simOverrideSpo2 = -1;
     simOverrideTemperature = -999.0f;
+    simImmediateVitalSample = true;
+    simImmediateTempSample = true;
     Serial.println("[SIM CLI] Restored nominal random vitals simulation");
 }
 
@@ -125,7 +132,12 @@ void temperatureTask(void *parameter)
         uint32_t now = millis();
         uint32_t period = getSamplePeriodMs(TASK_TEMP);
         
-        if (tempState == TEMP_IDLE && (now - lastSampleMs >= period || lastSampleMs == 0)) {
+        bool forced = (tempState == TEMP_IDLE) && simImmediateTempSample;
+        if (forced) {
+            simImmediateTempSample = false;
+        }
+
+        if (tempState == TEMP_IDLE && (forced || now - lastSampleMs >= period || lastSampleMs == 0)) {
             lastSampleMs = now;
             if (simOverrideTemperature > -100.0f) {
                 SensorMessage message = {};
@@ -233,7 +245,10 @@ void vitalTask(void *parameter)
         uint32_t now = millis();
         uint32_t period = getSamplePeriodMs(TASK_VITAL);
         
-        if (now - lastSampleMs >= period || lastSampleMs == 0) {
+        bool forced = simImmediateVitalSample;
+        simImmediateVitalSample = false;
+
+        if (forced || now - lastSampleMs >= period || lastSampleMs == 0) {
             lastSampleMs = now;
             SensorMessage message = {};
             message.type = VITAL_DATA;
