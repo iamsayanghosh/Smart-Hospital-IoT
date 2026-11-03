@@ -3,12 +3,12 @@
 [![ESP32](https://img.shields.io/badge/Hardware-ESP32--DevKit--C--V4-blue.svg)](https://www.espressif.com/)
 [![Framework](https://img.shields.io/badge/Framework-Arduino%20ESP32%20%2F%20FreeRTOS-green.svg)](https://github.com/espressif/arduino-esp32)
 [![PlatformIO](https://img.shields.io/badge/Build-PlatformIO%20Passing-brightgreen.svg)](https://platformio.org/)
-[![Wokwi Simulation](https://img.shields.io/badge/Simulation-Wokwi%20Live-orange.svg)](https://wokwi.com/projects/479471845533424641)
+[![Wokwi Simulation](https://img.shields.io/badge/Simulation-Wokwi%20Live-orange.svg)](https://wokwi.com/projects/479638666615150593)
 [![License](https://img.shields.io/badge/License-MIT-lightgrey.svg)](LICENSE)
 
 An enterprise-grade, concurrent medical telemetry and facility management firmware implemented on the ESP32 microcontroller using the Arduino framework and FreeRTOS SMP.
 
-* **Live Wokwi Simulation:** [wokwi.com/projects/479471845533424641](https://wokwi.com/projects/479471845533424641)
+* **Live Wokwi Simulation:** [wokwi.com/projects/479638666615150593](https://wokwi.com/projects/479638666615150593)
 * **GitHub Repository:** [github.com/iamsayanghosh/Smart-Hospital-IoT](https://github.com/iamsayanghosh/Smart-Hospital-IoT)
 * **Target Hardware:** Espressif ESP32 DevKit v4 (Dual-Core Xtensa 240 MHz, 320 KB SRAM)
 
@@ -276,7 +276,7 @@ The build system in `include/adafruit_io_config.h` automatically detects whether
 
 ## 10. Running in Browser Wokwi (wokwi.com)
 
-1. Open **[wokwi.com/projects/479471845533424641](https://wokwi.com/projects/479471845533424641)**.
+1. Open **[wokwi.com/projects/479638666615150593](https://wokwi.com/projects/479638666615150593)**.
 2. Click the green **Play** button (▶) to start the simulation.
 3. Open the Serial Monitor at 115200 baud to observe task heartbeats, FreeRTOS scheduling, and to input simulation commands (`SET_HR`, `SET_SPO2`, `SIM_OFFLINE`).
 4. Interact with the physical hardware:
