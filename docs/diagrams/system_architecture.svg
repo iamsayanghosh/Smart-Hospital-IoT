@@ -33,7 +33,7 @@
 
   <!-- Title Banner -->
   <rect x="30" y="20" width="1340" height="65" rx="12" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
-  <text x="55" y="52" fill="#f8fafc" font-size="22" font-weight="bold">Smart Hospital IoT System &amp;mdash; System Architecture Diagram</text>
+  <text x="55" y="52" fill="#f8fafc" font-size="22" font-weight="bold">Smart Hospital IoT System &#8212; System Architecture Diagram</text>
   <text x="55" y="72" fill="#94a3b8" font-size="13">Dual-Core ESP32 SoC Architecture &bull; FreeRTOS SMP Multitasking &bull; Thread-Safe IPC &bull; Hardware Peripherals &bull; Adafruit IO MQTT</text>
 
   <!-- Hardware Layer (Left Column) -->
