@@ -5,12 +5,16 @@
 [![PlatformIO](https://img.shields.io/badge/Build-PlatformIO%20Passing-brightgreen.svg)](https://platformio.org/)
 [![Wokwi Simulation](https://img.shields.io/badge/Simulation-Wokwi%20Live-orange.svg)](https://wokwi.com/projects/479638666615150593)
 [![License](https://img.shields.io/badge/License-MIT-lightgrey.svg)](LICENSE)
+[![Project Report](https://img.shields.io/badge/Report-PDF%20Available-red.svg)](docs/Smart_Hospital_IoT_Project_Report.pdf)
 
 An enterprise-grade, concurrent medical telemetry and facility management firmware implemented on the ESP32 microcontroller using the Arduino framework and FreeRTOS SMP.
 
 * **Live Wokwi Simulation:** [wokwi.com/projects/479638666615150593](https://wokwi.com/projects/479638666615150593)
 * **GitHub Repository:** [github.com/iamsayanghosh/Smart-Hospital-IoT](https://github.com/iamsayanghosh/Smart-Hospital-IoT)
 * **Target Hardware:** Espressif ESP32 DevKit v4 (Dual-Core Xtensa 240 MHz, 320 KB SRAM)
+* **Project Report (PDF):** [docs/Smart_Hospital_IoT_Project_Report.pdf](docs/Smart_Hospital_IoT_Project_Report.pdf)
+* **System Architecture Blueprint:** [docs/system_architecture.svg](docs/system_architecture.svg) | [PNG](docs/system_architecture.png)
+* **System Workflow Diagram:** [docs/system_workflow.svg](docs/system_workflow.svg) | [PNG](docs/system_workflow.png)
 
 ---
 
@@ -178,6 +182,12 @@ Smart-Hospital-IoT/
 │   ├── sensors.cpp                   # DS18B20, PIR, PPG, ECG tasks
 │   ├── state.cpp                     # Concurrency helpers & thresholds
 │   └── watchdog.cpp                  # TWDT reset & task audit loop
+├── docs/                             # Engineering Documentation & Deliverables
+│   ├── Smart_Hospital_IoT_Project_Report.pdf # Comprehensive Technical Report (PDF)
+│   ├── system_architecture.svg       # Dual-Core SMP Architecture Blueprint
+│   ├── system_architecture.png       # High-DPI Architecture Diagram
+│   ├── system_workflow.svg           # End-to-End Workflow & Dataflow
+│   └── system_workflow.png           # High-DPI Workflow Diagram
 ├── test/                             # Automated Unit Tests
 │   └── test_main.cpp                 # 15 Unity test cases
 ├── diagram.json                      # Wokwi circuit schematic wiring

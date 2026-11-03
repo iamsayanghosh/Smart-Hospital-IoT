@@ -22,6 +22,10 @@ include/adafruit_io_config.local.h
 .DS_Store
 Thumbs.db
 
+# Local scratch scripts and task notes
+scratch/
+*Build all internship tasks*
+
 # Root temporary screenshots (allow documentation screenshots in docs/ and screenshots/)
 /*.png
 /*.jpg
