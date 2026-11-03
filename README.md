@@ -82,7 +82,7 @@ graph TD
 * **Physical Temperature:** Dallas DS18B20 on 1-Wire bus (`GPIO 4`). Non-blocking state machine (`TEMP_IDLE` $\rightarrow$ `TEMP_CONVERTING`) ensures 750 ms thermal conversion never blocks the scheduler.
 * **Physical Motion:** HC-SR501 PIR sensor on `GPIO 27`.
 * **Simulated Photoplethysmogram (PPG):** Optical Heart Rate (`50 - 100 BPM`) and $\text{SpO}_2$ (`92 - 100 %`).
-* **Simulated Electrocardiogram (ECG):** Real-time Gaussian superposition model synthesizing cardiac cycle morphology at 5 Hz (200 ms).
+* **Simulated Electrocardiogram (ECG):** Illustrative real-time Gaussian superposition model synthesizing coarse cardiac cycle morphology at 5 Hz (200 ms cadence) for IoT demonstration (clinical diagnostic ECG requires $\ge 250\text{ Hz}$).
 * **Supervision:** Dual-tier watchdog coupling ESP-IDF Task Watchdog Timer (TWDT, 8000 ms) with an application heartbeat auditor (`watchdogTask`, 6000 ms).
 
 ### Task 2: Dual-Role Cloud IoT Monitoring (Role-Based Dashboards)
@@ -213,7 +213,24 @@ The firmware includes an interactive Serial Command Line Interface (115200 baud)
 
 ---
 
-## 6. How to Build & Run
+## 6. Known Architectural Limitations & Design Notes
+
+1. **Multiplexed Event Feed (Adafruit IO Quotas):**
+   Due to Adafruit IO's 10-feed limit on standard accounts (6 sensor feeds + 3 control feeds + 1 event feed), all clinical alerts, facility alerts, and 60-second summary reports are multiplexed onto the single shared `hospital-events` feed.
+2. **Logical Role Separation:**
+   Role separation between Medical Staff and Facility Management dashboards is implemented at the topic and dashboard layout level rather than through enforced multi-tenant cryptographic access control (RBAC).
+3. **Replayed Telemetry Arrival Timestamps:**
+   Replayed offline records carry the timestamp of broker reconnection/receipt rather than historic capture time due to Adafruit IO's standard MQTT ingestion format and absence of an onboard battery-backed RTC.
+4. **Bounded FIFO RAM Buffer:**
+   The offline buffer utilizes an in-memory FreeRTOS queue holding up to 64 records of 576 bytes each (~36.8 KB SRAM). When capacity is reached, it drops newest incoming records to protect initial fault events. It is RAM-only and lost upon power cycle or hardware reset.
+5. **Task Watchdog & SYSTEM_DEGRADED Window:**
+   `SYSTEM_DEGRADED` indicates an internal FreeRTOS worker task has starved its heartbeat while transport remains active. The ESP-IDF Task Watchdog Timer (TWDT) enforces an 8000 ms panic threshold; if a task hangs permanently, the chip resets ~2 seconds after entering `SYSTEM_DEGRADED` to guarantee fail-safe recovery in medical environments.
+6. **Simulated Sensor Telemetry:**
+   In simulation mode, physiological vitals (PPG, ECG) and ambient facility conditions (Room Temp, Oxygen %, AQI) are synthesized via mathematical models (e.g. Gaussian superposition) and UART CLI overrides (`SET_HR`, `SET_SPO2`, `SET_TEMP`, `SET_ROOM`, `SET_OXYGEN`, `SET_AQI`).
+
+---
+
+## 7. How to Build & Run
 
 ### Compile Firmware
 ```bash
@@ -236,7 +253,7 @@ pio test -e esp32dev --without-uploading --without-testing
 
 ---
 
-## 7. Performance & Resource Footprint
+## 8. Performance & Resource Footprint
 
 | Metric | Measured Value | Budget / Limit | Utilization |
 | :--- | :--- | :--- | :--- |
@@ -248,7 +265,7 @@ pio test -e esp32dev --without-uploading --without-testing
 
 ---
 
-## 8. Credentials Safety & Distribution Note
+## 9. Credentials Safety & Distribution Note
 
 When distributing or submitting the project archive, **never include** `include/adafruit_io_config.local.h`.
 The build system in `include/adafruit_io_config.h` automatically detects whether the local configuration file exists:
@@ -257,7 +274,7 @@ The build system in `include/adafruit_io_config.h` automatically detects whether
 
 ---
 
-## 9. Running in Browser Wokwi (wokwi.com)
+## 10. Running in Browser Wokwi (wokwi.com)
 
 1. Open **[wokwi.com/projects/479471845533424641](https://wokwi.com/projects/479471845533424641)**.
 2. Click the green **Play** button (▶) to start the simulation.

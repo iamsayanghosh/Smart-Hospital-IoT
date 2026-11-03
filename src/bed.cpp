@@ -37,7 +37,6 @@ enum BedMode {
     BED_MODE_SLEEPING,          ///< Rest angle (10°) during stable condition
     BED_MODE_BREATHING_SUPPORT, ///< Elevated angle (45°) for respiratory support (SpO2 88-91%)
     BED_MODE_EMERGENCY,         ///< Upright angle (90°) during acute physiological crises
-    BED_MODE_MANUAL             ///< Clinician-defined angle commanded via dashboard
 };
 
 /**
@@ -65,7 +64,6 @@ void bedTask(void *parameter)
     bedServo.writeMicroseconds(BED_SERVO_MIN_PULSE + (int)((currentAngle / BED_SERVO_MAX_ANGLE) * (BED_SERVO_MAX_PULSE - BED_SERVO_MIN_PULSE)));
 
     BedMode lastAutoMode = BED_MODE_SLEEPING;
-    bool isManualOverride = false;
     float targetAngle = 0.0f;
     float speedPerSecond = 1.5f;
 
@@ -87,7 +85,6 @@ void bedTask(void *parameter)
             if (targetAngle < 0.0f) targetAngle = 0.0f;
             if (targetAngle > 90.0f) targetAngle = 90.0f;
             
-            isManualOverride = true;
             speedPerSecond = 2.0f; // Manual: 2°/second
             Serial.print("[BED] Manual mode activated, target angle: ");
             Serial.println(targetAngle);
@@ -120,7 +117,6 @@ void bedTask(void *parameter)
         if (currentAutoMode != lastAutoMode || initialEval) {
             lastAutoMode = currentAutoMode;
             initialEval = false;
-            isManualOverride = false;
 
             if (currentAutoMode == BED_MODE_SLEEPING) {
                 targetAngle = 10.0f;

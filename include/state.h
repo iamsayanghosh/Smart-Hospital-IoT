@@ -94,10 +94,10 @@ struct TaskHeartbeat {
 };
 
 struct TieredThreshold {
-    float low = 0.0f;           ///< Nominal/Warning lower boundary (< triggers warning)
-    float high = 0.0f;          ///< Nominal/Warning upper boundary (> triggers warning)
-    float criticalLow = 0.0f;   ///< Critical lower boundary (< triggers critical)
-    float criticalHigh = 0.0f;  ///< Critical upper boundary (> triggers critical)
+    float low;           ///< Nominal/Warning lower boundary (< triggers warning)
+    float high;          ///< Nominal/Warning upper boundary (> triggers warning)
+    float criticalLow;   ///< Critical lower boundary (< triggers critical)
+    float criticalHigh;  ///< Critical upper boundary (> triggers critical)
 };
 
 // Alias for backwards compatibility

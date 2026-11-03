@@ -725,7 +725,6 @@ void mqttTask(void *parameter)
     mqttClient.setServer(mqttBroker, mqttPort);
     mqttClient.setSocketTimeout(3);
     configureMqttBuffer();
-    uint32_t lastWifiAttempt = 0;
     uint32_t nextWifiRetryMs = 0;
     uint32_t wifiRetryDelayMs = MQTT_INITIAL_RETRY_DELAY_MS;
     uint32_t lastSummaryPublishMs = 0;
