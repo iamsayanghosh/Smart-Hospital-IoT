@@ -175,7 +175,7 @@ Smart-Hospital-IoT/
 │   ├── connectivity.cpp              # Connectivity configuration
 │   ├── display.cpp                   # Dual-zone OLED rendering
 │   ├── environment.cpp               # Facility data generator & serial parser
-│   ├── main.cpp                      # Application entry point (mirrored in sketch.ino)
+│   ├── main.cpp                      # Application entry point (setup, loop, task start)
 │   ├── medication.cpp                # Dosage rate-limiting & button interlock
 │   ├── mqtt.cpp                      # Throttled publishing & FIFO replay
 │   ├── offline.cpp                   # Health supervision & buffer queue
