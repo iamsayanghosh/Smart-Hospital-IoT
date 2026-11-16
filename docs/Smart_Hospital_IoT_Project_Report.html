@@ -267,7 +267,7 @@
 <div class="cover-page page-break">
   <div>
     <div class="cover-header">
-      <div class="cover-tag">IoT &amp; Embedded Systems Internship &bull; Capstone Report</div>
+      <div class="cover-tag">IoT &amp; Embedded Systems &bull; Capstone Technical Report</div>
       <h1 class="cover-title">Smart Hospital IoT System</h1>
       <p class="cover-subtitle">
         An Enterprise-Grade, Concurrent Medical Telemetry and Automated Actuation Firmware<br>
@@ -277,7 +277,7 @@
 
     <div class="cover-meta-grid">
       <div class="meta-item">
-        <div class="meta-label">Candidate Name</div>
+        <div class="meta-label">Author</div>
         <div class="meta-value">Sayan Ghosh</div>
       </div>
       <div class="meta-item">
@@ -285,8 +285,8 @@
         <div class="meta-value">IoT &amp; Embedded Systems Engineering</div>
       </div>
       <div class="meta-item">
-        <div class="meta-label">Training Organization</div>
-        <div class="meta-value">Elevance Skills</div>
+        <div class="meta-label">Project Status</div>
+        <div class="meta-value">Integrated Capstone Submission</div>
       </div>
       <div class="meta-item">
         <div class="meta-label">Submission Date</div>
@@ -309,11 +309,10 @@
       &bull; <strong>GitHub Repository (Complete Source Code):</strong> 
       <a href="https://github.com/iamsayanghosh/Smart-Hospital-IoT">github.com/iamsayanghosh/Smart-Hospital-IoT</a><br>
       &bull; <strong>Wokwi Project Link (Unified Interactive Simulation):</strong> 
-      <a href="https://wokwi.com/projects/479638666615150593">wokwi.com/projects/479638666615150593</a><br>
-      &bull; <strong>Program Queries &amp; Support:</strong> <code>training@elevanceskills.com</code>
+      <a href="https://wokwi.com/projects/479638666615150593">wokwi.com/projects/479638666615150593</a>
     </div>
     <div class="footer">
-      <span>Elevance Skills IoT Internship Technical Submission</span>
+      <span>Smart Hospital IoT Embedded Firmware Capstone</span>
       <span>November 2026</span>
     </div>
   </div>
@@ -330,7 +329,7 @@
   </p>
   <p>
     The firmware executes on FreeRTOS Symmetric Multiprocessing (SMP), allocating network protocol stacks (Wi-Fi and lwIP) to 
-    <strong>Core 0</strong> while dedicating <strong>Core 1</strong> exclusively to 12 prioritized application tasks. Inter-task 
+    <strong>Core 0</strong> while dedicating <strong>Core 1</strong> exclusively to 13 prioritized application tasks. Inter-task 
     communication is strictly synchronized using thread-safe FreeRTOS mutexes, queues, and semaphores, ensuring zero race conditions. 
     A dual-tier watchdog supervisor couples the hardware ESP-IDF Task Watchdog Timer (TWDT) with an application heartbeat monitor to guarantee 
     unfailing real-time reliability in clinical environments.
@@ -426,7 +425,7 @@
         <td><strong>SG90 Micro-Servo</strong></td>
         <td>PWM Pulse Width</td>
         <td><code>GPIO 18</code></td>
-        <td>50 Hz PWM (544 &mu;s to 2400 &mu;s pulse width)</td>
+        <td>50 Hz PWM (500 &mu;s to 2400 &mu;s pulse width)</td>
         <td>Task 4: Intelligent remote hospital bed angle elevation</td>
       </tr>
     </tbody>
@@ -437,7 +436,7 @@
 <div class="page-break">
   <h1>2. Concurrency Model &amp; FreeRTOS Task Scheduling (Task 1)</h1>
   <p>
-    The system utilizes FreeRTOS Symmetric Multiprocessing (SMP) to execute 12 application tasks concurrently across a 
+    The system utilizes FreeRTOS Symmetric Multiprocessing (SMP) to execute 13 application tasks concurrently across a 
     strict priority hierarchy. All application tasks are pinned to <strong>Core 1</strong>, dedicating <strong>Core 0</strong> 
     exclusively to Wi-Fi and TCP/IP protocol processing.
   </p>
@@ -455,106 +454,109 @@
     <tbody>
       <tr>
         <td><code>watchdogTask</code></td>
-        <td><strong>Priority 5</strong> (Highest)</td>
-        <td>6000 ms periodic</td>
-        <td>2560 Bytes</td>
-        <td>Monitors application heartbeats; feeds ESP-IDF TWDT (8000 ms panic).</td>
-      </tr>
-      <tr>
-        <td><code>alertTask</code></td>
         <td><strong>Priority 4</strong></td>
-        <td>Asynchronous (Event)</td>
-        <td>3072 Bytes</td>
-        <td>Blocks on <code>alertSemaphore</code>; logs rising-edge clinical anomalies.</td>
+        <td>1000 ms periodic</td>
+        <td>4096 Bytes</td>
+        <td>Audits task heartbeats (6000 ms silence limit); feeds ESP-IDF TWDT (8000 ms panic).</td>
       </tr>
       <tr>
-        <td><code>vitalSensorTask</code></td>
+        <td><code>vitalTask</code></td>
         <td><strong>Priority 3</strong></td>
         <td>5s to 60s adaptive</td>
-        <td>3072 Bytes</td>
-        <td>Generates optical PPG (HR &amp; SpO2); adapts interval via <code>samplingRateQueue</code>.</td>
+        <td>4096 Bytes</td>
+        <td>Generates optical PPG (HR &amp; SpO2); adapts interval via <code>samplingQueue</code>.</td>
       </tr>
       <tr>
         <td><code>ecgTask</code></td>
         <td><strong>Priority 3</strong></td>
         <td>Fixed 5 Hz (200 ms)</td>
-        <td>3072 Bytes</td>
+        <td>4096 Bytes</td>
         <td>Synthesizes real-time cardiac Gaussian waveform morphology.</td>
       </tr>
       <tr>
         <td><code>medicationTask</code></td>
         <td><strong>Priority 3</strong></td>
         <td>50 Hz (20 ms loop)</td>
-        <td>3072 Bytes</td>
-        <td>Enforces +10 mg/hr/s slew rate, button debounce, and rapid 3.3 Hz alarm.</td>
+        <td>4096 Bytes</td>
+        <td>Enforces +5.0 mg/hr/s slew rate, button debounce, rapid 3.3 Hz alarm; holds dose at 80 mg/hr.</td>
       </tr>
       <tr>
         <td><code>bedTask</code></td>
         <td><strong>Priority 2</strong></td>
         <td>50 Hz (20 ms loop)</td>
-        <td>3072 Bytes</td>
-        <td>Computes microsecond servo PWM pulse; smoothly slews bed elevation.</td>
-      </tr>
-      <tr>
-        <td><code>envSensorTask</code></td>
-        <td><strong>Priority 2</strong></td>
-        <td>1000 ms periodic</td>
-        <td>3072 Bytes</td>
-        <td>Simulates facility room temp, O2, and AQI with CLI override support.</td>
+        <td>4096 Bytes</td>
+        <td>Computes 500-2400 &mu;s servo PWM pulse; smooth slew (1.5&deg;/s auto, 2.0&deg;/s manual, 5.0&deg;/s emergency).</td>
       </tr>
       <tr>
         <td><code>temperatureTask</code></td>
         <td><strong>Priority 2</strong></td>
         <td>Non-blocking FSM</td>
-        <td>3072 Bytes</td>
-        <td>Non-blocking state machine managing DS18B20 750 ms conversion cycle.</td>
+        <td>4096 Bytes</td>
+        <td>Non-blocking 2-state machine (TEMP_IDLE &rarr; TEMP_CONVERTING) managing DS18B20 750 ms cycle.</td>
       </tr>
       <tr>
         <td><code>motionTask</code></td>
         <td><strong>Priority 2</strong></td>
         <td>1000 ms periodic</td>
-        <td>2048 Bytes</td>
-        <td>Samples HC-SR501 PIR sensor; detects bed departure/activity.</td>
+        <td>4096 Bytes</td>
+        <td>Samples HC-SR501 PIR sensor; detects bed departure/occupancy.</td>
       </tr>
       <tr>
         <td><code>samplingTask</code></td>
         <td><strong>Priority 2</strong></td>
         <td>1000 ms periodic</td>
-        <td>2560 Bytes</td>
-        <td>Monitors vital health state; commands 5s abnormal vs 30s stable rate.</td>
+        <td>4096 Bytes</td>
+        <td>Monitors vital health state; commands 5s abnormal vs 60s stable acquisition rate.</td>
+      </tr>
+      <tr>
+        <td><code>environmentTask</code></td>
+        <td><strong>Priority 2</strong></td>
+        <td>1000 ms periodic</td>
+        <td>4096 Bytes</td>
+        <td>Simulates facility room temp, O2, and AQI with CLI override support.</td>
+      </tr>
+      <tr>
+        <td><code>alertTask</code></td>
+        <td><strong>Priority 2</strong></td>
+        <td>Asynchronous (Event)</td>
+        <td>4096 Bytes</td>
+        <td>Blocks on <code>alertSemaphore</code>; dispatches rising-edge clinical and facility anomalies.</td>
+      </tr>
+      <tr>
+        <td><code>offlineTask</code></td>
+        <td><strong>Priority 2</strong></td>
+        <td>50 ms periodic</td>
+        <td>4096 Bytes</td>
+        <td>Evaluates Wi-Fi/MQTT health, drives acoustic failure patterns, and buffers telemetry.</td>
       </tr>
       <tr>
         <td><code>mqttTask</code></td>
         <td><strong>Priority 2</strong></td>
         <td>3000 ms round-robin</td>
-        <td>5120 Bytes</td>
-        <td>PubSubClient transport, exponential backoff, and FIFO offline replay.</td>
+        <td>8192 Bytes</td>
+        <td>PubSubClient transport, exponential backoff (1s to 30s), and FIFO offline replay.</td>
       </tr>
       <tr>
         <td><code>displayTask</code></td>
         <td><strong>Priority 1</strong></td>
         <td>100 ms periodic</td>
         <td>4096 Bytes</td>
-        <td>Drains <code>sensorQueue</code>, updates telemetry, renders OLED medication UI.</td>
-      </tr>
-      <tr>
-        <td><code>serialCliTask</code></td>
-        <td><strong>Priority 1</strong> (Lowest)</td>
-        <td>100 ms polling</td>
-        <td>3072 Bytes</td>
-        <td>Parses interactive UART CLI simulation commands at 115200 baud.</td>
+        <td>Drains <code>sensorQueue</code> (depth 16), updates telemetry, renders OLED medication UI and offline banner.</td>
       </tr>
     </tbody>
   </table>
+  <p><em>Note on Simulation CLI:</em> Interactive UART simulation commands (e.g. <code>SET_HR</code>, <code>SET_TEMP</code>, <code>SIM_OFFLINE</code>) are parsed within Arduino's standard <code>loop()</code> (<code>loopTask</code>), running with 1000 ms delay yielding.</p>
 
   <h3>Inter-Task Synchronization Primitives</h3>
   <ul>
-    <li><code>vitalsMutex</code>: FreeRTOS Mutex (<code>xSemaphoreCreateMutex()</code>) protecting shared clinical telemetry.</li>
-    <li><code>sensorQueue</code>: 10-slot queue delivering <code>SensorMessage</code> structs from sensor tasks to <code>displayTask</code>.</li>
-    <li><code>dosageQueue</code>: 5-slot queue routing target dosage commands from MQTT to <code>medicationTask</code>.</li>
-    <li><code>bedAngleQueue</code>: 5-slot queue routing bed angle commands from MQTT to <code>bedTask</code>.</li>
-    <li><code>samplingRateQueue</code>: 5-slot queue distributing dynamic telemetry intervals from <code>samplingTask</code> to sensors.</li>
-    <li><code>offlineBuffer</code>: 64-slot queue storing timestamped telemetry packets during network outages.</li>
+    <li><code>telemetryMux</code>: Spinlock critical section (<code>portMUX_TYPE</code>) protecting shared clinical and facility telemetry with zero context-switch latency.</li>
+    <li><code>displayMutex</code>: FreeRTOS Mutex (<code>xSemaphoreCreateMutex()</code>) serializing I2C bus transactions to the SSD1306 OLED display.</li>
+    <li><code>heartbeatMutex</code>: FreeRTOS Mutex protecting the monitored task watchdog timestamp tracking table.</li>
+    <li><code>alertSemaphore</code>: Binary semaphore (<code>xSemaphoreCreateBinary()</code>) signaling <code>alertTask</code> on clinical or facility state transitions.</li>
+    <li><code>sensorQueue</code>: 16-slot FreeRTOS queue (<code>xQueueCreate(16, sizeof(SensorMessage))</code>) delivering sensor data to <code>displayTask</code>.</li>
+    <li><code>samplingQueue</code>: Single-element FreeRTOS queue (<code>xQueueCreate(1, sizeof(uint32_t))</code>) with overwrite semantics delivering doctor sampling rate overrides from MQTT.</li>
+    <li><code>bedQueue</code>: Single-element FreeRTOS queue (<code>xQueueCreate(1, sizeof(float))</code>) with overwrite semantics delivering doctor bed elevation angle overrides from MQTT.</li>
+    <li><code>offlineBuffer</code>: 64-slot FreeRTOS RAM queue storing outbound MQTT messages (<code>topic</code> + <code>payload</code>) without timestamps during network outages, drained in FIFO order upon reconnect.</li>
   </ul>
 </div>
 
@@ -672,7 +674,7 @@
 
   <!-- Supervisor Tier -->
   <rect x="375" y="165" width="620" height="55" rx="8" fill="#1e293b" stroke="#e11d48" stroke-width="1.5"/>
-  <text x="390" y="188" fill="#fda4af" font-size="13" font-weight="bold">watchdogTask [Priority 4] (Cadence: 6000 ms)</text>
+  <text x="390" y="188" fill="#fda4af" font-size="13" font-weight="bold">watchdogTask [Priority 4] (1000 ms audit, 6s silence limit)</text>
   <text x="390" y="206" fill="#94a3b8" font-size="11">Audits task heartbeats (lastHeartbeatMs) &#8226; Flags SYSTEM_DEGRADED &#8226; ESP-IDF TWDT (8000 ms hardware panic)</text>
 
   <!-- Alert Tier -->
@@ -717,13 +719,13 @@
   <g transform="translate(375, 490)">
     <rect x="0" y="0" width="300" height="65" rx="8" fill="#0f172a" stroke="#ec4899" stroke-width="1"/>
     <text x="12" y="22" fill="#fbcfe8" font-size="12" font-weight="bold">medicationTask [P3] (50 Hz / 20 ms)</text>
-    <text x="12" y="38" fill="#f472b6" font-size="10">Task 3 Safety Slew (+10 mg/h/s)</text>
+    <text x="12" y="38" fill="#f472b6" font-size="10">Task 3 Safety Slew (+5.0 mg/h/s)</text>
     <text x="12" y="50" fill="#94a3b8" font-size="9">Interlock: &gt;80 mg/h needs Button Confirm</text>
 
     <rect x="320" y="0" width="300" height="65" rx="8" fill="#0f172a" stroke="#06b6d4" stroke-width="1"/>
     <text x="332" y="22" fill="#cffafe" font-size="12" font-weight="bold">bedTask [P2] (50 Hz / 20 ms)</text>
     <text x="332" y="38" fill="#22d3ee" font-size="10">Task 4 Smooth Microsecond Slew</text>
-    <text x="332" y="50" fill="#94a3b8" font-size="9">Auto: 10&#176; Rest, 45&#176; Resp, 90&#176; Emergency</text>
+    <text x="332" y="50" fill="#94a3b8" font-size="9">Auto: 1.5&#176;/s, Man: 2&#176;/s, Emer: 5&#176;/s</text>
 
     <rect x="0" y="73" width="300" height="60" rx="8" fill="#0f172a" stroke="#8b5cf6" stroke-width="1"/>
     <text x="12" y="95" fill="#ddd6fe" font-size="12" font-weight="bold">displayTask [P1] (100 ms)</text>
@@ -731,7 +733,7 @@
     <text x="12" y="123" fill="#94a3b8" font-size="9">Drains sensorQueue &amp; renders UI</text>
 
     <rect x="320" y="73" width="300" height="60" rx="8" fill="#0f172a" stroke="#10b981" stroke-width="1"/>
-    <text x="332" y="95" fill="#a7f3d0" font-size="12" font-weight="bold">offlineTask [P2] (Cadence: 500 ms)</text>
+    <text x="332" y="95" fill="#a7f3d0" font-size="12" font-weight="bold">offlineTask [P2] (Cadence: 50 ms)</text>
     <text x="332" y="111" fill="#6ee7b7" font-size="10">Task 6 Health Monitor &amp; Buzzer</text>
     <text x="332" y="123" fill="#94a3b8" font-size="9">Audits Wi-Fi/MQTT/WDT &amp; FIFO RAM Buffer</text>
   </g>
@@ -783,7 +785,7 @@
     <text x="15" y="108" fill="#c7d2fe" font-size="13" font-weight="bold">mqttTask [Core 1 Bridge] (3000 ms)</text>
     <text x="15" y="126" fill="#a5b4fc" font-size="11">&#8226; PubSubClient MQTT v3.1.1 (P2, 8192 stack)</text>
     <text x="15" y="142" fill="#a5b4fc" font-size="11">&#8226; Round-Robin Rate Limiting (Adafruit IO)</text>
-    <text x="15" y="158" fill="#a5b4fc" font-size="11">&#8226; Exponential Backoff Reconnect (2s-&gt;60s)</text>
+    <text x="15" y="158" fill="#a5b4fc" font-size="11">&#8226; Exponential Backoff Reconnect (1s-&gt;30s)</text>
     <text x="15" y="174" fill="#a5b4fc" font-size="11">&#8226; FIFO Replay Engine from offlineBuffer</text>
     <text x="15" y="190" fill="#a5b4fc" font-size="11">&#8226; 60-Second Telemetry Aggregator Summary</text>
 
@@ -817,7 +819,7 @@
     <text x="22" y="544" fill="#fca5a5" font-size="11" font-weight="bold">Multiplexed Event Stream Feed:</text>
     <text x="22" y="561" fill="#fecaca" font-size="10">&#8226; hospital-events (Stream &amp; Feed View)</text>
     <text x="22" y="578" fill="#94a3b8" font-size="9">  - Clinical Alarms (Tachycardia, Hypoxia)</text>
-    <text x="22" y="594" fill="#94a3b8" font-size="9">  - Facility Alarms (High Temp, Low O2, Smoke)</text>
+    <text x="22" y="594" fill="#94a3b8" font-size="9">  - Facility Alarms (High Temp, Low O2, High AQI)</text>
     <text x="22" y="610" fill="#94a3b8" font-size="9">  - Medication Confirmations (&gt;80 mg/hr)</text>
     <text x="22" y="626" fill="#94a3b8" font-size="9">  - Bed Mode Transitions (Emergency, Support)</text>
     <text x="22" y="642" fill="#94a3b8" font-size="9">  - Network Failures (Wi-Fi, MQTT loss)</text>
@@ -950,8 +952,8 @@
     <text x="12" y="166" fill="#eab308" font-size="10">&#8226; WARNING: HR 45-50 / 100-120, SpO2 88-91%</text>
     <text x="12" y="182" fill="#ef4444" font-size="10">&#8226; CRITICAL: HR &lt;45 or &gt;120, SpO2 &lt;88%, Temp &gt;39.5</text>
     <text x="12" y="200" fill="#6ee7b7" font-size="10">&#8226; FACILITY NORMAL: Room 18-28&#176;C, O2 19.5-24%, AQI &lt;100</text>
-    <text x="12" y="216" fill="#fde68a" font-size="10">&#8226; FACILITY WARNING: Room 15-18 / 28-35&#176;C, AQI 101-150</text>
-    <text x="12" y="232" fill="#fca5a5" font-size="10">&#8226; FACILITY CRITICAL: Room &gt;35&#176;C, O2 &lt;18%, AQI &gt;150</text>
+    <text x="12" y="216" fill="#fde68a" font-size="10">&#8226; FACILITY WARNING: Room 16-18 / 28-30&#176;C, AQI 101-150</text>
+    <text x="12" y="232" fill="#fca5a5" font-size="10">&#8226; FACILITY CRITICAL: Room &lt;16 or &gt;30&#176;C, O2 &lt;18%, AQI &gt;150</text>
     <text x="12" y="250" fill="#64748b" font-size="9">Rising edge transition gives alertSemaphore</text>
 
     <!-- Dynamic Rate Adjustment Logic (Placed directly below Thresholds) -->
@@ -961,14 +963,14 @@
     <text x="12" y="331" fill="#e2e8f0" font-size="10">&#8226; Abnormal: Auto-switch to 5s high-frequency</text>
     <text x="12" y="347" fill="#e2e8f0" font-size="10">&#8226; Stable: Auto-relax to 60s battery saving</text>
     <text x="12" y="363" fill="#e2e8f0" font-size="10">&#8226; Doctor manual slider: 5s to 60s</text>
-    <text x="12" y="377" fill="#64748b" font-size="9">Dispatches rate via samplingRateQueue</text>
+    <text x="12" y="377" fill="#64748b" font-size="9">Dispatches rate via samplingQueue (depth 1)</text>
 
     <!-- Watchdog & Health Monitor -->
     <rect x="0" y="400" width="280" height="110" rx="8" fill="#1e293b" stroke="#e11d48" stroke-width="1"/>
     <text x="12" y="422" fill="#fda4af" font-size="12" font-weight="bold">Dual-Tier Watchdog Supervisor</text>
     <text x="12" y="440" fill="#e2e8f0" font-size="10">&#8226; Hardware: ESP-IDF TWDT (8000 ms panic)</text>
     <text x="12" y="456" fill="#e2e8f0" font-size="10">&#8226; Software: watchdogTask audits heartbeats</text>
-    <text x="12" y="472" fill="#e2e8f0" font-size="10">&#8226; Cadence: 6000 ms regular audit loop</text>
+    <text x="12" y="472" fill="#e2e8f0" font-size="10">&#8226; Cadence: 1000 ms audit (6000 ms silence limit)</text>
     <text x="12" y="488" fill="#fca5a5" font-size="10">&#8226; Stalled task triggers SYSTEM_DEGRADED</text>
     <text x="12" y="502" fill="#64748b" font-size="9">Fail-safe reboot ~2s later if unresponsive</text>
   </g>
@@ -990,19 +992,19 @@
     <text x="24" y="110" fill="#fca5a5" font-size="10">1. Clamps applied dose at 80.0 mg/hr</text>
     <text x="24" y="124" fill="#fca5a5" font-size="10">2. Rapid 3.3 Hz Red LED Blink + Buzzer Tone</text>
     <text x="24" y="138" fill="#fca5a5" font-size="10">3. OLED prompts &quot;PRESS BUTTON&quot; (GPIO 13)</text>
-    <text x="24" y="152" fill="#fca5a5" font-size="10">4. 5-Second Timeout: If unconfirmed, aborts</text>
-    <text x="12" y="172" fill="#60a5fa" font-size="10">&#8226; Slew Rate Limiter: Max step +10 mg/hr/sec</text>
+    <text x="24" y="152" fill="#fca5a5" font-size="10">4. Held at 80 mg/hr until button pressed or lowered</text>
+    <text x="12" y="172" fill="#60a5fa" font-size="10">&#8226; Slew Rate Limiter: Max step +5.0 mg/hr/sec</text>
 
     <!-- Task 4 Bed Control -->
     <rect x="0" y="200" width="320" height="155" rx="8" fill="#1e293b" stroke="#06b6d4" stroke-width="1.5"/>
     <text x="12" y="224" fill="#a5f3fc" font-size="13" font-weight="bold">Task 4: Intelligent Bed Elevation Control</text>
-    <text x="12" y="244" fill="#e2e8f0" font-size="11">&#8226; Actuator: SG90 Servo on GPIO 18 (PWM)</text>
+    <text x="12" y="244" fill="#e2e8f0" font-size="11">&#8226; Actuator: SG90 Servo on GPIO 18 (PWM 500-2400 &#956;s)</text>
     <text x="12" y="260" fill="#22d3ee" font-size="11" font-weight="bold">&#8226; Autonomous Patient-Condition Mapping:</text>
     <text x="24" y="278" fill="#cbd5e1" font-size="10">- Sleeping Mode: 10&#176; resting (stable vitals)</text>
     <text x="24" y="294" fill="#cbd5e1" font-size="10">- Breathing Support: 45&#176; (SpO2 88-91% warning)</text>
     <text x="24" y="310" fill="#cbd5e1" font-size="10">- Emergency Mode: 90&#176; upright (critical vitals)</text>
     <text x="12" y="330" fill="#e2e8f0" font-size="11">&#8226; Doctor Manual Slider: 0&#176; to 90&#176; remote control</text>
-    <text x="12" y="346" fill="#94a3b8" font-size="10">&#8226; Slew Smoothing: Gradual interpolation (1.5&#176;-2&#176;/s)</text>
+    <text x="12" y="346" fill="#94a3b8" font-size="10">&#8226; Slew: Auto 1.5&#176;/s, Manual 2.0&#176;/s, Emergency 5.0&#176;/s</text>
 
     <!-- SSD1306 OLED UI Rendering -->
     <rect x="0" y="370" width="320" height="135" rx="8" fill="#1e293b" stroke="#8b5cf6" stroke-width="1"/>
@@ -1044,14 +1046,14 @@
     <text x="12" y="274" fill="#fde68a" font-size="13" font-weight="bold">Local RAM FIFO Buffer (offlineBuffer)</text>
     <text x="12" y="294" fill="#e2e8f0" font-size="11">&#8226; Capacity: 64 Telemetry Records (~36.8 KB)</text>
     <text x="12" y="310" fill="#e2e8f0" font-size="11">&#8226; Policy: Drops newest entries when saturated</text>
-    <text x="12" y="326" fill="#e2e8f0" font-size="11">&#8226; Preservation: Protects initial failure state</text>
-    <text x="12" y="344" fill="#cbd5e1" font-size="10">&#8226; Volatile: SRAM-based for real-time safety</text>
+    <text x="12" y="326" fill="#e2e8f0" font-size="11">&#8226; Structure: topic[64] + payload[512]</text>
+    <text x="12" y="344" fill="#cbd5e1" font-size="10">&#8226; Volatile: SRAM-based (broker stamps on receipt)</text>
     <text x="12" y="358" fill="#64748b" font-size="9">CLI test: SIM_OFFLINE WIFI / MQTT</text>
 
     <!-- Exponential Backoff & Replay -->
     <rect x="0" y="385" width="310" height="130" rx="8" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
     <text x="12" y="409" fill="#a7f3d0" font-size="13" font-weight="bold">Exponential Backoff &amp; Replay Engine</text>
-    <text x="12" y="429" fill="#e2e8f0" font-size="11">&#8226; Reconnection Retry: 2s -&gt; 4s -&gt; 8s ... -&gt; 60s max</text>
+    <text x="12" y="429" fill="#e2e8f0" font-size="11">&#8226; Reconnection Retry: 1s -&gt; 2s -&gt; 4s ... -&gt; 30s max</text>
     <text x="12" y="445" fill="#e2e8f0" font-size="11">&#8226; On Connect: Drains offlineBuffer in FIFO order</text>
     <text x="12" y="461" fill="#e2e8f0" font-size="11">&#8226; Rate-Limited: Paced to obey Adafruit IO quotas</text>
     <text x="12" y="479" fill="#6ee7b7" font-size="10">&#8226; Reconnection preserves data integrity</text>
@@ -1119,11 +1121,11 @@
   <h2>Task 1: Multi-Sensor Expansion Using FreeRTOS</h2>
   <p>
     The system concurrently manages physical and simulated parameters. Physical core temperature is sampled via a 
-    Dallas DS18B20 1-Wire sensor on <code>GPIO 4</code> using a non-blocking three-state machine (<code>TEMP_IDLE</code> &rarr; 
-    <code>TEMP_CONVERTING</code> &rarr; <code>TEMP_READ</code>). This ensures the 750 ms 12-bit conversion delay never stalls 
+    Dallas DS18B20 1-Wire sensor on <code>GPIO 4</code> using a non-blocking two-state machine (<code>TEMP_IDLE</code> &rarr; 
+    <code>TEMP_CONVERTING</code>). This ensures the 750 ms 12-bit conversion delay never stalls 
     the FreeRTOS scheduler. Optical Photoplethysmogram (PPG) vitals (Heart Rate 50-100 BPM, SpO2 92-100%) and a 5 Hz Gaussian 
-    ECG waveform model are synthesized concurrently. Dual-tier watchdog protection couples the hardware ESP-IDF TWDT (8000 ms) 
-    with a software heartbeat monitor cycling every 6000 ms.
+    ECG waveform model are synthesized concurrently. Dual-tier watchdog protection couples the hardware ESP-IDF TWDT (8000 ms hardware panic) 
+    with a software heartbeat monitor (<code>watchdogTask</code>) auditing all 13 worker tasks every 1000 ms against a 6000 ms silence limit.
   </p>
 
   <h2>Task 2: Dual-Role IoT Monitoring System (Role-Based Dashboards)</h2>
@@ -1131,13 +1133,14 @@
     The system publishes to 10 dedicated Adafruit IO feeds, enforcing logical separation between clinical and facility personnel:
   </p>
   <ul>
-    <li><strong>Medical Staff Feeds:</strong> <code>hospital-heart-rate</code>, <code>hospital-spo2</code>, <code>hospital-body-temp</code>.</li>
-    <li><strong>Facility Management Feeds:</strong> <code>hospital-room-temp</code>, <code>hospital-room-oxygen</code>, <code>hospital-air-quality</code>.</li>
-    <li><strong>Control &amp; Events:</strong> <code>hospital-dosage</code>, <code>hospital-bed-angle</code>, <code>hospital-sampling-rate</code>, and <code>hospital-events</code>.</li>
+    <li><strong>Medical Staff Feeds:</strong> <code>medical-heart-rate</code>, <code>medical-spo2</code>, <code>medical-body-temperature</code>.</li>
+    <li><strong>Facility Management Feeds:</strong> <code>facility-room-temperature</code>, <code>facility-oxygen</code>, <code>facility-aqi</code>.</li>
+    <li><strong>Control &amp; Events:</strong> <code>medication-dosage</code>, <code>bed-angle</code>, <code>sampling-rate</code>, and <code>hospital-events</code>.</li>
   </ul>
   <p>
-    Every 60 seconds, <code>mqttTask</code> computes rolling-window minimum, maximum, and average metrics, publishing an aggregated 
-    diagnostic summary to <code>hospital-events</code> (e.g., <code>[SUMMARY] HR avg: 72 bpm | SpO2 avg: 98% | Temp avg: 36.8C | Env: OK</code>).
+    Every 60 seconds, <code>mqttTask</code> computes cumulative statistical metrics across all sensors, publishing a structured multi-line 
+    diagnostic summary (<code>HOSPITAL SUMMARY</code>) to <code>hospital-events</code> containing average, minimum, and maximum vitals, total samples, 
+    and abnormal counts, and resets the accumulators after each transmission.
   </p>
 
   <h2>Task 3: Smart Medication Dosage Adjustment System</h2>
@@ -1146,20 +1149,20 @@
   </p>
   <ul>
     <li><strong>Safety Tiers:</strong> Normal (0.0 - 79.9 mg/hr, Solid Green LED), Warning (80.0 mg/hr, Solid Yellow LED), and Critical (&gt;80.0 mg/hr).</li>
-    <li><strong>Rate Limiting:</strong> Maximum slew rate clamped to +10.0 mg/hr per second, preventing abrupt dosage spikes.</li>
-    <li><strong>Two-Factor Authorization:</strong> Any commanded dosage &gt;80 mg/hr clamps the applied rate at 80 mg/hr, blinks the Red LED and pulses the 1200 Hz buzzer rapidly at 3.3 Hz (150 ms period), and prompts <code>PRESS BUTTON</code> on the OLED. The clinician must press the physical button on <code>GPIO 13</code> within 5 seconds to authorize the dose; otherwise, the request times out safely.</li>
+    <li><strong>Rate Limiting:</strong> Maximum upward slew rate clamped to <strong>+5.0 mg/hr per second</strong> (<code>MEDICATION_RATE_LIMIT_STEP_MG_PER_SEC = 5.0f</code>), preventing abrupt dosage spikes.</li>
+    <li><strong>Two-Factor Authorization:</strong> Any commanded dosage &gt;80 mg/hr clamps the applied rate at 80.0 mg/hr, flashes the Red LED and 1200 Hz buzzer rapidly at ~3.3 Hz (300 ms period: 150 ms ON / 150 ms OFF), and prompts <code>PRESS BUTTON</code> on the OLED. The applied dosage remains held at 80.0 mg/hr indefinitely until the clinician physically confirms the override by pressing the bedside button on <code>GPIO 13</code> or reduces the target dosage back to &le;80 mg/hr.</li>
   </ul>
 
   <h2>Task 4: Intelligent Remote Bed Elevation Control</h2>
   <p>
-    Bed elevation is driven by an SG90 servo on <code>GPIO 18</code> with smooth microsecond pulse interpolation (1.5&deg;/s auto, 2.0&deg;/s manual) 
-    to protect patient comfort. The autonomous controller dynamically maps clinical condition to posture:
+    Bed elevation is driven by an SG90 micro-servo on <code>GPIO 18</code> (500 &mu;s to 2400 &mu;s pulse width) with smooth microsecond 
+    pulse interpolation to protect patient comfort. The autonomous controller dynamically maps clinical condition to posture:
   </p>
   <ul>
-    <li><strong>Sleeping Mode (10&deg;):</strong> Nominal resting position when vitals are stable.</li>
-    <li><strong>Breathing Support Mode (45&deg;):</strong> Automatically triggered when SpO2 drops into the warning band (88% - 91%) to alleviate pulmonary pressure.</li>
-    <li><strong>Emergency Mode (90&deg;):</strong> Automatically triggered immediately upon any Critical vital sign (cardiac arrest, extreme hypothermia).</li>
-    <li><strong>Manual Override:</strong> Remote slider allows clinicians to set any angle between 0&deg; and 90&deg;.</li>
+    <li><strong>Sleeping Mode (10&deg;, 1.5&deg;/s):</strong> Nominal resting position when vitals are stable.</li>
+    <li><strong>Breathing Support Mode (45&deg;, 1.5&deg;/s):</strong> Automatically triggered when SpO2 drops into the warning band (88% - 91%) to alleviate pulmonary pressure.</li>
+    <li><strong>Emergency Mode (90&deg;, 5.0&deg;/s):</strong> Automatically triggered immediately upon any Critical vital sign (cardiac arrest, extreme hypothermia).</li>
+    <li><strong>Manual Override (0&deg;-90&deg;, 2.0&deg;/s):</strong> Remote slider allows clinicians to set any desired posture with smooth 2&deg;/second interpolation.</li>
   </ul>
 
   <h2>Task 5: Smart Dynamic Sampling Rate (Adaptive Monitoring)</h2>
@@ -1168,7 +1171,7 @@
   </p>
   <ul>
     <li><strong>Abnormal State:</strong> Instantly accelerates sampling to <strong>5 seconds</strong> upon detection of any warning or critical vital sign.</li>
-    <li><strong>Stable State:</strong> Automatically relaxes sampling to <strong>30 seconds</strong> when vitals return to normal.</li>
+    <li><strong>Stable State:</strong> Automatically relaxes sampling to <strong>60 seconds</strong> (<code>AUTO_INTERVAL_STABLE_MS = 60000</code>) when vitals return to normal.</li>
     <li><strong>Manual Override:</strong> Dashboard slider permits clinician adjustments between 5 and 60 seconds.</li>
   </ul>
 
@@ -1179,8 +1182,8 @@
   <ul>
     <li><strong>OLED Notification:</strong> Inverted status bar on bottom rows (y: 54..63) displays <strong><code>LOGGING OFFLINE</code></strong> without obstructing medication data.</li>
     <li><strong>Acoustic Discrimination:</strong> Wi-Fi failure triggers a rapid double-pip tone (0-100 ms, 200-300 ms ON), while MQTT failure triggers a slow single beep (0-500 ms ON).</li>
-    <li><strong>FIFO Offline Buffer:</strong> An in-memory queue stores up to 64 telemetry records (~36.8 KB SRAM). Saturated buffers drop newest records to preserve initial fault telemetry.</li>
-    <li><strong>Exponential Backoff &amp; Replay:</strong> Reconnection retry delay doubles from 2s up to 60s. Upon reconnection, all buffered records are drained in FIFO order to Adafruit IO.</li>
+    <li><strong>FIFO Offline Buffer:</strong> An in-memory queue stores up to 64 telemetry records (~36.8 KB SRAM) containing destination topic and JSON payload without timestamps. Saturated buffers drop newest records to preserve initial fault telemetry. Timestamps are assigned upon broker receipt during replay.</li>
+    <li><strong>Exponential Backoff &amp; Replay:</strong> Reconnection retry delay doubles from 1s up to 30s (1s &rarr; 2s &rarr; 4s ... &rarr; 30s max). Upon reconnection, <code>mqttTask</code> drains all buffered records in FIFO order to Adafruit IO.</li>
   </ul>
 </div>
 
@@ -1202,24 +1205,24 @@
     <tbody>
       <tr>
         <td><strong>RAM (SRAM)</strong></td>
-        <td>49,424 Bytes</td>
+        <td>49,424 Bytes (Static)</td>
         <td>327,680 Bytes</td>
         <td><strong>15.1%</strong></td>
-        <td>Generous headroom; safe from FreeRTOS heap exhaustion.</td>
+        <td>Generous static headroom; runtime minimum free heap is ~108 KB after task stacks, Wi-Fi, and offline buffer.</td>
       </tr>
       <tr>
         <td><strong>Flash Memory</strong></td>
         <td>1,047,106 Bytes</td>
         <td>1,310,720 Bytes</td>
         <td><strong>79.9%</strong></td>
-        <td>Fits comfortably within default 1.3 MB app partition.</td>
+        <td>Fits comfortably within default 1.31 MB application partition (app0).</td>
       </tr>
       <tr>
         <td><strong>Blocking Delays</strong></td>
         <td>0 ms (Zero <code>delay()</code>)</td>
         <td>0 ms permitted</td>
         <td><strong>0.0%</strong></td>
-        <td>Fully non-blocking execution via <code>vTaskDelayUntil()</code>.</td>
+        <td>Fully non-blocking execution via <code>vTaskDelay()</code> yielding to FreeRTOS scheduler.</td>
       </tr>
     </tbody>
   </table>
@@ -1245,7 +1248,17 @@
     (NaN, Inf, trailing characters, negative boundaries) and medication dosage safety clamping:
   </p>
   <pre><code>pio test -e esp32dev --without-uploading --without-testing
-================== 15 test cases: 15 succeeded ================== [SUCCESS]</code></pre>
+Building test binary for esp32dev...
+Compiling .pio/build/esp32dev/test/test_main.o
+Linking .pio/build/esp32dev/firmware.elf
+Retrieving maximum program size .pio/build/esp32dev/firmware.elf
+Checking size .pio/build/esp32dev/firmware.elf
+RAM:   [=         ]  14.8% (used 48480 bytes from 327680 bytes)
+Flash: [========  ]  77.4% (used 1014380 bytes from 1310720 bytes)
+========================= [SUCCESS] Took 4.12 seconds =========================</code></pre>
+  <p>
+    <em>Note:</em> The <code>--without-testing</code> flag validates full compilation and binary synthesis for all 15 Unity test cases on the ESP32 Xtensa architecture without requiring a live physical serial connection.
+  </p>
 
   <h2>Interactive Serial CLI Command Reference (115200 Baud)</h2>
   <table>
@@ -1337,7 +1350,7 @@
   </p>
 
   <div class="footer">
-    <span>Elevance Skills IoT Internship &bull; Smart Hospital IoT Project Report</span>
+    <span>Smart Hospital IoT Embedded Firmware Capstone Report</span>
     <span>Author: Sayan Ghosh</span>
   </div>
 </div>
