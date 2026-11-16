@@ -47,7 +47,7 @@
     <rect x="0" y="0" width="280" height="65" rx="8" fill="#0f172a" stroke="#10b981" stroke-width="1"/>
     <text x="15" y="24" fill="#f8fafc" font-size="13" font-weight="bold">DS18B20 Temp Sensor</text>
     <text x="15" y="42" fill="#a7f3d0" font-size="11">1-Wire Bus &#8226; GPIO 4 &#8226; 4.7k Pull-up (physical)</text>
-    <text x="15" y="56" fill="#64748b" font-size="10">Non-blocking FSM (750 ms conversion)</text>
+    <text x="15" y="56" fill="#64748b" font-size="10">Non-blocking FSM (&#8805;800 ms millis() gate)</text>
 
     <!-- PIR Motion -->
     <rect x="0" y="75" width="280" height="55" rx="8" fill="#0f172a" stroke="#10b981" stroke-width="1"/>
@@ -126,7 +126,7 @@
     <rect x="0" y="68" width="300" height="60" rx="8" fill="#0f172a" stroke="#3b82f6" stroke-width="1"/>
     <text x="12" y="90" fill="#93c5fd" font-size="12" font-weight="bold">temperatureTask [P2]</text>
     <text x="12" y="106" fill="#60a5fa" font-size="10">DS18B20 1-Wire FSM</text>
-    <text x="12" y="118" fill="#64748b" font-size="9">IDLE -&gt; CONVERT (750 ms non-blocking)</text>
+    <text x="12" y="118" fill="#64748b" font-size="9">IDLE -&gt; CONVERT (&#8805;800 ms millis() gate)</text>
 
     <rect x="320" y="68" width="300" height="60" rx="8" fill="#0f172a" stroke="#3b82f6" stroke-width="1"/>
     <text x="332" y="90" fill="#93c5fd" font-size="12" font-weight="bold">motionTask [P2]</text>

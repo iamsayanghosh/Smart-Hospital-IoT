@@ -496,7 +496,7 @@
         <td><strong>Priority 2</strong></td>
         <td>Non-blocking FSM</td>
         <td>4096 Bytes</td>
-        <td>Non-blocking 2-state machine (TEMP_IDLE &rarr; TEMP_CONVERTING) managing DS18B20 750 ms cycle.</td>
+        <td>Non-blocking 2-state machine (TEMP_IDLE &rarr; TEMP_CONVERTING) managing DS18B20 &ge;800 ms acquisition via millis() gate.</td>
       </tr>
       <tr>
         <td><code>motionTask</code></td>
@@ -622,7 +622,7 @@
     <rect x="0" y="0" width="280" height="65" rx="8" fill="#0f172a" stroke="#10b981" stroke-width="1"/>
     <text x="15" y="24" fill="#f8fafc" font-size="13" font-weight="bold">DS18B20 Temp Sensor</text>
     <text x="15" y="42" fill="#a7f3d0" font-size="11">1-Wire Bus &#8226; GPIO 4 &#8226; 4.7k Pull-up (physical)</text>
-    <text x="15" y="56" fill="#64748b" font-size="10">Non-blocking FSM (750 ms conversion)</text>
+    <text x="15" y="56" fill="#64748b" font-size="10">Non-blocking FSM (&#8805;800 ms millis() gate)</text>
 
     <!-- PIR Motion -->
     <rect x="0" y="75" width="280" height="55" rx="8" fill="#0f172a" stroke="#10b981" stroke-width="1"/>
@@ -701,7 +701,7 @@
     <rect x="0" y="68" width="300" height="60" rx="8" fill="#0f172a" stroke="#3b82f6" stroke-width="1"/>
     <text x="12" y="90" fill="#93c5fd" font-size="12" font-weight="bold">temperatureTask [P2]</text>
     <text x="12" y="106" fill="#60a5fa" font-size="10">DS18B20 1-Wire FSM</text>
-    <text x="12" y="118" fill="#64748b" font-size="9">IDLE -&gt; CONVERT (750 ms non-blocking)</text>
+    <text x="12" y="118" fill="#64748b" font-size="9">IDLE -&gt; CONVERT (&#8805;800 ms millis() gate)</text>
 
     <rect x="320" y="68" width="300" height="60" rx="8" fill="#0f172a" stroke="#3b82f6" stroke-width="1"/>
     <text x="332" y="90" fill="#93c5fd" font-size="12" font-weight="bold">motionTask [P2]</text>
@@ -1126,7 +1126,7 @@
   <p>
     The system concurrently manages physical and simulated parameters. Physical core temperature is sampled via a 
     Dallas DS18B20 1-Wire sensor on <code>GPIO 4</code> using a non-blocking two-state machine (<code>TEMP_IDLE</code> &rarr; 
-    <code>TEMP_CONVERTING</code>). This ensures the 750 ms 12-bit conversion delay never stalls 
+    <code>TEMP_CONVERTING</code>). This ensures the &ge;800 ms 12-bit conversion delay (checked via <code>millis()</code> gate, <code>sensors.cpp:156</code>) never stalls 
     the FreeRTOS scheduler. Optical Photoplethysmogram (PPG) vitals (Heart Rate 50-100 BPM, SpO2 92-100%) and a 5 Hz Gaussian 
     ECG waveform model are synthesized concurrently. Dual-tier watchdog protection couples the hardware ESP-IDF TWDT (8000 ms hardware panic) 
     with a software heartbeat monitor (<code>watchdogTask</code>) auditing the 12 FreeRTOS worker tasks every 1000 ms against a 6000 ms silence limit while servicing its own hardware TWDT registration.
