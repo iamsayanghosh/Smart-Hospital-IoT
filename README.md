@@ -7,7 +7,7 @@
 [![License](https://img.shields.io/badge/License-MIT-lightgrey.svg)](LICENSE)
 [![Project Report](https://img.shields.io/badge/Report-PDF%20Available-red.svg)](docs/Smart_Hospital_IoT_Project_Report.pdf)
 
-An enterprise-grade, concurrent medical telemetry and facility management firmware implemented on the ESP32 microcontroller using the Arduino framework and FreeRTOS SMP.
+A concurrent medical telemetry and facility management firmware prototype implemented on the ESP32 microcontroller using the Arduino framework and FreeRTOS SMP.
 
 * **Live Wokwi Simulation:** [wokwi.com/projects/479638666615150593](https://wokwi.com/projects/479638666615150593)
 * **GitHub Repository:** [github.com/iamsayanghosh/Smart-Hospital-IoT](https://github.com/iamsayanghosh/Smart-Hospital-IoT)
@@ -85,7 +85,7 @@ graph TD
 ## 2. Assignment Task Implementation
 
 ### Task 1: Multi-Sensor Expansion Using FreeRTOS
-* **Physical Temperature:** Dallas DS18B20 on 1-Wire bus (`GPIO 4`). Non-blocking state machine (`TEMP_IDLE` $\rightarrow$ `TEMP_CONVERTING`) ensures 750 ms thermal conversion never blocks the scheduler.
+* **Physical Temperature:** Dallas DS18B20 on 1-Wire bus (`GPIO 4`). Non-blocking state machine (`TEMP_IDLE` $\rightarrow$ `TEMP_CONVERTING`) with $\ge 800\text{ ms}$ `millis()` conversion gate ensures thermal conversion never blocks the scheduler.
 * **Physical Motion:** HC-SR501 PIR sensor on `GPIO 27`.
 * **Simulated Photoplethysmogram (PPG):** Optical Heart Rate (`50 - 100 BPM`) and $\text{SpO}_2$ (`92 - 100 %`).
 * **Simulated Electrocardiogram (ECG):** Illustrative real-time Gaussian superposition model synthesizing coarse cardiac cycle morphology at 5 Hz (200 ms cadence) for IoT demonstration (clinical diagnostic ECG requires $\ge 250\text{ Hz}$).
@@ -134,7 +134,7 @@ graph TD
 | Peripheral | Component ID | ESP32 GPIO | Description / Mode |
 | :--- | :--- | :--- | :--- |
 | **OLED Display** | `oled1` | `GPIO 21` (SDA)<br>`GPIO 22` (SCL) | SSD1306 128x64 I2C monochrome at address `0x3C` |
-| **Body Temperature** | `temp1` | `GPIO 4` | Dallas DS18B20 1-Wire Digital Bus |
+| **Body Temperature** | `temp1` | `GPIO 4` | Dallas DS18B20 1-Wire Bus (4.7kΩ pull-up required on physical hardware; internally simulated in Wokwi) |
 | **Motion Detector** | `pir1` | `GPIO 27` | HC-SR501 PIR sensor (Digital Input) |
 | **Bed Elevation Servo** | `servo1` | `GPIO 18` | SG90 50 Hz PWM Servo Actuator (0 - 90°) |
 | **Bedside Button** | `btn1` | `GPIO 13` | Momentary pushbutton with internal pull-up (Active-LOW) |
@@ -236,7 +236,7 @@ The firmware includes an interactive Serial Command Line Interface (115200 baud)
 4. **Bounded FIFO RAM Buffer:**
    The offline buffer utilizes an in-memory FreeRTOS queue holding up to 64 records of 576 bytes each (~36.8 KB SRAM). When capacity is reached, it drops newest incoming records to protect initial fault events. It is RAM-only and lost upon power cycle or hardware reset.
 5. **Task Watchdog & SYSTEM_DEGRADED Window:**
-   `SYSTEM_DEGRADED` indicates an internal FreeRTOS worker task has starved its heartbeat while transport remains active. The ESP-IDF Task Watchdog Timer (TWDT) enforces an 8000 ms panic threshold; if a task hangs permanently, the chip resets ~2 seconds after entering `SYSTEM_DEGRADED` to guarantee fail-safe recovery in medical environments.
+   `SYSTEM_DEGRADED` indicates an internal FreeRTOS worker task has starved its heartbeat while transport remains active. The ESP-IDF Task Watchdog Timer (TWDT) enforces an 8000 ms panic threshold; if a task hangs permanently, the chip resets ~2 seconds after entering `SYSTEM_DEGRADED` to provide automatic recovery (simulation only).
 6. **Simulated Sensor Telemetry:**
    In simulation mode, physiological vitals (PPG, ECG) and ambient facility conditions (Room Temp, Oxygen %, AQI) are synthesized via mathematical models (e.g. Gaussian superposition) and UART CLI overrides (`SET_HR`, `SET_SPO2`, `SET_TEMP`, `SET_ROOM`, `SET_OXYGEN`, `SET_AQI`).
 

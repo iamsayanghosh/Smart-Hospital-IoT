@@ -270,7 +270,7 @@
       <div class="cover-tag">IoT &amp; Embedded Systems &bull; Capstone Technical Report</div>
       <h1 class="cover-title">Smart Hospital IoT System</h1>
       <p class="cover-subtitle">
-        An Enterprise-Grade, Concurrent Medical Telemetry and Automated Actuation Firmware<br>
+        A Concurrent Medical Telemetry and Automated Actuation Firmware Prototype<br>
         Implemented with FreeRTOS SMP Multitasking on Dual-Core ESP32 Microcontrollers
       </p>
     </div>
@@ -322,7 +322,7 @@
 <div class="avoid-break">
   <h1>Executive Summary</h1>
   <p>
-    This project presents an enterprise-grade, concurrent medical telemetry and automated facility management firmware 
+    This project presents a concurrent medical telemetry and automated facility management firmware prototype 
     engineered for the Espressif ESP32 dual-core microcontroller. Designed to satisfy all 6 mandatory internship assignments 
     within a single, unified codebase, the system integrates physical sensor acquisition, real-time physiological signal synthesis, 
     role-based cloud publishing via MQTT, closed-loop safety actuation, and an advanced fault-tolerant offline detection and replay engine.
@@ -373,7 +373,7 @@
         <td><strong>Dallas DS18B20</strong></td>
         <td>1-Wire Digital Bus</td>
         <td><code>GPIO 4</code></td>
-        <td>4.7k&Omega; pull-up resistor to 3.3V</td>
+        <td>4.7k&Omega; pull-up resistor to 3.3V (required on physical hardware; internally simulated in Wokwi)</td>
         <td>Physical patient core body temperature sensing</td>
       </tr>
       <tr>
@@ -621,7 +621,7 @@
     <!-- DS18B20 -->
     <rect x="0" y="0" width="280" height="65" rx="8" fill="#0f172a" stroke="#10b981" stroke-width="1"/>
     <text x="15" y="24" fill="#f8fafc" font-size="13" font-weight="bold">DS18B20 Temp Sensor</text>
-    <text x="15" y="42" fill="#a7f3d0" font-size="11">1-Wire Bus &#8226; GPIO 4 &#8226; 4.7k Pull-up</text>
+    <text x="15" y="42" fill="#a7f3d0" font-size="11">1-Wire Bus &#8226; GPIO 4 &#8226; 4.7k Pull-up (physical)</text>
     <text x="15" y="56" fill="#64748b" font-size="10">Non-blocking FSM (750 ms conversion)</text>
 
     <!-- PIR Motion -->
@@ -893,7 +893,7 @@
     <text x="12" y="22" fill="#a7f3d0" font-size="12" font-weight="bold">DS18B20 1-Wire State Machine</text>
     <text x="12" y="40" fill="#94a3b8" font-size="10">2-state cycle (IDLE &#8594; CONVERTING):</text>
     <text x="12" y="58" fill="#e2e8f0" font-size="10">&#8226; TEMP_IDLE: Start 12-bit conversion</text>
-    <text x="12" y="74" fill="#e2e8f0" font-size="10">&#8226; TEMP_CONVERTING: 750 ms wait (vTaskDelay)</text>
+    <text x="12" y="74" fill="#e2e8f0" font-size="10">&#8226; TEMP_CONVERTING: &#8805;800 ms wait (millis() gate)</text>
     <text x="12" y="90" fill="#e2e8f0" font-size="10">&#8226; Read scratchpad &amp; dispatch to queue</text>
     <text x="12" y="104" fill="#64748b" font-size="9">Never stalls RTOS scheduler</text>
 
@@ -1237,7 +1237,7 @@
     <li><strong>Logical Role Separation:</strong> Role separation between Medical Staff and Facility Management dashboards is implemented at the topic and dashboard layout level rather than through enforced multi-tenant cryptographic access control (RBAC).</li>
     <li><strong>Replayed Telemetry Arrival Timestamps:</strong> Replayed offline records carry the timestamp of broker reconnection/receipt rather than historic capture time due to Adafruit IO's standard MQTT ingestion format and absence of an onboard battery-backed RTC.</li>
     <li><strong>Bounded FIFO RAM Buffer:</strong> The offline buffer utilizes an in-memory FreeRTOS queue holding up to 64 records of 576 bytes each (~36.8 KB SRAM). When capacity is reached, it drops newest incoming records to protect initial fault events. It is RAM-only and volatile upon power cycle or hardware reset.</li>
-    <li><strong>Task Watchdog &amp; SYSTEM_DEGRADED Window:</strong> <code>SYSTEM_DEGRADED</code> indicates an internal FreeRTOS worker task has starved its heartbeat while transport remains active. The ESP-IDF Task Watchdog Timer (TWDT) enforces an 8000 ms panic threshold; if a task hangs permanently, the chip resets ~2 seconds after entering <code>SYSTEM_DEGRADED</code> to guarantee fail-safe recovery in medical environments.</li>
+    <li><strong>Task Watchdog &amp; SYSTEM_DEGRADED Window:</strong> <code>SYSTEM_DEGRADED</code> indicates an internal FreeRTOS worker task has starved its heartbeat while transport remains active. The ESP-IDF Task Watchdog Timer (TWDT) enforces an 8000 ms panic threshold; if a task hangs permanently, the chip resets ~2 seconds after entering <code>SYSTEM_DEGRADED</code> to provide automatic recovery (simulation only).</li>
     <li><strong>Simulated Sensor Telemetry:</strong> In simulation mode, physiological vitals (PPG, ECG) and ambient facility conditions (Room Temp, Oxygen %, AQI) are synthesized via mathematical models (e.g. Gaussian superposition) and UART CLI overrides (<code>SET_HR</code>, <code>SET_SPO2</code>, <code>SET_TEMP</code>, <code>SET_ROOM</code>, <code>SET_OXYGEN</code>, <code>SET_AQI</code>).</li>
   </ol>
 </div>

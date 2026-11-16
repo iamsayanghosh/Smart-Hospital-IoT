@@ -48,7 +48,7 @@
     <text x="12" y="22" fill="#a7f3d0" font-size="12" font-weight="bold">DS18B20 1-Wire State Machine</text>
     <text x="12" y="40" fill="#94a3b8" font-size="10">2-state cycle (IDLE &#8594; CONVERTING):</text>
     <text x="12" y="58" fill="#e2e8f0" font-size="10">&#8226; TEMP_IDLE: Start 12-bit conversion</text>
-    <text x="12" y="74" fill="#e2e8f0" font-size="10">&#8226; TEMP_CONVERTING: 750 ms wait (vTaskDelay)</text>
+    <text x="12" y="74" fill="#e2e8f0" font-size="10">&#8226; TEMP_CONVERTING: &#8805;800 ms wait (millis() gate)</text>
     <text x="12" y="90" fill="#e2e8f0" font-size="10">&#8226; Read scratchpad &amp; dispatch to queue</text>
     <text x="12" y="104" fill="#64748b" font-size="9">Never stalls RTOS scheduler</text>
 
