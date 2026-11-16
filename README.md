@@ -101,7 +101,7 @@ graph TD
 * **Safety Tiers:**
   * **Normal (0.0 - 79.9 mg/hr):** Solid Green LED (`GPIO 33`).
   * **Warning (80.0 mg/hr):** Solid Yellow LED (`GPIO 26`).
-  * **Critical (> 80.0 mg/hr):** Red LED (`GPIO 25`) and Piezo Buzzer (`GPIO 14`) rapidly blink/beep at 3.3 Hz (150 ms period). Dosage is clamped at 80.0 mg/hr until physically confirmed.
+  * **Critical (> 80.0 mg/hr):** Red LED (`GPIO 25`) and Piezo Buzzer (`GPIO 14`) rapidly blink/beep at ~3.3 Hz (300 ms period: 150 ms ON / 150 ms OFF). Dosage is clamped at 80.0 mg/hr until physically confirmed.
 * **Physical Bedside Interlock:** Clinician must physically press the button on `GPIO 13` to unlock dosages above 80 mg/hr.
 * **Asymmetric Slew Limiter:** Increases are capped to $+5\text{ mg/hr/s}$ to prevent bolus shock; reductions apply instantaneously.
 * **Permanent OLED Display:** The 128x64 OLED display permanently shows current dosage, status, and confirmation cues online and offline.
