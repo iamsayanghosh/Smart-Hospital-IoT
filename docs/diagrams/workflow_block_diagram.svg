@@ -46,10 +46,10 @@
     <!-- Temp -->
     <rect x="0" y="0" width="250" height="110" rx="8" fill="#1e293b" stroke="#10b981" stroke-width="1"/>
     <text x="12" y="22" fill="#a7f3d0" font-size="12" font-weight="bold">DS18B20 1-Wire State Machine</text>
-    <text x="12" y="40" fill="#94a3b8" font-size="10">Non-blocking Two-Phase Cycle:</text>
-    <text x="12" y="58" fill="#e2e8f0" font-size="10">&#8226; Phase 1: Request Temp Conversion</text>
-    <text x="12" y="74" fill="#e2e8f0" font-size="10">&#8226; Phase 2: 750 ms non-blocking wait</text>
-    <text x="12" y="90" fill="#e2e8f0" font-size="10">&#8226; Phase 3: Read Scratchpad via GPIO 4</text>
+    <text x="12" y="40" fill="#94a3b8" font-size="10">2-state cycle (IDLE &#8594; CONVERTING):</text>
+    <text x="12" y="58" fill="#e2e8f0" font-size="10">&#8226; TEMP_IDLE: Start 12-bit conversion</text>
+    <text x="12" y="74" fill="#e2e8f0" font-size="10">&#8226; TEMP_CONVERTING: 750 ms wait (vTaskDelay)</text>
+    <text x="12" y="90" fill="#e2e8f0" font-size="10">&#8226; Read scratchpad &amp; dispatch to queue</text>
     <text x="12" y="104" fill="#64748b" font-size="9">Never stalls RTOS scheduler</text>
 
     <!-- PIR -->
@@ -60,7 +60,7 @@
 
     <!-- Synthetic PPG -->
     <rect x="0" y="210" width="250" height="95" rx="8" fill="#1e293b" stroke="#10b981" stroke-width="1"/>
-    <text x="12" y="232" fill="#a7f3d0" font-size="12" font-weight="bold">Optical PPG Pulse Oximetry</text>
+    <text x="12" y="232" fill="#a7f3d0" font-size="12" font-weight="bold">Optical PPG Pulse Oximetry (Simulated)</text>
     <text x="12" y="250" fill="#e2e8f0" font-size="10">&#8226; Heart Rate: 50 - 100 BPM nominal</text>
     <text x="12" y="266" fill="#e2e8f0" font-size="10">&#8226; SpO2: 92% - 100% nominal</text>
     <text x="12" y="282" fill="#e2e8f0" font-size="10">&#8226; Dynamic Rate: 5s abnormal, 60s stable</text>
@@ -76,7 +76,7 @@
 
     <!-- Environmental -->
     <rect x="0" y="430" width="250" height="95" rx="8" fill="#1e293b" stroke="#10b981" stroke-width="1"/>
-    <text x="12" y="452" fill="#a7f3d0" font-size="12" font-weight="bold">Facility Ambient Sensors</text>
+    <text x="12" y="452" fill="#a7f3d0" font-size="12" font-weight="bold">Facility Ambient Sensors (Simulated)</text>
     <text x="12" y="470" fill="#e2e8f0" font-size="10">&#8226; Room Temperature (18 - 28 &#176;C)</text>
     <text x="12" y="486" fill="#e2e8f0" font-size="10">&#8226; Oxygen Level (19.5% - 24.0%)</text>
     <text x="12" y="502" fill="#e2e8f0" font-size="10">&#8226; Air Quality Index (0 - 100 AQI)</text>
@@ -84,7 +84,7 @@
 
     <!-- Push into SensorQueue -->
     <rect x="0" y="540" width="250" height="60" rx="8" fill="#065f46" stroke="#059669" stroke-width="1.5"/>
-    <text x="12" y="563" fill="#ecfdf5" font-size="12" font-weight="bold">sensorQueue [Capacity: 10]</text>
+    <text x="12" y="563" fill="#ecfdf5" font-size="12" font-weight="bold">sensorQueue [Capacity: 16]</text>
     <text x="12" y="581" fill="#a7f3d0" font-size="10">All sensor tasks pack SensorMessage</text>
     <text x="12" y="593" fill="#a7f3d0" font-size="9">and push asynchronously into FIFO queue</text>
   </g>
@@ -102,7 +102,7 @@
     <text x="12" y="40" fill="#e2e8f0" font-size="10">&#8226; Drains sensorQueue inside displayTask</text>
     <text x="12" y="56" fill="#e2e8f0" font-size="10">&#8226; Spinlock protected: telemetryMux</text>
     <text x="12" y="72" fill="#e2e8f0" font-size="10">&#8226; Updates atomic SystemState record</text>
-    <text x="12" y="88" fill="#64748b" font-size="9">Guarantees zero race conditions</text>
+    <text x="12" y="88" fill="#64748b" font-size="9">Protects against concurrent race conditions</text>
 
     <!-- 3-Tier Threshold Engine -->
     <rect x="0" y="110" width="280" height="150" rx="8" fill="#1e293b" stroke="#3b82f6" stroke-width="1"/>

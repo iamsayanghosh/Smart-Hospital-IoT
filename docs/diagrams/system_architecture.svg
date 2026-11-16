@@ -58,7 +58,7 @@
     <rect x="0" y="140" width="280" height="60" rx="8" fill="#0f172a" stroke="#10b981" stroke-width="1"/>
     <text x="15" y="164" fill="#f8fafc" font-size="13" font-weight="bold">Confirmation Push Button</text>
     <text x="15" y="182" fill="#a7f3d0" font-size="11">Active-Low Input &#8226; GPIO 13</text>
-    <text x="15" y="194" fill="#64748b" font-size="10">Task 3 Critical Dose 2-Factor Auth (5s timeout)</text>
+    <text x="15" y="194" fill="#64748b" font-size="10">Task 3 Critical Dose confirm (held at 80 until pressed)</text>
 
     <!-- Status LEDs -->
     <rect x="0" y="210" width="280" height="85" rx="8" fill="#0f172a" stroke="#10b981" stroke-width="1"/>
@@ -91,7 +91,7 @@
     <text x="15" y="568" fill="#6ee7b7" font-size="12" font-weight="bold">ESP32 DevKit v4 SoC Specs</text>
     <text x="15" y="586" fill="#ecfdf5" font-size="11">&#8226; Dual Tensilica Xtensa LX6 @ 240 MHz</text>
     <text x="15" y="602" fill="#ecfdf5" font-size="11">&#8226; 320 KB SRAM (15.1% utilized / 49.4 KB)</text>
-    <text x="15" y="618" fill="#ecfdf5" font-size="11">&#8226; 4 MB Flash (79.9% utilized / 1.04 MB)</text>
+    <text x="15" y="618" fill="#ecfdf5" font-size="11">&#8226; 1.31 MB app partition (79.9% utilized)</text>
     <text x="15" y="634" fill="#ecfdf5" font-size="11">&#8226; Hardware TWDT (8000 ms panic)</text>
     <text x="15" y="650" fill="#ecfdf5" font-size="11">&#8226; 0 ms Blocking delay() &#8226; 100% Non-blocking</text>
   </g>

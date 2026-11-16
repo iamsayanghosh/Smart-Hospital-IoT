@@ -13,6 +13,8 @@ An enterprise-grade, concurrent medical telemetry and facility management firmwa
 * **GitHub Repository:** [github.com/iamsayanghosh/Smart-Hospital-IoT](https://github.com/iamsayanghosh/Smart-Hospital-IoT)
 * **Target Hardware:** Espressif ESP32 DevKit v4 (Dual-Core Xtensa 240 MHz, 320 KB SRAM)
 * **Project Report (PDF):** [docs/Smart_Hospital_IoT_Project_Report.pdf](docs/Smart_Hospital_IoT_Project_Report.pdf)
+
+> **Disclaimer:** This project is an embedded systems engineering prototype and educational simulation developed for academic and technical evaluation. It is not a certified medical device and must not be used for actual clinical diagnosis, life support, or operational medical administration.
 * **System Architecture Blueprint:** [docs/system_architecture.svg](docs/system_architecture.svg) | [PNG](docs/system_architecture.png)
 * **System Workflow Diagram:** [docs/system_workflow.svg](docs/system_workflow.svg) | [PNG](docs/system_workflow.png)
 
