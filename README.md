@@ -216,7 +216,7 @@ The firmware includes an interactive Serial Command Line Interface (115200 baud)
 * `SET_ROOM <15-40>`: Force simulated ambient room temperature.
 * `SET_OXYGEN <18-25>`: Force ambient facility oxygen percentage.
 * `SET_AQI <0-300>`: Force Air Quality Index.
-* `RESET_FACILITY`: Restore default room parameters (22.0 °C, 20.8% O2, 35 AQI).
+* `RESET_FACILITY`: Clears environmental overrides; simulation resumes nominal baselines with random variation around 22.0 °C, 20.8% O2, and 35 AQI.
 * `SHOW_TASK2`: Print MQTT topic mappings in the console.
 
 ### Offline & Replay Simulation Commands (Task 6 in Wokwi):

@@ -331,7 +331,7 @@
     The firmware executes on FreeRTOS Symmetric Multiprocessing (SMP), allocating network protocol stacks (Wi-Fi and lwIP) to 
     <strong>Core 0</strong> while dedicating <strong>Core 1</strong> exclusively to 13 prioritized application tasks. Inter-task 
     communication is strictly synchronized using thread-safe FreeRTOS mutexes, queues, and spinlocks to prevent race conditions across shared telemetry and peripherals. 
-    A dual-tier watchdog supervisor couples the hardware ESP-IDF Task Watchdog Timer (TWDT) with an application heartbeat monitor to guarantee 
+    A dual-tier watchdog supervisor couples the hardware ESP-IDF Task Watchdog Timer (TWDT) with an application heartbeat monitor to provide 
     robust supervisory fault detection and automated recovery.
   </p>
 
@@ -1126,7 +1126,7 @@
   <p>
     The system concurrently manages physical and simulated parameters. Physical core temperature is sampled via a 
     Dallas DS18B20 1-Wire sensor on <code>GPIO 4</code> using a non-blocking two-state machine (<code>TEMP_IDLE</code> &rarr; 
-    <code>TEMP_CONVERTING</code>). This ensures the &ge;800 ms 12-bit conversion delay (checked via <code>millis()</code> gate, <code>sensors.cpp:156</code>) never stalls 
+    <code>TEMP_CONVERTING</code>). This ensures the &ge;800 ms 12-bit conversion delay (checked via non-blocking <code>millis()</code> gate in <code>sensors.cpp</code>) never stalls 
     the FreeRTOS scheduler. Optical Photoplethysmogram (PPG) vitals (Heart Rate 50-100 BPM, SpO2 92-100%) and a 5 Hz Gaussian 
     ECG waveform model are synthesized concurrently. Dual-tier watchdog protection couples the hardware ESP-IDF TWDT (8000 ms hardware panic) 
     with a software heartbeat monitor (<code>watchdogTask</code>) auditing the 12 FreeRTOS worker tasks every 1000 ms against a 6000 ms silence limit while servicing its own hardware TWDT registration.
@@ -1307,7 +1307,7 @@
       <tr>
         <td><code>RESET_FACILITY</code></td>
         <td>None</td>
-        <td>Clears all environmental overrides and restores nominal room parameters (22.0 &deg;C, 20.8% O2, 35 AQI).</td>
+        <td>Clears all environmental overrides; simulation resumes nominal baselines with random variation around 22.0 &deg;C, 20.8% O2, and 35 AQI.</td>
       </tr>
       <tr>
         <td><code>SIM_OFFLINE WIFI</code></td>
