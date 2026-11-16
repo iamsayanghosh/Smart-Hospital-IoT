@@ -15,8 +15,8 @@ A concurrent medical telemetry and facility management firmware prototype implem
 * **Project Report (PDF):** [docs/Smart_Hospital_IoT_Project_Report.pdf](docs/Smart_Hospital_IoT_Project_Report.pdf)
 
 > **Disclaimer:** This project is an embedded systems engineering prototype and educational simulation developed for academic and technical evaluation. It is not a certified medical device and must not be used for actual clinical diagnosis, life support, or operational medical administration.
-* **System Architecture Blueprint:** [docs/system_architecture.svg](docs/system_architecture.svg) | [PNG](docs/system_architecture.png)
-* **System Workflow Diagram:** [docs/system_workflow.svg](docs/system_workflow.svg) | [PNG](docs/system_workflow.png)
+* **System Architecture Blueprint:** [docs/diagrams/system_architecture.svg](docs/diagrams/system_architecture.svg) | [PNG](docs/diagrams/system_architecture.png)
+* **System Workflow Diagram:** [docs/diagrams/workflow_block_diagram.svg](docs/diagrams/workflow_block_diagram.svg) | [PNG](docs/diagrams/workflow_block_diagram.png)
 
 ---
 
@@ -186,10 +186,11 @@ Smart-Hospital-IoT/
 │   └── watchdog.cpp                  # TWDT reset & task audit loop
 ├── docs/                             # Engineering Documentation & Deliverables
 │   ├── Smart_Hospital_IoT_Project_Report.pdf # Comprehensive Technical Report (PDF)
-│   ├── system_architecture.svg       # Dual-Core SMP Architecture Blueprint
-│   ├── system_architecture.png       # High-DPI Architecture Diagram
-│   ├── system_workflow.svg           # End-to-End Workflow & Dataflow
-│   └── system_workflow.png           # High-DPI Workflow Diagram
+│   └── diagrams/                     # High-Resolution Architectural & Dataflow Diagrams
+│       ├── system_architecture.svg   # Dual-Core SMP Architecture Blueprint
+│       ├── system_architecture.png   # High-DPI Architecture Diagram
+│       ├── workflow_block_diagram.svg # End-to-End Workflow & Dataflow
+│       └── workflow_block_diagram.png # High-DPI Workflow Diagram
 ├── test/                             # Automated Unit Tests
 │   └── test_main.cpp                 # 15 Unity test cases
 ├── diagram.json                      # Wokwi circuit schematic wiring
@@ -270,7 +271,7 @@ pio test -e esp32dev --without-uploading --without-testing
 | Metric | Measured Value | Budget / Limit | Utilization |
 | :--- | :--- | :--- | :--- |
 | **RAM (SRAM)** | 49,424 Bytes | 327,680 Bytes | **15.1%** |
-| **Flash Memory** | 1,047,106 Bytes | 1,310,720 Bytes | **79.9%** |
+| **Flash Memory** | 1,047,210 Bytes | 1,310,720 Bytes | **79.9%** |
 | **FreeRTOS Application Tasks** | 13 tasks (all Core 1) | Dual Core Xtensa | Dedicated application core |
 | **Watchdog Timeout** | 8000 ms (Hardware TWDT) | 6000 ms (Heartbeat) | 100% monitored |
 | **Blocking Delays** | 0 ms (Zero `delay()`) | 0 allowed | Fully non-blocking |

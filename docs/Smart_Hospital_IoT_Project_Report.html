@@ -339,7 +339,7 @@
     <strong>Key Project Accomplishments:</strong>
     <ul>
       <li><strong>Unified Single-Project Integration:</strong> All 6 assigned internship tasks run simultaneously in one firmware image without blocking delays (0 ms <code>delay()</code>).</li>
-      <li><strong>Resource Efficiency:</strong> RAM utilization measured at <strong>15.1%</strong> (49,424 B of 327,680 B) and Flash at <strong>79.9%</strong> (1,047,106 B of 1,310,720 B).</li>
+      <li><strong>Resource Efficiency:</strong> RAM utilization measured at <strong>15.1%</strong> (49,424 B of 327,680 B) and Flash at <strong>79.9%</strong> (1,047,210 B of 1,310,720 B).</li>
       <li><strong>Automated Test Suite:</strong> 15 unit tests covering strict numeric string parsers and medication dosage safety clamping are build-verified for the ESP32 platform via PlatformIO Unity.</li>
       <li><strong>Open Source &amp; Credentials Safety:</strong> Released under the MIT License with complete credential isolation (private keys never committed to Git).</li>
     </ul>
@@ -954,7 +954,7 @@
     <text x="12" y="132" fill="#93c5fd" font-size="12" font-weight="bold">3-Tier Clinical &amp; Facility Thresholds</text>
     <text x="12" y="150" fill="#22c55e" font-size="10">&#8226; NORMAL: HR 50-100, SpO2 &gt;=92%, Temp 36-38</text>
     <text x="12" y="166" fill="#eab308" font-size="10">&#8226; WARNING: HR 45-50 / 100-120, SpO2 88-91%</text>
-    <text x="12" y="182" fill="#ef4444" font-size="10">&#8226; CRITICAL: HR &lt;45 or &gt;120, SpO2 &lt;88%, Temp &gt;39.5</text>
+    <text x="12" y="182" fill="#ef4444" font-size="10">&#8226; CRITICAL: HR &lt;45 or &gt;120, SpO2 &lt;88%, Temp &lt;34/&gt;39.5</text>
     <text x="12" y="200" fill="#6ee7b7" font-size="10">&#8226; FACILITY NORMAL: Room 18-28&#176;C, O2 19.5-24%, AQI &lt;100</text>
     <text x="12" y="216" fill="#fde68a" font-size="10">&#8226; FACILITY WARNING: Room 16-18 / 28-30&#176;C, AQI 101-150</text>
     <text x="12" y="232" fill="#fca5a5" font-size="10">&#8226; FACILITY CRITICAL: Room &lt;16 or &gt;30&#176;C, O2 &lt;18%, AQI &gt;150</text>
@@ -1216,7 +1216,7 @@
       </tr>
       <tr>
         <td><strong>Flash Memory</strong></td>
-        <td>1,047,106 Bytes</td>
+        <td>1,047,210 Bytes</td>
         <td>1,310,720 Bytes</td>
         <td><strong>79.9%</strong></td>
         <td>Fits comfortably within default 1.31 MB application partition (app0).</td>
@@ -1303,6 +1303,11 @@
         <td><code>SET_AQI &lt;val&gt;</code></td>
         <td>0 to 300 AQI</td>
         <td>Force Air Quality Index. <code>SET_AQI 160</code> &rarr; Unhealthy air quality alert (EPA Unhealthy band: 151-200).</td>
+      </tr>
+      <tr>
+        <td><code>RESET_FACILITY</code></td>
+        <td>None</td>
+        <td>Clears all environmental overrides and restores nominal room parameters (22.0 &deg;C, 20.8% O2, 35 AQI).</td>
       </tr>
       <tr>
         <td><code>SIM_OFFLINE WIFI</code></td>

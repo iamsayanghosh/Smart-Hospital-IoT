@@ -109,7 +109,7 @@
     <text x="12" y="132" fill="#93c5fd" font-size="12" font-weight="bold">3-Tier Clinical &amp; Facility Thresholds</text>
     <text x="12" y="150" fill="#22c55e" font-size="10">&#8226; NORMAL: HR 50-100, SpO2 &gt;=92%, Temp 36-38</text>
     <text x="12" y="166" fill="#eab308" font-size="10">&#8226; WARNING: HR 45-50 / 100-120, SpO2 88-91%</text>
-    <text x="12" y="182" fill="#ef4444" font-size="10">&#8226; CRITICAL: HR &lt;45 or &gt;120, SpO2 &lt;88%, Temp &gt;39.5</text>
+    <text x="12" y="182" fill="#ef4444" font-size="10">&#8226; CRITICAL: HR &lt;45 or &gt;120, SpO2 &lt;88%, Temp &lt;34/&gt;39.5</text>
     <text x="12" y="200" fill="#6ee7b7" font-size="10">&#8226; FACILITY NORMAL: Room 18-28&#176;C, O2 19.5-24%, AQI &lt;100</text>
     <text x="12" y="216" fill="#fde68a" font-size="10">&#8226; FACILITY WARNING: Room 16-18 / 28-30&#176;C, AQI 101-150</text>
     <text x="12" y="232" fill="#fca5a5" font-size="10">&#8226; FACILITY CRITICAL: Room &lt;16 or &gt;30&#176;C, O2 &lt;18%, AQI &gt;150</text>
