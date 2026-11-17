@@ -65,7 +65,7 @@
     <text x="15" y="234" fill="#f8fafc" font-size="13" font-weight="bold">Status Indicator LEDs</text>
     <text x="15" y="252" fill="#ef4444" font-size="11">&#8226; RED (GPIO 25): Critical (&gt;80 mg/hr)</text>
     <text x="15" y="268" fill="#eab308" font-size="11">&#8226; YELLOW (GPIO 26): Warning (80 mg/hr)</text>
-    <text x="15" y="284" fill="#22c55e" font-size="11">&#8226; GREEN (GPIO 33): Normal (0-79 mg/hr)</text>
+    <text x="15" y="284" fill="#22c55e" font-size="11">&#8226; GREEN (GPIO 33): Normal (0.0 - 79.9 mg/hr)</text>
 
     <!-- Buzzer -->
     <rect x="0" y="305" width="280" height="65" rx="8" fill="#0f172a" stroke="#10b981" stroke-width="1"/>
