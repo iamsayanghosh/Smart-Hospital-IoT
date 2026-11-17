@@ -116,7 +116,7 @@ graph TD
   * **Sleeping Rest (10°):** Normal baseline physiological status.
   * **Breathing Support (45°):** Semi-Fowler's positioning automatically triggered by hypoxia ($\text{SpO}_2 \in [88\%, 91\%]$).
   * **Emergency (90°):** Resuscitation positioning triggered by critical vitals ($\text{SpO}_2 < 88\%$, $\text{HR} < 45$ or $> 120\text{ BPM}$, extreme body temperature $<34.0^\circ\text{C}$ or $>39.5^\circ\text{C}$).
-* **Manual Override:** Clinicians can command angles ($0 - 90^\circ$) via `bed-angle`. Any change in clinical status automatically overrides manual positioning.
+* **Clinician-in-the-Loop Override Primacy:** Clinicians can command angles ($0 - 90^\circ$) via `bed-angle` with full medical override authority (e.g. flattening the bed to $0^\circ$ supine for emergency CPR chest compressions during a cardiac arrest). Any subsequent shift in clinical status re-triggers automatic positioning.
 
 ### Task 5: Smart Dynamic Sampling Rate (Adaptive Monitoring)
 * **Energy-Efficient Stable Mode:** Sets vital and temperature acquisition to **60 seconds** when all physiological markers are normal.
@@ -208,7 +208,7 @@ Smart-Hospital-IoT/
 
 ## 5. Interactive Simulation & Testing (Serial CLI)
 
-The firmware includes an interactive Serial Command Line Interface (115200 baud) strictly bounded to the visual dial limits of the Adafruit IO dashboard gauges. CLI overrides trigger an immediate sample (<0.5 s); the nominal autonomous 60 s / 5 s adaptive cadence is unchanged.
+The firmware includes an interactive Serial Command Line Interface (115200 baud) strictly bounded to the visual dial limits of the Adafruit IO dashboard gauges. CLI vital overrides trigger an immediate sample (<0.5 s, or &le;800 ms if waiting for an active 1-Wire DS18B20 conversion to finish); the nominal autonomous 60 s / 5 s adaptive cadence is unchanged.
 
 ### Patient Vitals Simulation Commands:
 * `SET_HR <40-140>`: Force patient heart rate (e.g. `SET_HR 105` for Warning, `SET_HR 130` for Emergency).
@@ -274,11 +274,11 @@ pio test -e esp32dev --without-uploading --without-testing
 
 | Metric | Measured Value | Budget / Limit | Utilization |
 | :--- | :--- | :--- | :--- |
-| **RAM (SRAM)** | 49,432 Bytes | 327,680 Bytes | **15.1%** |
-| **Flash Memory** | 1,047,410 Bytes | 1,310,720 Bytes | **79.9%** |
+| **Static RAM (SRAM)** | 49,456 Bytes | 327,680 Bytes | **15.1%** |
+| **Flash Memory** | 1,048,078 Bytes | 1,310,720 Bytes | **80.0%** |
 | **FreeRTOS Application Tasks** | 13 tasks (all Core 1) | Dual Core Xtensa | Dedicated application core |
 | **Watchdog Timeout** | 8000 ms (Hardware TWDT) | 6000 ms (Heartbeat) | 100% monitored |
-| **Blocking Delays** | 0 ms (Zero `delay()`) | 0 allowed | Fully non-blocking |
+| **Blocking Delays** | 0 ms (Zero `delay()`) | 0 allowed | Non-blocking sensor FSMs & event waits |
 
 ---
 

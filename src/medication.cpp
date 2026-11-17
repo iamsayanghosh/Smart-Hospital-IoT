@@ -124,8 +124,11 @@ static void updateMedicationDosageFromRequest()
     const float goal = state.criticalConfirmationPending ? MEDICATION_CRITICAL_DOSAGE_THRESHOLD : targetDosage;
     if (goal > state.applied) {
         float elapsedSeconds = 1.0f;
-        if (state.lastRateLimitUpdateMs != 0U && now > state.lastRateLimitUpdateMs) {
-            elapsedSeconds = static_cast<float>(now - state.lastRateLimitUpdateMs) / 1000.0f;
+        if (state.lastRateLimitUpdateMs != 0U) {
+            uint32_t deltaMs = now - state.lastRateLimitUpdateMs;
+            if (deltaMs > 0U && deltaMs < 60000U) {
+                elapsedSeconds = static_cast<float>(deltaMs) / 1000.0f;
+            }
         }
         if (elapsedSeconds <= 0.0f) {
             elapsedSeconds = 1.0f;

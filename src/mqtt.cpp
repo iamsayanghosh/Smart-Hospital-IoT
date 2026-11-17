@@ -222,7 +222,9 @@ void configureMqttBuffer()
     const uint16_t bufferSizeBefore = mqttClient.getBufferSize();
 
     if (bufferSizeBefore < configuredBufferSize) {
-        mqttClient.setBufferSize(configuredBufferSize);
+        if (!mqttClient.setBufferSize(configuredBufferSize)) {
+            Serial.println("[MQTT] Warning: Failed to allocate enlarged MQTT packet buffer");
+        }
     }
 
     Serial.print("[MQTT] MQTT buffer size before fix: ");
@@ -390,11 +392,15 @@ bool connectMqtt()
         mqttRoutes[2].topic = bedAngleTopic.c_str();
         
         mqttClient.setCallback(mqttMessageCallback);
-        mqttClient.subscribe(medicationDosageTopic.c_str());
-        mqttClient.subscribe(samplingRateTopic.c_str());
-        mqttClient.subscribe(bedAngleTopic.c_str());
+        bool sub1 = mqttClient.subscribe(medicationDosageTopic.c_str());
+        bool sub2 = mqttClient.subscribe(samplingRateTopic.c_str());
+        bool sub3 = mqttClient.subscribe(bedAngleTopic.c_str());
         mqttClient.loop();
-        Serial.println("[MQTT TASK] Connected to Adafruit IO broker");
+        if (!sub1 || !sub2 || !sub3) {
+            Serial.println("[MQTT TASK] Warning: One or more topic subscriptions failed");
+            return false;
+        }
+        Serial.println("[MQTT TASK] Connected and subscribed to Adafruit IO broker");
         return true;
     }
     Serial.print("[MQTT TASK] Connection failed, state=");
@@ -423,8 +429,7 @@ bool safePublish(const String& topic, const String& payload, bool offline) {
             return true;
         } else {
             Serial.println("[MQTT TASK] Publish failed; buffering telemetry");
-            enqueueBufferedTelemetry(topic.c_str(), payload.c_str());
-            return false;
+            return enqueueBufferedTelemetry(topic.c_str(), payload.c_str());
         }
     }
 }
@@ -455,6 +460,9 @@ bool publishLiveFeed(const Telemetry &snapshot, const FacilityTelemetry &facilit
             changed = !liveFeedPublished[feedIndex] || lastPublishedSpo2 != snapshot.spo2;
             break;
         case LIVE_MEDICAL_BODY_TEMPERATURE:
+            if (!snapshot.temperatureValid) {
+                return false;
+            }
             feedName = MEDICAL_BODY_TEMPERATURE_FEED;
             payload = String(snapshot.temperature, 1);
             changed = !liveFeedPublished[feedIndex] || lastPublishedBodyTemperature != snapshot.temperature;
@@ -534,13 +542,12 @@ void publishMedicalAlertIfNeeded(const Telemetry &snapshot, bool offline)
     const uint32_t now = millis();
     if (!candidate.active) {
         if (!medicalAlertStateKnown || medicalAlertPublished) {
-            if (medicalAlertStateKnown && now - lastMedicalAlertPublishMs < ALERT_PUBLISH_INTERVAL_MS) {
-                return;
-            }
-            const char *normalPayload = "MEDICAL STATUS: NORMAL\nNo active medical alerts.";
-            if (safePublish(getAioFeedTopic(HOSPITAL_EVENTS_FEED), String(normalPayload), offline)) {
-                lastMedicalAlertPublishMs = now;
-                medicalAlertStateKnown = true;
+            if (!medicalAlertStateKnown || now - lastMedicalAlertPublishMs >= ALERT_PUBLISH_INTERVAL_MS) {
+                const char *normalPayload = "MEDICAL STATUS: NORMAL\nNo active medical alerts.";
+                if (safePublish(getAioFeedTopic(HOSPITAL_EVENTS_FEED), String(normalPayload), offline)) {
+                    lastMedicalAlertPublishMs = now;
+                    medicalAlertStateKnown = true;
+                }
             }
         }
         medicalAlertPublished = false;
@@ -587,13 +594,12 @@ void publishFacilityAlertIfNeeded(const FacilityTelemetry &snapshot, bool offlin
     const uint32_t now = millis();
     if (!candidate.active) {
         if (!facilityAlertStateKnown || facilityAlertPublished) {
-            if (facilityAlertStateKnown && now - lastFacilityAlertPublishMs < ALERT_PUBLISH_INTERVAL_MS) {
-                return;
-            }
-            const char *normalPayload = "FACILITY STATUS: NORMAL\nNo active facility alerts.";
-            if (safePublish(getAioFeedTopic(HOSPITAL_EVENTS_FEED), String(normalPayload), offline)) {
-                lastFacilityAlertPublishMs = now;
-                facilityAlertStateKnown = true;
+            if (!facilityAlertStateKnown || now - lastFacilityAlertPublishMs >= ALERT_PUBLISH_INTERVAL_MS) {
+                const char *normalPayload = "FACILITY STATUS: NORMAL\nNo active facility alerts.";
+                if (safePublish(getAioFeedTopic(HOSPITAL_EVENTS_FEED), String(normalPayload), offline)) {
+                    lastFacilityAlertPublishMs = now;
+                    facilityAlertStateKnown = true;
+                }
             }
         }
         facilityAlertPublished = false;
@@ -652,7 +658,7 @@ void publishSummaryData(bool offline)
 
     const float medicalAverageHeartRate = medicalSummaryStats.sampleCount > 0 ? medicalSummaryStats.heartRateTotal / medicalSummaryStats.sampleCount : static_cast<float>(snapshot.heartRate);
     const int medicalMinSpo2 = medicalSummaryStats.sampleCount > 0 ? medicalSummaryStats.minSpo2 : snapshot.spo2;
-    const float medicalMaxBodyTemperature = medicalSummaryStats.sampleCount > 0 ? medicalSummaryStats.maxBodyTemperature : snapshot.temperature;
+    const float medicalMaxBodyTemperature = medicalSummaryStats.temperatureSampleCount > 0 ? medicalSummaryStats.maxBodyTemperature : (snapshot.temperatureValid ? snapshot.temperature : 0.0f);
 
     const float facilityAverageRoomTemperature = facilitySummaryStats.sampleCount > 0 ? facilitySummaryStats.roomTemperatureTotal / facilitySummaryStats.sampleCount : facilitySnapshot.roomTemperature;
     const float facilityAverageOxygen = facilitySummaryStats.sampleCount > 0 ? facilitySummaryStats.oxygenTotal / facilitySummaryStats.sampleCount : facilitySnapshot.oxygenLevel;
@@ -784,9 +790,7 @@ void mqttTask(void *parameter)
             Telemetry snapshot = getTelemetrySnapshot();
             FacilityTelemetry facilitySnapshot = getFacilitySnapshot();
 
-            if (snapshot.temperatureValid) {
-                updateMedicalSummaryStats(snapshot);
-            }
+            updateMedicalSummaryStats(snapshot);
             updateFacilitySummaryStats(facilitySnapshot);
 
             publishMedicalAlertIfNeeded(snapshot, offline);

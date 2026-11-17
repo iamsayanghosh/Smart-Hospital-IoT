@@ -182,7 +182,9 @@ void appInit()
         failSetup("[SETUP] Heartbeat mutex creation failed");
     }
     watchdogInit();
-    initOfflineBuffer();
+    if (!initOfflineBuffer()) {
+        failSetup("[SETUP] Offline buffer queue creation failed");
+    }
     Serial.println("[SETUP] Queues, mutexes, and offline buffer created");
 
     // Initialize thresholds, simulation state, telemetry, and summary windows.

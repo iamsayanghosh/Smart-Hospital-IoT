@@ -174,6 +174,7 @@ struct MedicalSummaryStats {
     int minSpo2 = 100;
     float maxBodyTemperature = 0.0f;
     uint32_t abnormalCount = 0;
+    uint32_t temperatureSampleCount = 0;
 };
 
 struct FacilitySummaryStats {

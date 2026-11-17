@@ -18,9 +18,11 @@
  *     - Emergency (90°, 5.0°/s): Critical vitals (HR <45 or >120, SpO2 <88%, ECG <45 or >120, Temp <34°C or >39.5°C).
  *     - Breathing Support (45°, 1.5°/s): Hypoxia support (SpO2 88-91%).
  *     - Sleeping (10°, 1.5°/s): Normal stable vitals or non-critical anomalies.
- * - Manual Override: Ingests manual angle targets [0°-90°] via bedQueue from MQTT feed "bed-angle".
- *   Manual override is preserved ONLY until the patient's clinical state changes. Any change in
- *   auto mode immediately cancels manual override and restores clinical automatic angle.
+ * - Clinician-in-the-Loop Override Primacy: Ingests manual angle targets [0°-90°] via bedQueue
+ *   from MQTT feed "bed-angle". The attending physician retains absolute human-in-the-loop authority
+ *   to command any bed angle at any time (e.g. flattening the bed to 0° supine for emergency CPR
+ *   chest compressions or surgical access during a cardiac arrest). Any subsequent transition in
+ *   the patient's clinical state automatically cancels manual override and re-evaluates posture.
  * - Kinematic Smoothing: Updates at 50 Hz (20 ms dt) with velocity-clamped increments (max 0.1° per 20 ms step = 5.0°/s maximum emergency slew rate, 1.5°/s nominal) to guarantee smooth, non-abrupt motion for patient comfort.
  *
  * @param parameter Unused FreeRTOS task parameter pointer (NULL).

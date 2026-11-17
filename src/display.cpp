@@ -81,6 +81,16 @@ static void drawOfflineBanner()
     display.print("LOGGING OFFLINE");
 }
 
+/** @brief Draws the Task 6 "SYSTEM DEGRADED" banner when an internal worker task starves heartbeats. */
+static void drawDegradedBanner()
+{
+    display.fillRect(0, BANNER_BAR_Y, SCREEN_WIDTH, BANNER_BAR_H, SSD1306_WHITE);
+    display.setTextColor(SSD1306_BLACK);
+    display.setTextSize(1);
+    display.setCursor(2, BANNER_BAR_Y + 1);
+    display.print("SYSTEM DEGRADED");
+}
+
 /**
  * @brief Configures I2C bus clock and initializes SSD1306 display hardware.
  *
@@ -170,11 +180,14 @@ void displayTask(void *parameter)
 
         MedicationDosageControl dosageSnapshot = getMedicationDosageSnapshot();
         bool showOfflineBanner = isOfflineAlertConfirmed();
+        bool showDegradedBanner = (!showOfflineBanner && getSystemHealthState() == SYSTEM_DEGRADED);
         if (xSemaphoreTake(displayMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
             display.clearDisplay();
             drawMedicationScreen(dosageSnapshot); // always visible, online or offline
             if (showOfflineBanner) {
                 drawOfflineBanner();
+            } else if (showDegradedBanner) {
+                drawDegradedBanner();
             }
             display.display();
             xSemaphoreGive(displayMutex);

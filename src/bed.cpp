@@ -78,7 +78,10 @@ void bedTask(void *parameter)
             continue;
         }
 
-        // 1. Check for manual override from MQTT
+        // 1. Check for manual override from MQTT (Clinician-in-the-Loop Primacy)
+        // In clinical medicine, the attending physician retains ultimate authority to command any
+        // angle (e.g. flattening the bed to 0° supine for CPR compressions during a cardiac arrest).
+        // Any subsequent transition in the patient's clinical state will re-trigger automatic positioning.
         float manualTarget = -1.0f;
         if (xQueueReceive(bedQueue, &manualTarget, 0) == pdTRUE) {
             targetAngle = manualTarget;
@@ -86,7 +89,7 @@ void bedTask(void *parameter)
             if (targetAngle > 90.0f) targetAngle = 90.0f;
             
             speedPerSecond = 2.0f; // Manual: 2°/second
-            Serial.print("[BED] Manual mode activated, target angle: ");
+            Serial.print("[BED] Clinician manual override active, target angle: ");
             Serial.println(targetAngle);
         }
 

@@ -15,6 +15,7 @@
  */
 
 #include "outputs.h"
+#include <atomic>
 
 #define RED_LED_PIN 25     ///< Red indicator LED pin (Critical dosage >80 mg/hr)
 #define YELLOW_LED_PIN 26  ///< Yellow indicator LED pin (Warning dosage 80 mg/hr)
@@ -36,8 +37,8 @@ void outputsInit()
     noTone(BUZZER_PIN);
 }
 
-static bool medicationBuzzerActive = false; ///< Holds active acoustic alarm request from medicationTask
-static bool actualBuzzerState = false;      ///< Current physical tone state of the buzzer transducer
+static std::atomic<bool> medicationBuzzerActive{false}; ///< Holds active acoustic alarm request from medicationTask
+static bool actualBuzzerState = false;                  ///< Current physical tone state of the buzzer transducer
 
 /**
  * @brief Applies visual LED indicators and registers acoustic alarm intent for medication safety.
@@ -53,7 +54,7 @@ void setSafetyOutputs(bool red, bool yellow, bool green, bool buzzer)
     digitalWrite(YELLOW_LED_PIN, yellow ? HIGH : LOW);
     digitalWrite(GREEN_LED_PIN, green ? HIGH : LOW);
 
-    medicationBuzzerActive = buzzer;
+    medicationBuzzerActive.store(buzzer, std::memory_order_relaxed);
 }
 
 /**
@@ -67,7 +68,7 @@ void setSafetyOutputs(bool red, bool yellow, bool green, bool buzzer)
  * @param mode Offline cadence enum (BUZZER_MODE_NORMAL, BUZZER_MODE_WIFI_FAIL, or BUZZER_MODE_MQTT_FAIL).
  */
 void updateOfflineBuzzer(OfflineBuzzerMode mode) {
-    bool shouldBuzz = medicationBuzzerActive;
+    bool shouldBuzz = medicationBuzzerActive.load(std::memory_order_relaxed);
     
     if (!shouldBuzz) {
         if (mode == BUZZER_MODE_WIFI_FAIL) {

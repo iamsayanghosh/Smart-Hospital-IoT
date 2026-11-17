@@ -111,9 +111,18 @@ bool peekBufferedTelemetry(BufferedTelemetryMessage* msg);
 size_t getBufferedTelemetryCount();
 
 /**
- * @brief Allocates the 64-slot FreeRTOS queue used for offline telemetry buffering.
+ * @brief Returns the current system health state (ONLINE, DEGRADED, or OFFLINE).
+ *
+ * @return SystemHealthState Current infrastructure status.
  */
-void initOfflineBuffer();
+SystemHealthState getSystemHealthState();
+
+/**
+ * @brief Allocates the 64-slot FreeRTOS queue used for offline telemetry buffering.
+ *
+ * @return true if queue creation succeeded; false on allocation failure.
+ */
+bool initOfflineBuffer();
 
 /**
  * @brief FreeRTOS task supervising connectivity states and offline buzzer signaling.

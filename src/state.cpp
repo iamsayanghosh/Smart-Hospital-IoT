@@ -169,88 +169,98 @@ bool sendSensorMessage(const SensorMessage &message, const char *taskName)
  */
 AlertCandidate evaluateMedicalAlert(const Telemetry &snapshot)
 {
-    AlertCandidate candidate;
+    AlertCandidate bestCandidate;
 
-    if (snapshot.heartRate < medicalThresholds.heartRate.low || snapshot.heartRate > medicalThresholds.heartRate.high) {
-        candidate.active = true;
-        candidate.parameter = "heartRate";
-        candidate.value = static_cast<float>(snapshot.heartRate);
-        candidate.message = snapshot.heartRate < medicalThresholds.heartRate.low ? "Low heart rate" : "High heart rate";
-        candidate.severity = (snapshot.heartRate < medicalThresholds.heartRate.criticalLow || snapshot.heartRate > medicalThresholds.heartRate.criticalHigh) 
-                             ? ALERT_SEVERITY_CRITICAL : ALERT_SEVERITY_WARNING;
-        return candidate;
-    }
+    auto checkCandidate = [&](const char* param, float val, const char* msg, AlertSeverity sev) {
+        if (!bestCandidate.active || (sev > bestCandidate.severity)) {
+            bestCandidate.active = true;
+            bestCandidate.parameter = param;
+            bestCandidate.value = val;
+            bestCandidate.message = msg;
+            bestCandidate.severity = sev;
+        }
+    };
 
+    // 1. SpO2 (Hypoxia / critical airway priority)
     if (snapshot.spo2 < medicalThresholds.spo2.low) {
-        candidate.active = true;
-        candidate.parameter = "spo2";
-        candidate.value = static_cast<float>(snapshot.spo2);
-        candidate.message = "Low SpO2";
-        candidate.severity = snapshot.spo2 < medicalThresholds.spo2.criticalLow ? ALERT_SEVERITY_CRITICAL : ALERT_SEVERITY_WARNING;
-        return candidate;
+        AlertSeverity sev = (snapshot.spo2 < medicalThresholds.spo2.criticalLow) 
+                            ? ALERT_SEVERITY_CRITICAL : ALERT_SEVERITY_WARNING;
+        checkCandidate("spo2", static_cast<float>(snapshot.spo2), "Low SpO2", sev);
     }
 
+    // 2. Heart Rate
+    if (snapshot.heartRate < medicalThresholds.heartRate.low || snapshot.heartRate > medicalThresholds.heartRate.high) {
+        AlertSeverity sev = (snapshot.heartRate < medicalThresholds.heartRate.criticalLow || snapshot.heartRate > medicalThresholds.heartRate.criticalHigh) 
+                            ? ALERT_SEVERITY_CRITICAL : ALERT_SEVERITY_WARNING;
+        const char *msg = snapshot.heartRate < medicalThresholds.heartRate.low ? "Low heart rate" : "High heart rate";
+        checkCandidate("heartRate", static_cast<float>(snapshot.heartRate), msg, sev);
+    }
+
+    // 3. ECG Rate
     if (snapshot.ecgRate < medicalThresholds.ecgRate.low || snapshot.ecgRate > medicalThresholds.ecgRate.high) {
-        candidate.active = true;
-        candidate.parameter = "ecgRate";
-        candidate.value = static_cast<float>(snapshot.ecgRate);
-        candidate.message = snapshot.ecgRate < medicalThresholds.ecgRate.low ? "Low ECG rate" : "High ECG rate";
-        candidate.severity = (snapshot.ecgRate < medicalThresholds.ecgRate.criticalLow || snapshot.ecgRate > medicalThresholds.ecgRate.criticalHigh) 
-                             ? ALERT_SEVERITY_CRITICAL : ALERT_SEVERITY_WARNING;
-        return candidate;
+        AlertSeverity sev = (snapshot.ecgRate < medicalThresholds.ecgRate.criticalLow || snapshot.ecgRate > medicalThresholds.ecgRate.criticalHigh) 
+                            ? ALERT_SEVERITY_CRITICAL : ALERT_SEVERITY_WARNING;
+        const char *msg = snapshot.ecgRate < medicalThresholds.ecgRate.low ? "Low ECG rate" : "High ECG rate";
+        checkCandidate("ecgRate", static_cast<float>(snapshot.ecgRate), msg, sev);
     }
 
+    // 4. Body Temperature (only evaluated if sensor is valid/connected)
     if (snapshot.temperatureValid) {
         if (snapshot.temperature < medicalThresholds.bodyTemperature.low || snapshot.temperature > medicalThresholds.bodyTemperature.high) {
-            candidate.active = true;
-            candidate.parameter = "bodyTemperature";
-            candidate.value = snapshot.temperature;
-            candidate.message = snapshot.temperature < medicalThresholds.bodyTemperature.low ? "Low body temperature" : "High body temperature";
-            candidate.severity = (snapshot.temperature < medicalThresholds.bodyTemperature.criticalLow || snapshot.temperature > medicalThresholds.bodyTemperature.criticalHigh) ? ALERT_SEVERITY_CRITICAL : ALERT_SEVERITY_WARNING;
-            return candidate;
+            AlertSeverity sev = (snapshot.temperature < medicalThresholds.bodyTemperature.criticalLow || snapshot.temperature > medicalThresholds.bodyTemperature.criticalHigh) 
+                                ? ALERT_SEVERITY_CRITICAL : ALERT_SEVERITY_WARNING;
+            const char *msg = snapshot.temperature < medicalThresholds.bodyTemperature.low ? "Low body temperature" : "High body temperature";
+            checkCandidate("bodyTemperature", snapshot.temperature, msg, sev);
         }
     }
 
-    return candidate;
+    return bestCandidate;
 }
 
 
 
 /**
- * @brief Selects the first active facility alert in a telemetry snapshot.
+ * @brief Selects the most severe active facility alert in a telemetry snapshot.
  */
 AlertCandidate evaluateFacilityAlert(const FacilityTelemetry &snapshot)
 {
-    AlertCandidate candidate;
+    AlertCandidate bestCandidate;
 
-    if (snapshot.roomTemperature < facilityThresholds.roomTemperature.low || snapshot.roomTemperature > facilityThresholds.roomTemperature.high) {
-        candidate.active = true;
-        candidate.parameter = "roomTemperature";
-        candidate.value = snapshot.roomTemperature;
-        candidate.message = snapshot.roomTemperature < facilityThresholds.roomTemperature.low ? "Low room temperature" : "High room temperature";
-        candidate.severity = (snapshot.roomTemperature < facilityThresholds.roomTemperature.criticalLow || snapshot.roomTemperature > facilityThresholds.roomTemperature.criticalHigh) ? ALERT_SEVERITY_CRITICAL : ALERT_SEVERITY_WARNING;
-        return candidate;
-    }
+    auto checkCandidate = [&](const char* param, float val, const char* msg, AlertSeverity sev) {
+        if (!bestCandidate.active || (sev > bestCandidate.severity)) {
+            bestCandidate.active = true;
+            bestCandidate.parameter = param;
+            bestCandidate.value = val;
+            bestCandidate.message = msg;
+            bestCandidate.severity = sev;
+        }
+    };
 
+    // 1. Oxygen Level (suffocation / hypoxia risk)
     if (snapshot.oxygenLevel < facilityThresholds.oxygen.low || snapshot.oxygenLevel > facilityThresholds.oxygen.high) {
-        candidate.active = true;
-        candidate.parameter = "oxygenLevel";
-        candidate.value = snapshot.oxygenLevel;
-        candidate.message = snapshot.oxygenLevel < facilityThresholds.oxygen.low ? "Low oxygen level" : "High oxygen level";
-        candidate.severity = (snapshot.oxygenLevel < facilityThresholds.oxygen.criticalLow || snapshot.oxygenLevel > facilityThresholds.oxygen.criticalHigh) ? ALERT_SEVERITY_CRITICAL : ALERT_SEVERITY_WARNING;
-        return candidate;
+        AlertSeverity sev = (snapshot.oxygenLevel < facilityThresholds.oxygen.criticalLow || snapshot.oxygenLevel > facilityThresholds.oxygen.criticalHigh) 
+                            ? ALERT_SEVERITY_CRITICAL : ALERT_SEVERITY_WARNING;
+        const char *msg = snapshot.oxygenLevel < facilityThresholds.oxygen.low ? "Low oxygen level" : "High oxygen level";
+        checkCandidate("oxygenLevel", snapshot.oxygenLevel, msg, sev);
     }
 
+    // 2. Room Temperature
+    if (snapshot.roomTemperature < facilityThresholds.roomTemperature.low || snapshot.roomTemperature > facilityThresholds.roomTemperature.high) {
+        AlertSeverity sev = (snapshot.roomTemperature < facilityThresholds.roomTemperature.criticalLow || snapshot.roomTemperature > facilityThresholds.roomTemperature.criticalHigh) 
+                            ? ALERT_SEVERITY_CRITICAL : ALERT_SEVERITY_WARNING;
+        const char *msg = snapshot.roomTemperature < facilityThresholds.roomTemperature.low ? "Low room temperature" : "High room temperature";
+        checkCandidate("roomTemperature", snapshot.roomTemperature, msg, sev);
+    }
+
+    // 3. AQI
     if (snapshot.aqi < facilityThresholds.aqi.low || snapshot.aqi > facilityThresholds.aqi.high) {
-        candidate.active = true;
-        candidate.parameter = "aqi";
-        candidate.value = static_cast<float>(snapshot.aqi);
-        candidate.message = snapshot.aqi > facilityThresholds.aqi.high ? "AQI elevated" : "AQI unusually low";
-        candidate.severity = snapshot.aqi > facilityThresholds.aqi.criticalHigh ? ALERT_SEVERITY_CRITICAL : ALERT_SEVERITY_WARNING;
-        return candidate;
+        AlertSeverity sev = (snapshot.aqi > facilityThresholds.aqi.criticalHigh) 
+                            ? ALERT_SEVERITY_CRITICAL : ALERT_SEVERITY_WARNING;
+        const char *msg = snapshot.aqi > facilityThresholds.aqi.high ? "AQI elevated" : "AQI unusually low";
+        checkCandidate("aqi", static_cast<float>(snapshot.aqi), msg, sev);
     }
 
-    return candidate;
+    return bestCandidate;
 }
 
 
@@ -263,10 +273,12 @@ AlertCandidate evaluateFacilityAlert(const FacilityTelemetry &snapshot)
  * @brief Adds one valid medical telemetry snapshot to the summary window.
  *
  * The snapshot is supplied by mqttTask while MQTT is connected.
+ * Decoupled from temperature validity: Heart Rate and SpO2 accumulate even if the
+ * DS18B20 1-Wire temperature sensor is disconnected.
  */
 void updateMedicalSummaryStats(const Telemetry &snapshot)
 {
-    if (!snapshot.temperatureValid || !snapshot.initialVitalsProcessed) {
+    if (!snapshot.initialVitalsProcessed) {
         return;
     }
 
@@ -278,9 +290,13 @@ void updateMedicalSummaryStats(const Telemetry &snapshot)
 
     medicalSummaryStats.sampleCount += 1;
     medicalSummaryStats.heartRateTotal += snapshot.heartRate;
-    medicalSummaryStats.bodyTemperatureTotal += snapshot.temperature;
     medicalSummaryStats.minSpo2 = min(medicalSummaryStats.minSpo2, snapshot.spo2);
-    medicalSummaryStats.maxBodyTemperature = max(medicalSummaryStats.maxBodyTemperature, snapshot.temperature);
+
+    if (snapshot.temperatureValid) {
+        medicalSummaryStats.temperatureSampleCount += 1;
+        medicalSummaryStats.bodyTemperatureTotal += snapshot.temperature;
+        medicalSummaryStats.maxBodyTemperature = max(medicalSummaryStats.maxBodyTemperature, snapshot.temperature);
+    }
 
     AlertCandidate alert = evaluateMedicalAlert(snapshot);
     if (alert.active) {

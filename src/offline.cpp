@@ -36,6 +36,14 @@ static volatile bool offlineAlertConfirmed = false;
 bool isOfflineAlertConfirmed() {
     return offlineAlertConfirmed;
 }
+
+/**
+ * @brief Returns the current system health state.
+ */
+SystemHealthState getSystemHealthState() {
+    return currentHealth;
+}
+
 static QueueHandle_t offlineBufferQueue = NULL;              ///< Thread-safe FreeRTOS queue storing buffered outbound telemetry
 
 /**
@@ -70,8 +78,9 @@ void updateSystemHealth(bool wifiConnected, bool mqttConnected, bool systemHealt
 /**
  * @brief Allocates the 64-item FreeRTOS queue for offline telemetry storage.
  */
-void initOfflineBuffer() {
+bool initOfflineBuffer() {
     offlineBufferQueue = xQueueCreate(64, sizeof(BufferedTelemetryMessage));
+    return (offlineBufferQueue != NULL);
 }
 
 /**
@@ -166,6 +175,16 @@ void offlineTask(void *parameter) {
         bool healthy = isSystemHealthy();
         
         updateSystemHealth(wifi, mqtt, healthy);
+
+        static SystemHealthState lastLoggedHealth = SYSTEM_ONLINE;
+        if (currentHealth != lastLoggedHealth) {
+            if (currentHealth == SYSTEM_DEGRADED) {
+                Serial.println("[HEALTH] System state transition: SYSTEM_DEGRADED (Worker task watchdog starvation)");
+            } else if (currentHealth == SYSTEM_ONLINE && lastLoggedHealth == SYSTEM_DEGRADED) {
+                Serial.println("[HEALTH] System state transition: SYSTEM_ONLINE (All tasks healthy)");
+            }
+            lastLoggedHealth = currentHealth;
+        }
         
         // Dual-layer filter via OfflineBannerGate:
         // 1. Initial boot grace (10s / OFFLINE_BOOT_GRACE_MS) prevents false alarms during Wi-Fi association.

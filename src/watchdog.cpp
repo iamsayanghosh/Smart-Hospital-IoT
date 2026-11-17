@@ -19,6 +19,7 @@
 #include "watchdog.h"
 #include "app.h" // For taskNameFromId
 #include "esp_task_wdt.h"
+#include <atomic>
 
 static const uint32_t WATCHDOG_TIMEOUT_MS = 6000;         ///< Maximum allowable silent period before task flagged unresponsive (6 s)
 static const uint32_t WATCHDOG_CHECK_INTERVAL_MS = 1000;  ///< Supervisory evaluation period (1 s)
@@ -26,7 +27,7 @@ static const uint32_t STARTUP_GRACE_PERIOD_MS = 2000;     ///< Initial boot grac
 static const uint32_t HEARTBEAT_MUTEX_WAIT_MS = 50;       ///< Maximum mutex wait when logging task heartbeat (50 ms)
 
 TaskHeartbeat taskHeartbeats[TASK_MONITORED_COUNT];
-static bool globalSystemHealthy = true;
+static std::atomic<bool> globalSystemHealthy{true};
 
 /**
  * @brief Returns whether all monitored tasks are healthy and responsive.
@@ -34,7 +35,7 @@ static bool globalSystemHealthy = true;
  * @return true if no tasks have missed heartbeats; false otherwise.
  */
 bool isSystemHealthy() {
-    return globalSystemHealthy;
+    return globalSystemHealthy.load(std::memory_order_relaxed);
 }
 
 /**
@@ -143,7 +144,7 @@ void watchdogTask(void *parameter)
             }
         }
 
-        globalSystemHealthy = !unhealthyFound;
+        globalSystemHealthy.store(!unhealthyFound, std::memory_order_relaxed);
 
         if (!unhealthyFound) {
             if (millis() - lastHealthyLogMs > 10000) {

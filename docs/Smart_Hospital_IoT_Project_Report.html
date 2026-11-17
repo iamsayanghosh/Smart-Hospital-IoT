@@ -339,7 +339,7 @@
     <strong>Key Project Accomplishments:</strong>
     <ul>
       <li><strong>Unified Single-Project Integration:</strong> All 6 assigned internship tasks run simultaneously in one firmware image without blocking delays (0 ms <code>delay()</code>).</li>
-      <li><strong>Resource Efficiency:</strong> RAM utilization measured at <strong>15.1%</strong> (49,432 B of 327,680 B) and Flash at <strong>79.9%</strong> (1,047,410 B of 1,310,720 B).</li>
+      <li><strong>Resource Efficiency:</strong> Static RAM utilization measured at <strong>15.1%</strong> (49,456 B of 327,680 B) and Flash at <strong>80.0%</strong> (1,048,078 B of 1,310,720 B), leaving healthy runtime dynamic heap for FreeRTOS queues.</li>
       <li><strong>Automated Test Suite:</strong> 15 unit tests covering strict numeric string parsers and medication dosage safety clamping are build-verified for the ESP32 platform via PlatformIO Unity.</li>
       <li><strong>Open Source &amp; Credentials Safety:</strong> Released under the MIT License with complete credential isolation (private keys never committed to Git).</li>
     </ul>
@@ -468,7 +468,7 @@
         <td><strong>Priority 3</strong></td>
         <td>5s to 60s adaptive</td>
         <td>4096 Bytes</td>
-        <td>Generates optical PPG (HR &amp; SpO2); adapts interval via <code>samplingQueue</code>.</td>
+        <td>Generates optical PPG (HR &amp; SpO2); queries adaptive cadence via <code>getSamplePeriodMs()</code> (managed by <code>samplingTask</code> via <code>samplingQueue</code>).</td>
       </tr>
       <tr>
         <td><code>ecgTask</code></td>
@@ -640,7 +640,7 @@
     <text x="15" y="234" fill="#f8fafc" font-size="13" font-weight="bold">Status Indicator LEDs</text>
     <text x="15" y="252" fill="#ef4444" font-size="11">&#8226; RED (GPIO 25): Critical (&gt;80 mg/hr)</text>
     <text x="15" y="268" fill="#eab308" font-size="11">&#8226; YELLOW (GPIO 26): Warning (80 mg/hr)</text>
-    <text x="15" y="284" fill="#22c55e" font-size="11">&#8226; GREEN (GPIO 33): Normal (0-79 mg/hr)</text>
+    <text x="15" y="284" fill="#22c55e" font-size="11">&#8226; GREEN (GPIO 33): Normal (0.0 - 79.9 mg/hr)</text>
 
     <!-- Buzzer -->
     <rect x="0" y="305" width="280" height="65" rx="8" fill="#0f172a" stroke="#10b981" stroke-width="1"/>
@@ -665,8 +665,8 @@
     <rect x="0" y="545" width="280" height="135" rx="8" fill="#064e3b" stroke="#059669" stroke-width="1"/>
     <text x="15" y="568" fill="#6ee7b7" font-size="12" font-weight="bold">ESP32 DevKit v4 SoC Specs</text>
     <text x="15" y="586" fill="#ecfdf5" font-size="11">&#8226; Dual Tensilica Xtensa LX6 @ 240 MHz</text>
-    <text x="15" y="602" fill="#ecfdf5" font-size="11">&#8226; 320 KB SRAM (15.1% utilized / 49.4 KB)</text>
-    <text x="15" y="618" fill="#ecfdf5" font-size="11">&#8226; 1.31 MB app partition (79.9% utilized)</text>
+    <text x="15" y="602" fill="#ecfdf5" font-size="11">&#8226; 320 KB SRAM (15.1% static / 49.5 KB)</text>
+    <text x="15" y="618" fill="#ecfdf5" font-size="11">&#8226; 1.31 MB app partition (80.0% utilized / 1.05 MB)</text>
     <text x="15" y="634" fill="#ecfdf5" font-size="11">&#8226; Hardware TWDT (8000 ms panic)</text>
     <text x="15" y="650" fill="#ecfdf5" font-size="11">&#8226; 0 ms Blocking delay() &#8226; 100% Non-blocking</text>
   </g>
@@ -952,12 +952,12 @@
     <!-- 3-Tier Threshold Engine -->
     <rect x="0" y="110" width="280" height="150" rx="8" fill="#1e293b" stroke="#3b82f6" stroke-width="1"/>
     <text x="12" y="132" fill="#93c5fd" font-size="12" font-weight="bold">3-Tier Clinical &amp; Facility Thresholds</text>
-    <text x="12" y="150" fill="#22c55e" font-size="10">&#8226; NORMAL: HR 50-100, SpO2 &gt;=92%, Temp 36-38</text>
-    <text x="12" y="166" fill="#eab308" font-size="10">&#8226; WARNING: HR 45-50 / 100-120, SpO2 88-91%</text>
-    <text x="12" y="182" fill="#ef4444" font-size="10">&#8226; CRITICAL: HR &lt;45 or &gt;120, SpO2 &lt;88%, Temp &lt;34/&gt;39.5</text>
+    <text x="12" y="150" fill="#22c55e" font-size="10">&#8226; NORMAL: HR/ECG 50-100, SpO2 &gt;=92%, Temp 36-38</text>
+    <text x="12" y="166" fill="#eab308" font-size="10">&#8226; WARNING: HR/ECG 45-49 / 101-120, SpO2 88-91%</text>
+    <text x="12" y="182" fill="#ef4444" font-size="10">&#8226; CRITICAL: HR/ECG &lt;45 or &gt;120, SpO2 &lt;88%, Temp &lt;34/&gt;39.5</text>
     <text x="12" y="200" fill="#6ee7b7" font-size="10">&#8226; FACILITY NORMAL: Room 18-28&#176;C, O2 19.5-24%, AQI &lt;100</text>
     <text x="12" y="216" fill="#fde68a" font-size="10">&#8226; FACILITY WARNING: Room 16-18 / 28-30&#176;C, AQI 101-150</text>
-    <text x="12" y="232" fill="#fca5a5" font-size="10">&#8226; FACILITY CRITICAL: Room &lt;16 or &gt;30&#176;C, O2 &lt;18%, AQI &gt;150</text>
+    <text x="12" y="232" fill="#fca5a5" font-size="10">&#8226; FACILITY CRITICAL: Room &lt;16/&gt;30&#176;C, O2 &lt;18/&gt;24.5%, AQI &gt;150</text>
     <text x="12" y="250" fill="#64748b" font-size="9">Rising edge transition gives alertSemaphore</text>
 
     <!-- Dynamic Rate Adjustment Logic (Placed directly below Thresholds) -->
@@ -1168,7 +1168,7 @@
     <li><strong>Sleeping Mode (10&deg;, 1.5&deg;/s):</strong> Nominal resting position when vitals are stable.</li>
     <li><strong>Breathing Support Mode (45&deg;, 1.5&deg;/s):</strong> Automatically triggered when SpO2 drops into the warning band (88% - 91%) to alleviate pulmonary pressure.</li>
     <li><strong>Emergency Mode (90&deg;, 5.0&deg;/s):</strong> Automatically triggered immediately upon any Critical vital sign (cardiac arrest, extreme hypothermia).</li>
-    <li><strong>Manual Override (0&deg;-90&deg;, 2.0&deg;/s):</strong> Remote slider allows clinicians to set any desired posture with smooth 2&deg;/second interpolation.</li>
+    <li><strong>Clinician-in-the-Loop Override Primacy (0&deg;-90&deg;, 2.0&deg;/s):</strong> Remote slider allows attending physicians to command any posture with full clinical authority (e.g. flattening the bed to 0&deg; supine for CPR chest compressions or surgical access during a cardiac arrest). Any subsequent shift in clinical state re-evaluates automatic posture.</li>
   </ul>
 
   <h2>Task 5: Smart Dynamic Sampling Rate (Adaptive Monitoring)</h2>
@@ -1211,16 +1211,16 @@
     <tbody>
       <tr>
         <td><strong>RAM (SRAM)</strong></td>
-        <td>49,432 Bytes (Static)</td>
+        <td>49,456 Bytes (Static)</td>
         <td>327,680 Bytes</td>
         <td><strong>15.1%</strong></td>
         <td>Generous static headroom; runtime minimum free heap is ~108 KB (measured via <code>ESP.getMinFreeHeap()</code> in serial diagnostics emitted every 30 seconds by <code>watchdogTask</code> after task stacks, Wi-Fi buffers, and the 64-item offline telemetry queue are allocated).</td>
       </tr>
       <tr>
         <td><strong>Flash Memory</strong></td>
-        <td>1,047,410 Bytes</td>
+        <td>1,048,078 Bytes</td>
         <td>1,310,720 Bytes</td>
-        <td><strong>79.9%</strong></td>
+        <td><strong>80.0%</strong></td>
         <td>Fits comfortably within default 1.31 MB application partition (app0).</td>
       </tr>
       <tr>
