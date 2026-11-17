@@ -50,16 +50,17 @@ graph TD
     subgraph "Core 0: Network Stacks"
         WIFI_STACK["Espressif Wi-Fi MAC / PHY"]
         LWIP["lwIP TCP/IP Stack"]
+        WIFI_STACK <--> LWIP
     end
 
     subgraph "Core 1: FreeRTOS Application Tasks"
-        P4["P4: watchdogTask (1000 ms)"]
+        P4["P4: watchdogTask (Auditor 1000 ms)"]
         P3_1["P3: medicationTask (50 Hz / 20 ms)"]
         P3_2["P3: vitalTask (PPG 5s-60s)"]
         P3_3["P3: ecgTask (Fixed 5 Hz / 200 ms)"]
         P2_1["P2: temperatureTask (DS18B20 5s-60s)"]
         P2_2["P2: motionTask (PIR 1000 ms)"]
-        P2_3["P2: environmentTask (1000 ms)"]
+        P2_3["P2: environmentTask (Facility 1000 ms)"]
         P2_4["P2: bedTask (Servo 50 Hz / 20 ms)"]
         P2_5["P2: mqttTask (Adafruit IO 3000 ms)"]
         P2_6["P2: samplingTask (Adaptive 1000 ms)"]
@@ -74,9 +75,12 @@ graph TD
         HW_ACT["Servo (18), Buzzer (14), LEDs (25, 26, 33)"]
     end
 
+    %% Hardware Input / Output Flows
+    HW_SENS --> P2_1 & P2_2 & P3_1
     P1 --> HW_OLED
-    P2_1 & P2_2 & P3_1 --> HW_SENS
     P2_4 & P3_1 & P2_8 --> HW_ACT
+
+    %% Inter-Core Network Flow
     P2_5 <--> LWIP
 ```
 
