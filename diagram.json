@@ -103,7 +103,7 @@
     [ "oled1:SDA", "esp:21", "green", [ "v0" ] ],
     [ "temp1:VCC", "esp:3V3", "red", [ "v19.2", "h-163.2" ] ],
     [ "temp1:DQ", "esp:4", "green", [ "v0" ] ],
-    [ "pir1:VCC", "esp:3V3", "red", [ "v48", "h-336" ] ],
+    [ "pir1:VCC", "esp:5V", "red", [ "v48", "h-336" ] ],
     [ "pir1:OUT", "esp:27", "green", [ "v76.8", "h-115.34", "v240", "h-240", "v-9.6" ] ],
     [ "oled1:VCC", "esp:3V3", "red", [ "v-19.2", "h-163.05", "v144", "h-192", "v-201.6" ] ],
     [ "led1:C", "esp:GND.1", "black", [ "v0" ] ],

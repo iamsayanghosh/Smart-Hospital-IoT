@@ -89,8 +89,8 @@ graph TD
 ## 2. Assignment Task Implementation
 
 ### Task 1: Multi-Sensor Expansion Using FreeRTOS
-* **Physical Temperature:** Dallas DS18B20 on 1-Wire bus (`GPIO 4`). Non-blocking state machine (`TEMP_IDLE` $\rightarrow$ `TEMP_CONVERTING`) with $\ge 800\text{ ms}$ `millis()` conversion gate ensures thermal conversion never blocks the scheduler.
-* **Physical Motion:** HC-SR501 PIR sensor on `GPIO 27`.
+* **Physical Temperature:** Dallas DS18B20 on 1-Wire bus (`GPIO 4`). Non-blocking state machine (`TEMP_IDLE` $\rightarrow$ `TEMP_CONVERTING`) with an 800–900 ms completion window (800 ms conversion gate plus 100 ms polling cadence) ensures thermal conversion never blocks the scheduler. Filters power-on scratchpad reading (+85.0°C) and invalidates telemetry if sensor resets mid-operation.
+* **Physical Motion:** HC-SR501 PIR sensor on `GPIO 27`, powered from 5V (`esp:5V`) in circuit diagram to ensure reliable operation of the module's onboard 3.3V LDO regulator on physical hardware.
 * **Simulated Photoplethysmogram (PPG):** Optical Heart Rate (`50 - 100 BPM`) and $\text{SpO}_2$ (`92 - 100 %`).
 * **Simulated Electrocardiogram (ECG):** Illustrative real-time Gaussian superposition model synthesizing coarse cardiac cycle morphology at 5 Hz (200 ms cadence) for IoT demonstration (clinical diagnostic ECG requires $\ge 250\text{ Hz}$).
 * **Supervision:** Dual-tier watchdog coupling ESP-IDF Task Watchdog Timer (TWDT, 8000 ms) with an application heartbeat auditor (`watchdogTask`, 6000 ms).
@@ -98,20 +98,21 @@ graph TD
 ### Task 2: Dual-Role Cloud IoT Monitoring (Role-Based Dashboards)
 * **Medical Staff Telemetry:** `medical-heart-rate`, `medical-spo2`, `medical-body-temperature`.
 * **Facility Management Telemetry:** `facility-room-temperature`, `facility-oxygen`, `facility-aqi`.
-* **Consolidated Events & Summaries:** `hospital-events` receives real-time medical/facility alerts and an aggregated 60-second summary report.
+* **Consolidated Events & Summaries:** `hospital-events` receives real-time medical/facility alerts (evaluating $\text{SpO}_2 \rightarrow \text{HR} \rightarrow \text{ECG} \rightarrow \text{Temp}$) and an aggregated 60-second summary report distinguishing `NORMAL`, `WARNING`, and `CRITICAL` statuses.
 
-### Task 3: Smart Medication Infusion Safety System
+### Task 3: Simulated Medication Infusion Safety System
+* **Educational Demonstration:** The firmware models a rate-limited infusion dosage controller with physical safety interlocks (demonstrates software-in-the-loop safety and verification; physical delivery actuators/pumps are not part of the hardware BOM).
 * **Infusion Rate Bounds:** 0.0 to 100.0 mg/hr commanded remotely via `medication-dosage`.
 * **Safety Tiers:**
   * **Normal (0.0 - 79.9 mg/hr):** Solid Green LED (`GPIO 33`).
   * **Warning (80.0 mg/hr):** Solid Yellow LED (`GPIO 26`).
   * **Critical (> 80.0 mg/hr):** Red LED (`GPIO 25`) and Piezo Buzzer (`GPIO 14`) rapidly blink/beep at ~3.3 Hz (300 ms period: 150 ms ON / 150 ms OFF). Dosage is clamped at 80.0 mg/hr until physically confirmed.
 * **Physical Bedside Interlock:** Clinician must physically press the button on `GPIO 13` to unlock dosages above 80 mg/hr.
-* **Asymmetric Slew Limiter:** Increases are capped to $+5\text{ mg/hr/s}$ to prevent bolus shock; reductions apply instantaneously.
+* **Asymmetric Slew Limiter:** Increases are smoothly capped to $+5\text{ mg/hr/s}$ across 50 Hz task cycles (with cycle 0 step-jump elimination) to prevent bolus shock; reductions apply instantaneously.
 * **Permanent OLED Display:** The 128x64 OLED display permanently shows current dosage, status, and confirmation cues online and offline.
 
 ### Task 4: Intelligent Remote Bed Elevation
-* **Actuation:** SG90 Servo on `GPIO 18` with kinematic ramp smoothing (1.5°/s, 2.0°/s, 5.0°/s).
+* **Actuation:** SG90 Servo on `GPIO 18` with kinematic ramp smoothing (1.5°/s, 2.0°/s, 5.0°/s). During boot failure rollback (`failSetup()`), the servo PWM timer is explicitly detached.
 * **Predefined Clinical Modes:**
   * **Sleeping Rest (10°):** Normal baseline physiological status.
   * **Breathing Support (45°):** Semi-Fowler's positioning automatically triggered by hypoxia ($\text{SpO}_2 \in [88\%, 91\%]$).
@@ -119,8 +120,8 @@ graph TD
 * **Clinician-in-the-Loop Override Primacy:** Clinicians can command angles ($0 - 90^\circ$) via `bed-angle` with full medical override authority (e.g. flattening the bed to $0^\circ$ supine for emergency CPR chest compressions during a cardiac arrest). Any subsequent transition in the patient's bed posture category (`SLEEPING` ↔ `BREATHING_SUPPORT` ↔ `EMERGENCY`) automatically cancels manual override and re-evaluates posture.
 
 ### Task 5: Smart Dynamic Sampling Rate (Adaptive Monitoring)
-* **Energy-Efficient Stable Mode:** Sets vital and temperature acquisition to **60 seconds** when all physiological markers are normal.
-* **Acute Crisis Mode:** Automatically accelerates sampling to **5 seconds** upon any abnormal vital sign.
+* **Energy-Efficient Stable Mode:** Sets vital and temperature acquisition to **60 seconds** when all physiological markers are normal. Discrete sampling introduces a sample-and-hold detection latency (up to 60 seconds) before an acute deterioration is acquired.
+* **Acute Crisis Mode:** Once an abnormal vital sign is acquired, sampling automatically accelerates to **5 seconds**.
 * **Manual Slider Override:** Doctor can adjust sampling interval (5 s to 60 s) via `sampling-rate`. Clinical severity transitions take precedence: an acute escalation to `CRITICAL` severity immediately cancels any slower manual override and enforces rapid 5-second monitoring.
 
 ### Task 6: Fault-Tolerant Offline Detection & Buffering
@@ -129,7 +130,7 @@ graph TD
 * **Non-Clobbering OLED Banner:** When offline, an inverted ticker bar (`LOGGING OFFLINE`) renders on the bottom row (`y = 54..63`) while medication dosage remains visible.
 * **Acoustic Cadences:** Distinct failure cadences for Wi-Fi failure (rapid double-pip) vs. MQTT broker failure (slow beep). Medication critical alarms take absolute priority over network beeps.
 * **Offline SRAM Buffer:** Outgoing telemetry packets are diverted to a 64-item **bounded FIFO queue** (sized up to 512 bytes per packet). Provides best-effort local data retention during outages under QoS 0 at-most-once delivery. If network disconnection persists beyond 64 messages, the queue safely preserves earlier historical data.
-* **Reconnection Replay:** Replays missed records in strict FIFO order, sharing the 3000 ms round-robin slot (20 msgs/min baseline) to stay safely within Adafruit IO's 30 msgs/min account-wide quota.
+* **Reconnection Replay:** Replays missed records in strict FIFO order, sharing the 3000 ms round-robin slot (20 msgs/min baseline). Normal telemetry runs at 20 msgs/min; event notifications and 60 s summaries contribute toward Adafruit IO's 30 data points/minute free account quota. Pending `STATUS: NORMAL` clear events are retained until successfully delivered or buffered.
 
 ---
 
@@ -262,11 +263,16 @@ The compiled binaries will be output to:
 pio run --target upload
 ```
 
-### Automated Unit Testing
-Unit tests are implemented under `test/test_main.cpp` with 15 unit tests covering strict numeric string parsers (NaN, Inf, float integers, negative boundary handling) and medication dosage safety clamping.
-```bash
-pio test -e esp32dev --without-uploading --without-testing
-```
+### Build & Automated Unit Testing
+* **Compile Complete Application (`src/`):**
+  ```bash
+  pio run -e esp32dev
+  ```
+* **Compile Unit Test Binary (`test/`):**
+  ```bash
+  pio test -e esp32dev --without-uploading --without-testing
+  ```
+  Unit tests are implemented under `test/test_main.cpp` covering 15 test cases for strict numeric string parsers (NaN, Inf, float integers, negative boundary handling) and medication dosage safety clamping.
 
 ---
 
@@ -274,17 +280,20 @@ pio test -e esp32dev --without-uploading --without-testing
 
 | Metric | Measured Value | Budget / Limit | Utilization |
 | :--- | :--- | :--- | :--- |
-| **Static RAM (SRAM)** | 49,456 Bytes | 327,680 Bytes | **15.1%** |
-| **Flash Memory** | 1,048,078 Bytes | 1,310,720 Bytes | **80.0%** |
+| **Static RAM (SRAM)** | 49,536 Bytes | 327,680 Bytes | **15.1%** |
+| **Flash Memory** | 1,050,258 Bytes | 1,310,720 Bytes | **80.1%** |
 | **FreeRTOS Application Tasks** | 13 tasks (all Core 1) | Dual Core Xtensa | Dedicated application core |
 | **Watchdog Timeout** | 8000 ms (Hardware TWDT) | 6000 ms (Heartbeat) | 100% monitored |
-| **Blocking Delays** | 0 ms (Zero `delay()`) | 0 allowed | Non-blocking sensor FSMs & event waits |
+| **Task Scheduling Delays** | 0 ms (Zero Arduino `delay()`) | Cooperative yielding | FreeRTOS `vTaskDelay` (peripheral I/O remains synchronous) |
+
+> **Memory Accounting Note:** The physical ESP32 SoC contains 520 KB of on-chip SRAM; `327,680 Bytes` (320 KB) denotes the usable application data SRAM allocation budget reported by the linker.
 
 ---
 
-## 9. Credentials Safety & Distribution Note
+## 9. Network Security & Production Deployment Note
 
-When distributing or submitting the project archive, **never include** `include/adafruit_io_config.local.h`.
+* **MQTT Encryption:** For educational and Wokwi simulation simplicity, communication uses unencrypted MQTT on port 1883 (`WiFiClient`). For physical hospital deployments handling Protected Health Information (PHI), port 8883 with TLS/SSL encryption (`WiFiClientSecure`) and broker root CA verification is required.
+* **Credentials Isolation:** When distributing or submitting the project archive, **never include** `include/adafruit_io_config.local.h`.
 The build system in `include/adafruit_io_config.h` automatically detects whether the local configuration file exists:
 - If present: loads private credentials.
 - If absent: falls back cleanly to placeholder values, keeping the repository safe and buildable without leaking secrets.

@@ -48,6 +48,8 @@ SamplingPeriods samplingPeriods;
 
 bool medicalAlertPublished = false;
 bool facilityAlertPublished = false;
+bool medicalNormalPending = false;
+bool facilityNormalPending = false;
 String lastMedicalAlertParameter = "";
 String lastFacilityAlertParameter = "";
 AlertSeverity lastMedicalAlertSeverity = ALERT_SEVERITY_NORMAL;
@@ -162,10 +164,11 @@ bool sendSensorMessage(const SensorMessage &message, const char *taskName)
 
 
 /**
- * @brief Selects the first active medical alert in a telemetry snapshot.
+ * @brief Selects the highest-severity active medical alert in a telemetry snapshot.
  *
- * Evaluates physiological parameters in priority order: heart rate, SpO2,
- * ECG rate, and body temperature against critical and warning thresholds.
+ * Evaluates physiological parameters in clinical priority order: SpO2 (hypoxia / airway),
+ * Heart Rate, ECG Rate, and Body Temperature with severity weighting (critical abnormalities
+ * supersede warning-level deviations).
  */
 AlertCandidate evaluateMedicalAlert(const Telemetry &snapshot)
 {
@@ -308,6 +311,9 @@ void updateMedicalSummaryStats(const Telemetry &snapshot)
     AlertCandidate alert = evaluateMedicalAlert(snapshot);
     if (alert.active) {
         medicalSummaryStats.abnormalCount += 1;
+        if (alert.severity == ALERT_SEVERITY_CRITICAL) {
+            medicalSummaryStats.criticalCount += 1;
+        }
     }
 }
 
@@ -325,8 +331,12 @@ void updateFacilitySummaryStats(const FacilityTelemetry &snapshot)
     facilitySummaryStats.oxygenTotal += snapshot.oxygenLevel;
     facilitySummaryStats.aqiTotal += snapshot.aqi;
 
-    if (isFacilityAbnormal(snapshot)) {
+    AlertCandidate alert = evaluateFacilityAlert(snapshot);
+    if (alert.active) {
         facilitySummaryStats.abnormalCount += 1;
+        if (alert.severity == ALERT_SEVERITY_CRITICAL) {
+            facilitySummaryStats.criticalCount += 1;
+        }
     }
 }
 

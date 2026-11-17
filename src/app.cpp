@@ -125,7 +125,10 @@ void failSetup(const char *message)
         vTaskDelete(watchdogHandle);
         watchdogHandle = NULL;
     }
-    // Force outputs to safe unpowered state
+    // Detach servo PWM actuator to eliminate floating pulses
+    bedDetachServo();
+
+    // Force discrete outputs to safe unpowered state
     pinMode(25, OUTPUT); digitalWrite(25, LOW);
     pinMode(26, OUTPUT); digitalWrite(26, LOW);
     pinMode(33, OUTPUT); digitalWrite(33, LOW);

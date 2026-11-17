@@ -51,18 +51,36 @@ void alertTask(void *parameter)
         if (xSemaphoreTake(alertSemaphore, pdMS_TO_TICKS(500)) == pdTRUE) {
             Telemetry snapshot = getTelemetrySnapshot();
             FacilityTelemetry facilitySnapshot = getFacilitySnapshot();
-            Serial.print("[ALERT TASK] Medical abnormal: HR=");
-            Serial.print(snapshot.heartRate);
-            Serial.print(" SpO2=");
-            Serial.print(snapshot.spo2);
-            Serial.print(" Temp=");
-            Serial.print(snapshot.temperature, 1);
-            Serial.print(" | Facility abnormal: room=");
-            Serial.print(facilitySnapshot.roomTemperature, 1);
-            Serial.print("C oxygen=");
-            Serial.print(facilitySnapshot.oxygenLevel, 1);
-            Serial.print("% AQI=");
-            Serial.println(facilitySnapshot.aqi);
+
+            const bool medAbnormal = isAbnormal(snapshot);
+            const bool facAbnormal = isFacilityAbnormal(facilitySnapshot);
+
+            if (medAbnormal) {
+                Serial.print("[ALERT TASK] Medical anomaly detected: HR=");
+                Serial.print(snapshot.heartRate);
+                Serial.print(" BPM | SpO2=");
+                Serial.print(snapshot.spo2);
+                Serial.print(" % | Temp=");
+                if (snapshot.temperatureValid) {
+                    Serial.print(snapshot.temperature, 1);
+                    Serial.println(" C");
+                } else {
+                    Serial.println("N/A");
+                }
+            }
+
+            if (facAbnormal) {
+                Serial.print("[ALERT TASK] Facility anomaly detected: Room=");
+                Serial.print(facilitySnapshot.roomTemperature, 1);
+                Serial.print(" C | Oxygen=");
+                Serial.print(facilitySnapshot.oxygenLevel, 1);
+                Serial.print(" % | AQI=");
+                Serial.println(facilitySnapshot.aqi);
+            }
+
+            if (!medAbnormal && !facAbnormal) {
+                Serial.println("[ALERT TASK] Alert status cleared: All clinical and facility parameters nominal");
+            }
         }
     }
 }

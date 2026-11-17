@@ -329,7 +329,7 @@
   </p>
   <p>
     The firmware executes on FreeRTOS Symmetric Multiprocessing (SMP), allocating network protocol stacks (Wi-Fi and lwIP) to 
-    <strong>Core 0</strong> while allocating <strong>Core 1</strong> to 13 prioritized application worker tasks alongside Arduino's <code>loopTask</code>. Inter-task 
+    <strong>Core 0</strong> while dedicating <strong>Core 1</strong> exclusively to 13 prioritized application tasks. Inter-task 
     communication is strictly synchronized using thread-safe FreeRTOS mutexes, queues, and spinlocks to prevent race conditions across shared telemetry and peripherals. 
     A dual-tier watchdog supervisor couples the hardware ESP-IDF Task Watchdog Timer (TWDT) with an application heartbeat monitor to provide 
     robust supervisory fault detection and automated recovery.
@@ -338,8 +338,8 @@
   <div class="callout callout-success">
     <strong>Key Project Accomplishments:</strong>
     <ul>
-      <li><strong>Unified Single-Project Integration:</strong> All 6 assigned internship tasks run simultaneously in one firmware image without blocking delays (0 ms <code>delay()</code>).</li>
-      <li><strong>Resource Efficiency:</strong> Static RAM utilization measured at <strong>15.1%</strong> (49,456 B of 327,680 B) and Flash at <strong>80.0%</strong> (1,048,078 B of 1,310,720 B), leaving healthy runtime dynamic heap for FreeRTOS queues.</li>
+      <li><strong>Unified Single-Project Integration:</strong> All 6 assigned internship tasks run simultaneously in one firmware image without blocking delays (0 ms Arduino <code>delay()</code>).</li>
+      <li><strong>Resource Efficiency:</strong> Static RAM utilization measured at <strong>15.1%</strong> (49,536 B of 327,680 B data SRAM budget; 520 KB physical on-chip SRAM) and Flash at <strong>80.1%</strong> (1,050,258 B of 1,310,720 B), leaving healthy runtime dynamic heap for FreeRTOS queues.</li>
       <li><strong>Automated Test Suite:</strong> 15 unit tests covering strict numeric string parsers and medication dosage safety clamping are build-verified for the ESP32 platform via PlatformIO Unity.</li>
       <li><strong>Open Source &amp; Credentials Safety:</strong> Released under the MIT License with complete credential isolation (private keys never committed to Git).</li>
     </ul>
@@ -441,8 +441,8 @@
   <h1>2. Concurrency Model &amp; FreeRTOS Task Scheduling (Task 1)</h1>
   <p>
     The system utilizes FreeRTOS Symmetric Multiprocessing (SMP) to execute 13 application tasks concurrently across a 
-    strict priority hierarchy. All application tasks are pinned to <strong>Core 1</strong> (executing alongside Arduino's <code>loopTask</code>), dedicating <strong>Core 0</strong> 
-    to Espressif Wi-Fi MAC and TCP/IP (lwIP) protocol processing.
+    strict priority hierarchy. All application tasks are pinned to <strong>Core 1</strong>, dedicating <strong>Core 0</strong> 
+    exclusively to Wi-Fi and TCP/IP protocol processing.
   </p>
 
   <table>
@@ -1168,7 +1168,7 @@
     <li><strong>Sleeping Mode (10&deg;, 1.5&deg;/s):</strong> Nominal resting position when vitals are stable.</li>
     <li><strong>Breathing Support Mode (45&deg;, 1.5&deg;/s):</strong> Automatically triggered when SpO2 drops into the warning band (88% - 91%) to alleviate pulmonary pressure.</li>
     <li><strong>Emergency Mode (90&deg;, 5.0&deg;/s):</strong> Automatically triggered immediately upon any Critical vital sign (cardiac arrest, extreme hypothermia).</li>
-    <li><strong>Clinician-in-the-Loop Override Primacy (0&deg;-90&deg;, 2.0&deg;/s):</strong> Remote slider allows attending physicians to command any posture with full clinical authority (e.g. flattening the bed to 0&deg; supine for CPR chest compressions or surgical access during a cardiac arrest). Any subsequent shift in clinical state re-evaluates automatic posture.</li>
+    <li><strong>Clinician-in-the-Loop Override Primacy (0&deg;-90&deg;, 2.0&deg;/s):</strong> Remote slider allows attending physicians to command any posture with full clinical authority (e.g. flattening the bed to 0&deg; supine for CPR chest compressions or surgical access during a cardiac arrest). Any subsequent transition in the patient's bed posture category (<code>SLEEPING</code> &harr; <code>BREATHING_SUPPORT</code> &harr; <code>EMERGENCY</code>) automatically cancels manual override and re-evaluates posture.</li>
   </ul>
 
   <h2>Task 5: Smart Dynamic Sampling Rate (Adaptive Monitoring)</h2>
@@ -1176,9 +1176,9 @@
     To optimize battery life and bus utilization, <code>samplingTask</code> dynamically adjusts the sensor acquisition (sampling) interval based on patient stability (while MQTT telemetry transmission remains on its independent 3-second round-robin cycle):
   </p>
   <ul>
-    <li><strong>Abnormal State:</strong> Instantly accelerates sampling to <strong>5 seconds</strong> upon detection of any warning or critical vital sign.</li>
+    <li><strong>Abnormal State:</strong> Once an abnormal vital sign is acquired, sampling automatically accelerates to <strong>5 seconds</strong>. (During 60-second stable mode, discrete sampling introduces an acquisition latency of up to 60 seconds before an acute vital fluctuation is sampled).</li>
     <li><strong>Stable State:</strong> Automatically relaxes sampling to <strong>60 seconds</strong> (<code>AUTO_INTERVAL_STABLE_MS = 60000</code>) when vitals return to normal.</li>
-    <li><strong>Manual Override:</strong> Dashboard slider permits clinician adjustments between 5 and 60 seconds.</li>
+    <li><strong>Manual Override:</strong> Dashboard slider permits clinician adjustments between 5 and 60 seconds. Clinical severity escalation to Critical immediately revokes slower overrides.</li>
   </ul>
 
   <h2>Task 6: Advanced Offline Detection (Fault-Tolerant System)</h2>
@@ -1188,8 +1188,8 @@
   <ul>
     <li><strong>OLED Notification:</strong> Inverted status bar on bottom rows (y: 54..63) displays <strong><code>LOGGING OFFLINE</code></strong> without obstructing medication data.</li>
     <li><strong>Acoustic Discrimination:</strong> Wi-Fi failure triggers a rapid double-pip tone (0-100 ms, 200-300 ms ON), while MQTT failure triggers a slow single beep (0-500 ms ON).</li>
-    <li><strong>FIFO Offline Buffer:</strong> An in-memory queue stores up to 64 telemetry records (~36.8 KB SRAM) containing destination topic and JSON payload without timestamps. Saturated buffers drop newest records to preserve initial fault telemetry. Timestamps are assigned upon broker receipt during replay.</li>
-    <li><strong>Exponential Backoff &amp; Replay:</strong> Reconnection retry delay doubles from 1s up to 30s (1s &rarr; 2s &rarr; 4s ... &rarr; 30s max). Upon reconnection, <code>mqttTask</code> drains all buffered records in FIFO order to Adafruit IO.</li>
+    <li><strong>FIFO Offline Buffer:</strong> An in-memory queue stores up to 64 telemetry records (~36.8 KB SRAM) providing best-effort local data retention during transport outages under QoS 0 at-most-once delivery. Timestamps are assigned upon broker receipt during replay.</li>
+    <li><strong>Exponential Backoff &amp; Replay:</strong> Reconnection retry delay doubles from 1s up to 30s (1s &rarr; 2s &rarr; 4s ... &rarr; 30s max). Upon reconnection, <code>mqttTask</code> drains buffered records in FIFO order, sharing the 3000 ms round-robin slot (20 msgs/min baseline); event bursts and 60 s summaries contribute toward Adafruit IO's 30 data points/minute quota.</li>
   </ul>
 </div>
 
@@ -1211,24 +1211,24 @@
     <tbody>
       <tr>
         <td><strong>RAM (SRAM)</strong></td>
-        <td>49,456 Bytes (Static)</td>
-        <td>327,680 Bytes</td>
+        <td>49,536 Bytes (Static)</td>
+        <td>327,680 Bytes (Data SRAM)</td>
         <td><strong>15.1%</strong></td>
-        <td>Generous static headroom; runtime minimum free heap is ~108 KB (measured via <code>ESP.getMinFreeHeap()</code> in serial diagnostics emitted every 30 seconds by <code>watchdogTask</code> after task stacks, Wi-Fi buffers, and the 64-item offline telemetry queue are allocated).</td>
+        <td>Generous static headroom; runtime minimum free heap is ~108 KB (measured via <code>ESP.getMinFreeHeap()</code> after task stacks, Wi-Fi buffers, and 64-item offline queue). ESP32 SoC contains 520 KB total physical SRAM; 327,680 Bytes is the application data SRAM allocation budget.</td>
       </tr>
       <tr>
         <td><strong>Flash Memory</strong></td>
-        <td>1,048,078 Bytes</td>
+        <td>1,050,258 Bytes</td>
         <td>1,310,720 Bytes</td>
-        <td><strong>80.0%</strong></td>
+        <td><strong>80.1%</strong></td>
         <td>Fits comfortably within default 1.31 MB application partition (app0).</td>
       </tr>
       <tr>
-        <td><strong>Blocking Delays</strong></td>
-        <td>0 ms (Zero <code>delay()</code>)</td>
-        <td>0 ms permitted</td>
+        <td><strong>Task Scheduling Delays</strong></td>
+        <td>0 ms (Zero Arduino <code>delay()</code>)</td>
+        <td>Cooperative yielding</td>
         <td><strong>0.0%</strong></td>
-        <td>Fully non-blocking execution via <code>vTaskDelay()</code> yielding to FreeRTOS scheduler.</td>
+        <td>Uses FreeRTOS <code>vTaskDelay()</code> yielding; peripheral I/O and network transactions remain synchronous.</td>
       </tr>
     </tbody>
   </table>
@@ -1238,10 +1238,12 @@
     <li><strong>Multiplexed Event Feed (Adafruit IO Quotas):</strong> Due to Adafruit IO's 10-feed limit on standard accounts (6 sensor feeds + 3 control feeds + 1 event feed), all clinical alerts, facility alerts, and 60-second summary reports are multiplexed onto the single shared <code>hospital-events</code> feed.</li>
     <li><strong>Logical Role Separation:</strong> Role separation between Medical Staff and Facility Management dashboards is implemented at the topic and dashboard layout level rather than through enforced multi-tenant cryptographic access control (RBAC).</li>
     <li><strong>Replayed Telemetry Arrival Timestamps:</strong> Replayed offline records carry the timestamp of broker reconnection/receipt rather than historic capture time due to Adafruit IO's standard MQTT ingestion format and absence of an onboard battery-backed RTC.</li>
-    <li><strong>Bounded FIFO RAM Buffer:</strong> The offline buffer utilizes an in-memory FreeRTOS queue holding up to 64 records of 576 bytes each (~36.8 KB SRAM). When capacity is reached, it drops newest incoming records to protect initial fault events. It is RAM-only and volatile upon power cycle or hardware reset.</li>
+    <li><strong>Bounded FIFO RAM Buffer:</strong> The offline buffer utilizes an in-memory FreeRTOS queue holding up to 64 records of 576 bytes each (~36.8 KB SRAM) under QoS 0 at-most-once delivery. When capacity is reached, it drops newest incoming records to protect initial fault events. It is RAM-only and volatile upon power cycle or hardware reset.</li>
     <li><strong>Task Watchdog &amp; SYSTEM_DEGRADED Window:</strong> <code>SYSTEM_DEGRADED</code> indicates an internal FreeRTOS worker task has starved its heartbeat while transport remains active. The ESP-IDF Task Watchdog Timer (TWDT) enforces an 8000 ms panic threshold; if a task hangs permanently, the chip resets ~2 seconds after entering <code>SYSTEM_DEGRADED</code> to provide automatic recovery (simulation only).</li>
     <li><strong>Simulated Sensor Telemetry:</strong> In simulation mode, physiological vitals (PPG, ECG) and ambient facility conditions (Room Temp, Oxygen %, AQI) are synthesized via mathematical models (e.g. Gaussian superposition) and UART CLI overrides (<code>SET_HR</code>, <code>SET_SPO2</code>, <code>SET_TEMP</code>, <code>SET_ROOM</code>, <code>SET_OXYGEN</code>, <code>SET_AQI</code>).</li>
     <li><strong>Timer Rollover &amp; Reconnection Hygiene:</strong> Network retry timers employ signed modular delta arithmetic (<code>(int32_t)(now - nextRetryMs) &ge; 0</code>) combined with active timestamp refreshes during healthy connectivity (<code>nextRetryMs = now;</code>), systematically preventing both 49.7-day 32-bit <code>millis()</code> rollover lockups and long-uptime signed subtraction stalls.</li>
+    <li><strong>Simulated Medication Dosage Controller:</strong> Task 3 demonstrates software-in-the-loop rate limiting (+5 mg/hr/sec), physical button confirmation interlocks, and alert arbitration. It models infusion pump control logic; physical pump actuators or verified flow sensors are not included in the BOM.</li>
+    <li><strong>Network Security:</strong> The prototype connects using standard unencrypted MQTT on port 1883 for Wokwi simulation simplicity. For physical hospital networks, TLS 1.3 on port 8883 with certificate verification is recommended.</li>
   </ol>
 </div>
 
@@ -1284,8 +1286,8 @@
       </tr>
       <tr>
         <td><code>SET_TEMP &lt;val&gt;</code></td>
-        <td>30.0 to 42.0 &deg;C</td>
-        <td>Force body temperature. <code>SET_TEMP 33.5</code> &rarr; Critical hypothermia alert. <code>SET_TEMP 39.8</code> &rarr; Critical hyperthermia alert.</td>
+        <td>34.0 to 42.0 &deg;C</td>
+        <td>Force body temperature. <code>SET_TEMP 39.8</code> &rarr; Critical hyperthermia alert.</td>
       </tr>
       <tr>
         <td><code>RESET_VITALS</code></td>
@@ -1299,7 +1301,7 @@
       </tr>
       <tr>
         <td><code>SET_OXYGEN &lt;val&gt;</code></td>
-        <td>16.0 to 25.0 %</td>
+        <td>18.0 to 25.0 %</td>
         <td>Force room oxygen percentage. <code>SET_OXYGEN 17.5</code> &rarr; Critical hypoxia alarm.</td>
       </tr>
       <tr>

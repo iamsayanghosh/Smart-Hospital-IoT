@@ -28,3 +28,10 @@
  * @param parameter Unused FreeRTOS task parameter pointer (NULL).
  */
 void bedTask(void *parameter);
+
+/**
+ * @brief Detaches bed servo PWM and drives control line to safe unpowered state.
+ *
+ * Called during startup failure rollback or shutdown to prevent floating PWM lines.
+ */
+void bedDetachServo();

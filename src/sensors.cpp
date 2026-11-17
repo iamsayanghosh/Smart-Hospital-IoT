@@ -145,19 +145,25 @@ void temperatureTask(void *parameter) {
   TempReadState tempState = TEMP_IDLE;
   uint32_t lastSampleMs = 0;
   uint32_t requestStartMs = 0;
+  bool hasReadValidTemperature = false;
 
   while (true) {
     uint32_t now = millis();
     uint32_t period = getSamplePeriodMs(TASK_TEMP);
 
-    bool forced =
-        (tempState == TEMP_IDLE) && simImmediateTempSample.exchange(false);
+    // Consume immediate sample request unconditionally to prevent duplicate samples
+    bool forced = simImmediateTempSample.exchange(false);
+    if (forced && tempState == TEMP_CONVERTING) {
+      // Abort in-flight physical conversion to immediately dispatch requested override
+      tempState = TEMP_IDLE;
+    }
 
     if (tempState == TEMP_IDLE &&
         (forced || now - lastSampleMs >= period || lastSampleMs == 0)) {
       lastSampleMs = now;
       float overrideTemp = simOverrideTemperature.load();
       if (overrideTemp > -100.0f) {
+        hasReadValidTemperature = true;
         SensorMessage message = {};
         message.type = TEMP_DATA;
         message.temperature = overrideTemp;
@@ -179,18 +185,28 @@ void temperatureTask(void *parameter) {
                           ? overrideTemp
                           : temperatureSensor.getTempCByIndex(0);
 
-      // Filter out default uninitialized power-on scratchpad (+85.0 C)
+      // Distinguish initial cold-boot scratchpad (+85.0 C) from runtime sensor reset
       if (abs(rawTemp - 85.0f) <= 0.05f) {
-        Serial.println("[TEMP TASK] Ignored DS18B20 power-on reset scratchpad "
-                       "reading (85.0 C)");
+        if (!hasReadValidTemperature) {
+          Serial.println("[TEMP TASK] Ignored initial DS18B20 power-on reset scratchpad "
+                         "reading (85.0 C)");
+        } else {
+          Serial.println("[TEMP TASK] Warning: DS18B20 reset during operation (85.0 C scratchpad); marking unavailable");
+          SensorMessage message = {};
+          message.type = TEMP_DATA;
+          message.temperature = DEVICE_DISCONNECTED_C;
+          sendSensorMessage(message, "TEMP TASK");
+        }
       } else if (rawTemp == DEVICE_DISCONNECTED_C || rawTemp <= -55.0f ||
                  rawTemp > 125.0f) {
         Serial.println("[TEMP TASK] Warning: DS18B20 disconnected");
+        hasReadValidTemperature = false;
         SensorMessage message = {};
         message.type = TEMP_DATA;
         message.temperature = DEVICE_DISCONNECTED_C;
         sendSensorMessage(message, "TEMP TASK");
       } else {
+        hasReadValidTemperature = true;
         SensorMessage message = {};
         message.type = TEMP_DATA;
         message.temperature = rawTemp;

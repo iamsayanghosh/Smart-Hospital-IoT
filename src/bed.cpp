@@ -39,6 +39,20 @@ enum BedMode {
     BED_MODE_EMERGENCY,         ///< Upright angle (90°) during acute physiological crises
 };
 
+static Servo bedServo;
+
+/**
+ * @brief Detaches bed servo PWM and drives control line to safe unpowered state.
+ */
+void bedDetachServo()
+{
+    if (bedServo.attached()) {
+        bedServo.detach();
+    }
+    pinMode(BED_SERVO_PIN, OUTPUT);
+    digitalWrite(BED_SERVO_PIN, LOW);
+}
+
 /**
  * @brief FreeRTOS task implementing bed elevation kinematic control and clinical arbitration.
  *
@@ -55,7 +69,6 @@ void bedTask(void *parameter)
     }
     Serial.println("[WATCHDOG] BED task registered with TWDT");
 
-    Servo bedServo;
     bedServo.setPeriodHertz(50);
     bedServo.attach(BED_SERVO_PIN, BED_SERVO_MIN_PULSE, BED_SERVO_MAX_PULSE);
 

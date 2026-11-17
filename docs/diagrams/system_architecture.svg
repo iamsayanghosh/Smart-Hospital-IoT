@@ -91,9 +91,9 @@
     <text x="15" y="568" fill="#6ee7b7" font-size="12" font-weight="bold">ESP32 DevKit v4 SoC Specs</text>
     <text x="15" y="586" fill="#ecfdf5" font-size="11">&#8226; Dual Tensilica Xtensa LX6 @ 240 MHz</text>
     <text x="15" y="602" fill="#ecfdf5" font-size="11">&#8226; 320 KB SRAM (15.1% static / 49.5 KB)</text>
-    <text x="15" y="618" fill="#ecfdf5" font-size="11">&#8226; 1.31 MB app partition (80.0% utilized / 1.05 MB)</text>
+    <text x="15" y="618" fill="#ecfdf5" font-size="11">&#8226; 1.31 MB app partition (80.1% utilized / 1.05 MB)</text>
     <text x="15" y="634" fill="#ecfdf5" font-size="11">&#8226; Hardware TWDT (8000 ms panic)</text>
-    <text x="15" y="650" fill="#ecfdf5" font-size="11">&#8226; 0 ms Blocking delay() &#8226; 100% Non-blocking</text>
+    <text x="15" y="650" fill="#ecfdf5" font-size="11">&#8226; 0 ms Arduino delay() &#8226; FreeRTOS Task Yielding</text>
   </g>
 
   <!-- ESP32 FreeRTOS Core 1: Application Tasks (Center Column) -->

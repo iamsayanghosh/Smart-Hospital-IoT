@@ -174,6 +174,7 @@ struct MedicalSummaryStats {
     int minSpo2 = 100;
     float maxBodyTemperature = 0.0f;
     uint32_t abnormalCount = 0;
+    uint32_t criticalCount = 0;
     uint32_t temperatureSampleCount = 0;
 };
 
@@ -183,6 +184,7 @@ struct FacilitySummaryStats {
     float oxygenTotal = 0.0f;
     float aqiTotal = 0.0f;
     uint32_t abnormalCount = 0;
+    uint32_t criticalCount = 0;
 };
 
 struct SamplingPeriods {
@@ -204,6 +206,8 @@ extern FacilitySummaryStats facilitySummaryStats;
 extern SamplingPeriods samplingPeriods;
 extern bool medicalAlertPublished;
 extern bool facilityAlertPublished;
+extern bool medicalNormalPending;
+extern bool facilityNormalPending;
 extern String lastMedicalAlertParameter;
 extern String lastFacilityAlertParameter;
 extern AlertSeverity lastMedicalAlertSeverity;

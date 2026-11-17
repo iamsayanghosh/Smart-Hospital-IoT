@@ -123,21 +123,23 @@ static void updateMedicationDosageFromRequest()
 
     const float goal = state.criticalConfirmationPending ? MEDICATION_CRITICAL_DOSAGE_THRESHOLD : targetDosage;
     if (goal > state.applied) {
-        float elapsedSeconds = 1.0f;
+        float elapsedSeconds = 0.0f;
         if (state.lastRateLimitUpdateMs != 0U) {
             uint32_t deltaMs = now - state.lastRateLimitUpdateMs;
             if (deltaMs > 0U && deltaMs < 60000U) {
                 elapsedSeconds = static_cast<float>(deltaMs) / 1000.0f;
             }
-        }
-        if (elapsedSeconds <= 0.0f) {
-            elapsedSeconds = 1.0f;
+        } else {
+            // First upward adjustment initializes baseline timestamp without an instantaneous step
+            state.lastRateLimitUpdateMs = now;
         }
 
-        const float maxIncrease = MEDICATION_RATE_LIMIT_STEP_MG_PER_SEC * elapsedSeconds;
-        const float allowedIncrease = min(maxIncrease, goal - state.applied);
-        state.applied += allowedIncrease;
-        state.lastRateLimitUpdateMs = now;
+        if (elapsedSeconds > 0.0f) {
+            const float maxIncrease = MEDICATION_RATE_LIMIT_STEP_MG_PER_SEC * elapsedSeconds;
+            const float allowedIncrease = min(maxIncrease, goal - state.applied);
+            state.applied += allowedIncrease;
+            state.lastRateLimitUpdateMs = now;
+        }
     } else {
         state.applied = goal;
         state.lastRateLimitUpdateMs = now;

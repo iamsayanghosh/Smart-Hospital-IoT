@@ -188,35 +188,41 @@ String buildFacilitySummaryPayload(float averageRoomTemperature, float averageOx
  *
  * The resulting message is published periodically through hospital-events.
  */
-String buildHospitalSummaryPayload(float averageHeartRate, int minimumSpo2, const char *maxBodyTempStr,
-                                  uint32_t medicalSampleCount, uint32_t medicalAbnormalCount,
+String buildHospitalSummaryPayload(const char *averageHeartRateStr, const char *minimumSpo2Str, const char *maxBodyTempStr,
+                                  uint32_t medicalSampleCount, uint32_t medicalAbnormalCount, uint32_t medicalCriticalCount,
                                   float averageRoomTemperature, float averageOxygen, float averageAqi,
-                                  uint32_t facilitySampleCount, uint32_t facilityAbnormalCount)
+                                  uint32_t facilitySampleCount, uint32_t facilityAbnormalCount, uint32_t facilityCriticalCount)
 {
+    const char *medicalStatus = (medicalCriticalCount > 0) ? "CRITICAL" : (medicalAbnormalCount > 0 ? "WARNING" : "NORMAL");
+    const char *facilityStatus = (facilityCriticalCount > 0) ? "CRITICAL" : (facilityAbnormalCount > 0 ? "WARNING" : "NORMAL");
+
     char payload[620];
     snprintf(payload, sizeof(payload),
-             "HOSPITAL SUMMARY\n==============================\n\nMEDICAL SUMMARY\n\nAverage HR: %.2f BPM\nMinimum SpO2: %d %%\nMaximum Body Temperature: %s\n\nSamples: %lu\nAbnormal Readings: %lu\n\nStatus: %s\n\n\nFACILITY SUMMARY\n\nAverage Room Temperature: %.2f °C\nAverage Oxygen: %.2f %%\nAverage AQI: %.2f\n\nSnapshots: %lu\nAbnormal Readings: %lu\n\nStatus: %s",
-             averageHeartRate, minimumSpo2, maxBodyTempStr,
+             "HOSPITAL SUMMARY\n==============================\n\nMEDICAL SUMMARY\n\nAverage HR: %s\nMinimum SpO2: %s\nMaximum Body Temperature: %s\n\nSamples: %lu\nAbnormal Readings: %lu\n\nStatus: %s\n\n\nFACILITY SUMMARY\n\nAverage Room Temperature: %.2f °C\nAverage Oxygen: %.2f %%\nAverage AQI: %.2f\n\nSnapshots: %lu\nAbnormal Readings: %lu\n\nStatus: %s",
+             averageHeartRateStr, minimumSpo2Str, maxBodyTempStr,
              static_cast<unsigned long>(medicalSampleCount), static_cast<unsigned long>(medicalAbnormalCount),
-             medicalAbnormalCount > 0 ? "WARNING" : "NORMAL",
+             medicalStatus,
              averageRoomTemperature, averageOxygen, averageAqi,
              static_cast<unsigned long>(facilitySampleCount), static_cast<unsigned long>(facilityAbnormalCount),
-             facilityAbnormalCount > 0 ? "WARNING" : "NORMAL");
+             facilityStatus);
     return String(payload);
 }
 
 /**
  * @brief Builds a condensed summary payload (<200 bytes) for safe transmission when buffer is un-enlarged.
  */
-String buildCompactHospitalSummaryPayload(float averageHeartRate, int minimumSpo2, const char *maxBodyTempStr,
-                                         uint32_t medicalAbnormalCount, float averageOxygen, uint32_t facilityAbnormalCount)
+String buildCompactHospitalSummaryPayload(const char *averageHeartRateStr, const char *minimumSpo2Str, const char *maxBodyTempStr,
+                                         uint32_t medicalAbnormalCount, uint32_t medicalCriticalCount,
+                                         float averageOxygen, uint32_t facilityAbnormalCount, uint32_t facilityCriticalCount)
 {
-    char payload[200];
+    const char *medStat = (medicalCriticalCount > 0) ? "CRIT" : (medicalAbnormalCount > 0 ? "WARN" : "NORM");
+    const char *facStat = (facilityCriticalCount > 0) ? "CRIT" : (facilityAbnormalCount > 0 ? "WARN" : "NORM");
+
+    char payload[220];
     snprintf(payload, sizeof(payload),
-             "SUMMARY: Med[HR:%.1f,SpO2:%d%%,Temp:%s,Abn:%lu] Fac[O2:%.1f%%,Abn:%lu]",
-             averageHeartRate, minimumSpo2, maxBodyTempStr,
-             static_cast<unsigned long>(medicalAbnormalCount),
-             averageOxygen, static_cast<unsigned long>(facilityAbnormalCount));
+             "SUMMARY: Med[HR:%s,SpO2:%s,Temp:%s,%s] Fac[O2:%.1f%%,%s]",
+             averageHeartRateStr, minimumSpo2Str, maxBodyTempStr, medStat,
+             averageOxygen, facStat);
     return String(payload);
 }
 
@@ -232,8 +238,8 @@ String buildCompactHospitalSummaryPayload(float averageHeartRate, int minimumSpo
 bool configureMqttBuffer()
 {
     String sizingPayload = buildHospitalSummaryPayload(
-        999.99f, 100, "999.99 °C", UINT32_MAX, UINT32_MAX,
-        999.99f, 999.99f, 999.99f, UINT32_MAX, UINT32_MAX);
+        "999.99 BPM", "100 %", "999.99 °C", UINT32_MAX, UINT32_MAX, UINT32_MAX,
+        999.99f, 999.99f, 999.99f, UINT32_MAX, UINT32_MAX, UINT32_MAX);
     String hospitalEventsTopic = getAioFeedTopic(HOSPITAL_EVENTS_FEED);
     const uint16_t requiredPacketSize = MQTT_MAX_HEADER_SIZE + 2 + hospitalEventsTopic.length() + sizingPayload.length();
     const uint16_t configuredBufferSize = requiredPacketSize + MQTT_SUMMARY_BUFFER_MARGIN;
@@ -563,19 +569,28 @@ void publishMedicalAlertIfNeeded(const Telemetry &snapshot, bool offline)
     AlertCandidate candidate = evaluateMedicalAlert(snapshot);
     const uint32_t now = millis();
     if (!candidate.active) {
-        if (!medicalAlertStateKnown || medicalAlertPublished) {
+        if (medicalAlertPublished) {
+            medicalAlertPublished = false;
+            medicalNormalPending = true;
+        }
+
+        if (!medicalAlertStateKnown || medicalNormalPending) {
             if (!medicalAlertStateKnown || now - lastMedicalAlertPublishMs >= ALERT_PUBLISH_INTERVAL_MS) {
                 const char *normalPayload = "MEDICAL STATUS: NORMAL\nNo active medical alerts.";
                 if (safePublish(getAioFeedTopic(HOSPITAL_EVENTS_FEED), String(normalPayload), offline)) {
                     lastMedicalAlertPublishMs = now;
                     medicalAlertStateKnown = true;
+                    medicalNormalPending = false;
+                    lastMedicalAlertParameter = "";
+                    lastMedicalAlertSeverity = ALERT_SEVERITY_NORMAL;
                 }
             }
         }
-        medicalAlertPublished = false;
-        lastMedicalAlertParameter = "";
         return;
     }
+
+    // Cancel pending normal if an acute abnormality emerges
+    medicalNormalPending = false;
 
     const bool isMedicalEscalation = (candidate.severity == ALERT_SEVERITY_CRITICAL &&
                                       (!medicalAlertPublished || lastMedicalAlertSeverity != ALERT_SEVERITY_CRITICAL));
@@ -615,19 +630,28 @@ void publishFacilityAlertIfNeeded(const FacilityTelemetry &snapshot, bool offlin
     AlertCandidate candidate = evaluateFacilityAlert(snapshot);
     const uint32_t now = millis();
     if (!candidate.active) {
-        if (!facilityAlertStateKnown || facilityAlertPublished) {
+        if (facilityAlertPublished) {
+            facilityAlertPublished = false;
+            facilityNormalPending = true;
+        }
+
+        if (!facilityAlertStateKnown || facilityNormalPending) {
             if (!facilityAlertStateKnown || now - lastFacilityAlertPublishMs >= ALERT_PUBLISH_INTERVAL_MS) {
                 const char *normalPayload = "FACILITY STATUS: NORMAL\nNo active facility alerts.";
                 if (safePublish(getAioFeedTopic(HOSPITAL_EVENTS_FEED), String(normalPayload), offline)) {
                     lastFacilityAlertPublishMs = now;
                     facilityAlertStateKnown = true;
+                    facilityNormalPending = false;
+                    lastFacilityAlertParameter = "";
+                    lastFacilityAlertSeverity = ALERT_SEVERITY_NORMAL;
                 }
             }
         }
-        facilityAlertPublished = false;
-        lastFacilityAlertParameter = "";
         return;
     }
+
+    // Cancel pending normal if a facility anomaly emerges
+    facilityNormalPending = false;
 
     const bool isFacilityEscalation = (candidate.severity == ALERT_SEVERITY_CRITICAL &&
                                        (!facilityAlertPublished || lastFacilityAlertSeverity != ALERT_SEVERITY_CRITICAL));
@@ -678,8 +702,19 @@ void publishSummaryData(bool offline)
         facilitySummaryStats.aqiTotal = facilitySnapshot.aqi;
     }
 
-    const float medicalAverageHeartRate = medicalSummaryStats.sampleCount > 0 ? medicalSummaryStats.heartRateTotal / medicalSummaryStats.sampleCount : static_cast<float>(snapshot.heartRate);
-    const int medicalMinSpo2 = medicalSummaryStats.sampleCount > 0 ? medicalSummaryStats.minSpo2 : snapshot.spo2;
+    char hrBuf[32];
+    char minSpo2Buf[32];
+    if (medicalSummaryStats.sampleCount > 0) {
+        snprintf(hrBuf, sizeof(hrBuf), "%.2f BPM", medicalSummaryStats.heartRateTotal / medicalSummaryStats.sampleCount);
+        snprintf(minSpo2Buf, sizeof(minSpo2Buf), "%d %%", medicalSummaryStats.minSpo2);
+    } else if (snapshot.initialVitalsProcessed) {
+        snprintf(hrBuf, sizeof(hrBuf), "%.2f BPM", static_cast<float>(snapshot.heartRate));
+        snprintf(minSpo2Buf, sizeof(minSpo2Buf), "%d %%", snapshot.spo2);
+    } else {
+        snprintf(hrBuf, sizeof(hrBuf), "N/A");
+        snprintf(minSpo2Buf, sizeof(minSpo2Buf), "N/A");
+    }
+
     char maxTempBuf[32];
     if (medicalSummaryStats.temperatureSampleCount > 0) {
         snprintf(maxTempBuf, sizeof(maxTempBuf), "%.2f °C", medicalSummaryStats.maxBodyTemperature);
@@ -696,24 +731,28 @@ void publishSummaryData(bool offline)
     String hospitalSummaryPayload;
     if (mqttClient.getBufferSize() >= 400) {
         hospitalSummaryPayload = buildHospitalSummaryPayload(
-            medicalAverageHeartRate,
-            medicalMinSpo2,
+            hrBuf,
+            minSpo2Buf,
             maxTempBuf,
             medicalSummaryStats.sampleCount,
             medicalSummaryStats.abnormalCount,
+            medicalSummaryStats.criticalCount,
             facilityAverageRoomTemperature,
             facilityAverageOxygen,
             facilityAverageAqi,
             facilitySummaryStats.sampleCount,
-            facilitySummaryStats.abnormalCount);
+            facilitySummaryStats.abnormalCount,
+            facilitySummaryStats.criticalCount);
     } else {
         hospitalSummaryPayload = buildCompactHospitalSummaryPayload(
-            medicalAverageHeartRate,
-            medicalMinSpo2,
+            hrBuf,
+            minSpo2Buf,
             maxTempBuf,
             medicalSummaryStats.abnormalCount,
+            medicalSummaryStats.criticalCount,
             facilityAverageOxygen,
-            facilitySummaryStats.abnormalCount);
+            facilitySummaryStats.abnormalCount,
+            facilitySummaryStats.criticalCount);
     }
 
     Serial.print("[MQTT] Hospital summary payload length: ");
