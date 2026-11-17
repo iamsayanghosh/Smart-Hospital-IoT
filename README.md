@@ -205,8 +205,6 @@ Smart-Hospital-IoT/
 └── LICENSE                           # MIT Open Source License
 ```
 
-> **Distribution Note on Submission Archives:** To keep distribution packages lightweight and strictly within email and upload portal limits, the project submission archive (`Smart-Hospital-IoT-submission.zip`, ~78 KB) packages all 41 source code, configuration, hardware wiring, and unit test files. The compiled 12-page technical PDF report and high-resolution visual diagrams are hosted directly in the [GitHub Repository `docs/` directory](https://github.com/iamsayanghosh/Smart-Hospital-IoT/tree/main/docs) and downloadable via the links above.
-
 ---
 
 ## 5. Interactive Simulation & Testing (Serial CLI)
