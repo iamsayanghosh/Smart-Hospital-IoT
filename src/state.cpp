@@ -266,9 +266,15 @@ AlertCandidate evaluateFacilityAlert(const FacilityTelemetry &snapshot)
  */
 void updateMedicalSummaryStats(const Telemetry &snapshot)
 {
-    if (!snapshot.temperatureValid) {
+    if (!snapshot.temperatureValid || !snapshot.initialVitalsProcessed) {
         return;
     }
+
+    static uint32_t lastProcessedSampleCount = 0;
+    if (snapshot.vitalSampleCount == lastProcessedSampleCount) {
+        return;
+    }
+    lastProcessedSampleCount = snapshot.vitalSampleCount;
 
     medicalSummaryStats.sampleCount += 1;
     medicalSummaryStats.heartRateTotal += snapshot.heartRate;

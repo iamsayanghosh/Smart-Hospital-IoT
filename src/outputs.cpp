@@ -64,7 +64,7 @@ void setSafetyOutputs(bool red, bool yellow, bool green, bool buzzer)
  * - BUZZER_MODE_MQTT_FAIL: Slow single beep (0-500 ms ON, 500-1000 ms OFF).
  * - Priority: If medicationBuzzerActive is asserted, offline cadences are superseded.
  *
- * @param mode Offline cadence enum (BUZZER_MODE_NONE, BUZZER_MODE_WIFI_FAIL, or BUZZER_MODE_MQTT_FAIL).
+ * @param mode Offline cadence enum (BUZZER_MODE_NORMAL, BUZZER_MODE_WIFI_FAIL, or BUZZER_MODE_MQTT_FAIL).
  */
 void updateOfflineBuzzer(OfflineBuzzerMode mode) {
     bool shouldBuzz = medicationBuzzerActive;

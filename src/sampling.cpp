@@ -116,7 +116,15 @@ void samplingTask(void *parameter)
             effectiveIntervalMs = (currentAutoMode == SAMPLING_MODE_ABNORMAL) ? AUTO_INTERVAL_ABNORMAL_MS : AUTO_INTERVAL_STABLE_MS;
 
             Serial.print("[SAMPLING TASK] Clinical state transition: ");
-            Serial.println(currentAutoMode == SAMPLING_MODE_ABNORMAL ? "ABNORMAL (Auto 5 s)" : "STABLE (Auto 60 s)");
+            if (currentAutoMode == SAMPLING_MODE_ABNORMAL) {
+                Serial.print("ABNORMAL (Auto ");
+                Serial.print(AUTO_INTERVAL_ABNORMAL_MS / 1000);
+                Serial.println(" s)");
+            } else {
+                Serial.print("STABLE (Auto ");
+                Serial.print(AUTO_INTERVAL_STABLE_MS / 1000);
+                Serial.println(" s)");
+            }
         } else {
             // Clinical state unchanged: retain active manual override if present, else auto target
             if (isManualOverride) {

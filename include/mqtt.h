@@ -59,13 +59,6 @@ void setSimulateOfflineMqtt(bool enable);
 bool isSimulateOfflineWifi();
 
 /**
- * @brief Queries whether simulated MQTT broker offline mode is active.
- *
- * @return true if simulated MQTT drop is enabled; false otherwise.
- */
-bool isSimulateOfflineMqtt();
-
-/**
  * @brief FreeRTOS task managing MQTT lifecycle, message routing, and publication scheduling.
  *
  * Running at Priority 2 with an 8192-byte stack:

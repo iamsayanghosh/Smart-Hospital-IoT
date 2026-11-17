@@ -127,6 +127,7 @@ void updateTelemetry(const SensorMessage &message)
         telemetry.heartRate = message.heartRate;
         telemetry.spo2 = message.spo2;
         telemetry.initialVitalsProcessed = true;
+        telemetry.vitalSampleCount++;
     } else if (message.type == ECG_DATA) {
         telemetry.ecgRate = message.ecgRate;
         telemetry.ecgSample = message.ecgSample;

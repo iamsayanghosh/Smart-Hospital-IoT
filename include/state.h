@@ -137,6 +137,7 @@ struct Telemetry {
     bool alertActive = false;
     bool initialVitalsProcessed = false;
     bool initialEcgProcessed = false;
+    uint32_t vitalSampleCount = 0;
 };
 
 struct FacilityTelemetry {

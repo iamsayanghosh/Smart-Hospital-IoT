@@ -18,11 +18,3 @@ extern const char *mqttBroker;   ///< Adafruit IO MQTT broker hostname (io.adafr
 extern const uint16_t mqttPort;  ///< Adafruit IO MQTT TCP port (default 1883)
 
 extern WiFiClient wifiClient;    ///< Underlying TCP socket client used by PubSubClient
-
-/**
- * @brief Optional pre-initialization hook for network connectivity.
- *
- * The actual Wi-Fi connection loop is handled asynchronously within mqttTask
- * to avoid blocking system startup before FreeRTOS tasks are launched.
- */
-void setupConnectivity();

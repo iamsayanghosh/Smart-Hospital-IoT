@@ -39,24 +39,6 @@ bool isOfflineAlertConfirmed() {
 static QueueHandle_t offlineBufferQueue = NULL;              ///< Thread-safe FreeRTOS queue storing buffered outbound telemetry
 
 /**
- * @brief Retrieves the active infrastructure health state.
- *
- * @return SystemHealthState Current state: SYSTEM_ONLINE, SYSTEM_DEGRADED, or SYSTEM_OFFLINE.
- */
-SystemHealthState getSystemHealthState() {
-    return currentHealth;
-}
-
-/**
- * @brief Retrieves the active network buzzer cadence pattern.
- *
- * @return OfflineBuzzerMode Active cadence: BUZZER_MODE_NORMAL, BUZZER_MODE_WIFI_FAIL, or BUZZER_MODE_MQTT_FAIL.
- */
-OfflineBuzzerMode getOfflineBuzzerMode() {
-    return currentBuzzer;
-}
-
-/**
  * @brief Evaluates connectivity and watchdog health inputs to update system status and buzzer demand.
  *
  * Decision Logic:

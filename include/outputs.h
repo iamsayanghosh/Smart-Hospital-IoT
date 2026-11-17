@@ -48,7 +48,7 @@ void setSafetyOutputs(bool red, bool yellow, bool green, bool buzzer);
  * If medicationBuzzerActive is true, medication alarm takes absolute precedence.
  * Otherwise, generates cadence beeps for Wi-Fi failure (double pip) or MQTT failure (slow pip).
  *
- * @param mode Offline buzzer cadence mode (NONE, WIFI_FAIL, or MQTT_FAIL).
+ * @param mode Offline buzzer cadence mode (BUZZER_MODE_NORMAL, BUZZER_MODE_WIFI_FAIL, or BUZZER_MODE_MQTT_FAIL).
  */
 void updateOfflineBuzzer(OfflineBuzzerMode mode);
 

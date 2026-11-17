@@ -56,13 +56,6 @@ struct BufferedTelemetryMessage {
 };
 
 /**
- * @brief Returns the current system health classification.
- *
- * @return SystemHealthState ONLINE, DEGRADED, or OFFLINE.
- */
-SystemHealthState getSystemHealthState();
-
-/**
  * @brief Queries whether the system is confirmed offline after boot grace (10s) and debounce hold (5s).
  *
  * Single canonical gate shared by both the buzzer (offline.cpp) and OLED banner (display.cpp).
@@ -79,13 +72,6 @@ bool isOfflineAlertConfirmed();
  * @param systemHealthy True if all monitored tasks have reported recent heartbeats.
  */
 void updateSystemHealth(bool wifiConnected, bool mqttConnected, bool systemHealthy);
-
-/**
- * @brief Returns the active network alert buzzer cadence mode.
- *
- * @return OfflineBuzzerMode Active cadence pattern.
- */
-OfflineBuzzerMode getOfflineBuzzerMode();
 
 /**
  * @brief Enqueues an outgoing telemetry message into the offline FIFO queue.

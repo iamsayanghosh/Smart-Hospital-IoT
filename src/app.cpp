@@ -212,7 +212,9 @@ void appStartTasks()
     esp_err_t wdtResult = esp_task_wdt_init(&wdtConfig);
     bool watchdogReconfigured = false;
     if (wdtResult == ESP_ERR_INVALID_STATE) {
-        Serial.println("[SETUP] TWDT already initialized; reconfiguring to 8 s");
+        Serial.print("[SETUP] TWDT already initialized; reconfiguring to ");
+        Serial.print(TWDT_TIMEOUT_MS / 1000);
+        Serial.println(" s");
         watchdogReconfigured = true;
         wdtResult = esp_task_wdt_reconfigure(&wdtConfig);
     }
@@ -221,11 +223,11 @@ void appStartTasks()
         Serial.println(esp_err_to_name(wdtResult));
         failSetup("[SETUP] System halted for safe failure");
     }
-    if (watchdogReconfigured) {
-        Serial.println("[SETUP] ESP Task Watchdog configured with 8 s timeout");
-    } else {
-        Serial.println("[SETUP] ESP Task Watchdog initialized with 8 s timeout");
-    }
+    Serial.print("[SETUP] ESP Task Watchdog ");
+    Serial.print(watchdogReconfigured ? "configured" : "initialized");
+    Serial.print(" with ");
+    Serial.print(TWDT_TIMEOUT_MS / 1000);
+    Serial.println(" s timeout");
 
     // Pin every task to Core 1. Actual priorities are watchdog 4, vital/ECG/
     // medication 3, temperature/motion/MQTT/alert/sampling/bed/offline/environment 2, and display 1.

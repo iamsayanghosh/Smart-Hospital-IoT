@@ -79,15 +79,6 @@ bool isSimulateOfflineWifi() {
 }
 
 /**
- * @brief Queries whether simulated MQTT disconnect flag is set.
- *
- * @return true if simulated MQTT drop is active; false otherwise.
- */
-bool isSimulateOfflineMqtt() {
-    return simForceMqttOffline;
-}
-
-/**
  * @brief Thread-safe query of active MQTT connection status.
  *
  * Reflects broker connection status filtered through simulation override flags.
@@ -203,7 +194,7 @@ String buildHospitalSummaryPayload(float averageHeartRate, int minimumSpo2, floa
 {
     char payload[620];
     snprintf(payload, sizeof(payload),
-             "HOSPITAL SUMMARY\n==============================\n\nMEDICAL SUMMARY\n\nAverage HR: %.2f BPM\nMinimum SpO2: %d %%\nMaximum Body Temperature: %.2f °C\n\nSamples: %lu\nAbnormal Readings: %lu\n\nStatus: %s\n\n\nFACILITY SUMMARY\n\nAverage Room Temperature: %.2f °C\nAverage Oxygen: %.2f %%\nAverage AQI: %.2f\n\nSamples: %lu\nAbnormal Readings: %lu\n\nStatus: %s",
+             "HOSPITAL SUMMARY\n==============================\n\nMEDICAL SUMMARY\n\nAverage HR: %.2f BPM\nMinimum SpO2: %d %%\nMaximum Body Temperature: %.2f °C\n\nSamples: %lu\nAbnormal Readings: %lu\n\nStatus: %s\n\n\nFACILITY SUMMARY\n\nAverage Room Temperature: %.2f °C\nAverage Oxygen: %.2f %%\nAverage AQI: %.2f\n\nSnapshots: %lu\nAbnormal Readings: %lu\n\nStatus: %s",
              averageHeartRate, minimumSpo2, maximumBodyTemperature,
              static_cast<unsigned long>(medicalSampleCount), static_cast<unsigned long>(medicalAbnormalCount),
              medicalAbnormalCount > 0 ? "WARNING" : "NORMAL",
@@ -751,7 +742,7 @@ void mqttTask(void *parameter)
             }
             mqttConnectedFlag = false;
         } else if (WiFi.status() != WL_CONNECTED) {
-            if (now >= nextWifiRetryMs) {
+            if ((int32_t)(now - nextWifiRetryMs) >= 0) {
                 Serial.println("[MQTT TASK] WiFi unavailable; retrying...");
                 WiFi.disconnect();
                 WiFi.begin(wifiSsid, "");
@@ -763,9 +754,10 @@ void mqttTask(void *parameter)
             nextMqttRetryMs = now;
         } else {
             wifiRetryDelayMs = MQTT_INITIAL_RETRY_DELAY_MS; // reset on success
+            nextWifiRetryMs = now;
             
             if (!mqttClient.connected()) {
-                if (now >= nextMqttRetryMs) {
+                if ((int32_t)(now - nextMqttRetryMs) >= 0) {
                     if (connectMqtt()) {
                         resetLiveFeedPublishState();
                         lastPublishMs = now - MQTT_TASK_INTERVAL_MS;
@@ -778,6 +770,7 @@ void mqttTask(void *parameter)
                     }
                 }
             } else {
+                nextMqttRetryMs = now;
                 mqttClient.loop();
             }
         }
