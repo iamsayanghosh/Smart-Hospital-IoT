@@ -20,17 +20,18 @@
 #include <Arduino.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
+#include <atomic>
 #include "state.h"
 #include "watchdog.h"
 #include "esp_task_wdt.h"
 #include "app.h"
 #include "environment.h"
 
-static volatile int simOverrideHeartRate = -1;
-static volatile int simOverrideSpo2 = -1;
-static volatile float simOverrideTemperature = -999.0f;
-static volatile bool simImmediateVitalSample = false;
-static volatile bool simImmediateTempSample = false;
+static std::atomic<int> simOverrideHeartRate{-1};
+static std::atomic<int> simOverrideSpo2{-1};
+static std::atomic<float> simOverrideTemperature{-999.0f};
+static std::atomic<bool> simImmediateVitalSample{false};
+static std::atomic<bool> simImmediateTempSample{false};
 
 /**
  * @brief Overrides simulated heart rate for interactive testing/demonstration in Wokwi/CLI.
@@ -132,17 +133,15 @@ void temperatureTask(void *parameter)
         uint32_t now = millis();
         uint32_t period = getSamplePeriodMs(TASK_TEMP);
         
-        bool forced = (tempState == TEMP_IDLE) && simImmediateTempSample;
-        if (forced) {
-            simImmediateTempSample = false;
-        }
+        bool forced = (tempState == TEMP_IDLE) && simImmediateTempSample.exchange(false);
 
         if (tempState == TEMP_IDLE && (forced || now - lastSampleMs >= period || lastSampleMs == 0)) {
             lastSampleMs = now;
-            if (simOverrideTemperature > -100.0f) {
+            float overrideTemp = simOverrideTemperature.load();
+            if (overrideTemp > -100.0f) {
                 SensorMessage message = {};
                 message.type = TEMP_DATA;
-                message.temperature = simOverrideTemperature;
+                message.temperature = overrideTemp;
                 sendSensorMessage(message, "TEMP TASK");
 
                 Serial.print("[TEMP TASK] Temperature (override): ");
@@ -155,7 +154,8 @@ void temperatureTask(void *parameter)
             }
         } else if (tempState == TEMP_CONVERTING && (now - requestStartMs >= 800)) {
             tempState = TEMP_IDLE;
-            float rawTemp = simOverrideTemperature > -100.0f ? simOverrideTemperature : temperatureSensor.getTempCByIndex(0);
+            float overrideTemp = simOverrideTemperature.load();
+            float rawTemp = (overrideTemp > -100.0f) ? overrideTemp : temperatureSensor.getTempCByIndex(0);
 
             // Filter out default uninitialized power-on scratchpad (+85.0 C)
             if (abs(rawTemp - 85.0f) <= 0.05f) {
@@ -243,15 +243,16 @@ void vitalTask(void *parameter)
         uint32_t now = millis();
         uint32_t period = getSamplePeriodMs(TASK_VITAL);
         
-        bool forced = simImmediateVitalSample;
-        simImmediateVitalSample = false;
+        bool forced = simImmediateVitalSample.exchange(false);
 
         if (forced || now - lastSampleMs >= period || lastSampleMs == 0) {
             lastSampleMs = now;
             SensorMessage message = {};
             message.type = VITAL_DATA;
-            message.heartRate = (simOverrideHeartRate >= 0) ? simOverrideHeartRate : random(68, 81);
-            message.spo2 = (simOverrideSpo2 >= 0) ? simOverrideSpo2 : random(95, 99);
+            int overrideHr = simOverrideHeartRate.load();
+            int overrideSpo2 = simOverrideSpo2.load();
+            message.heartRate = (overrideHr >= 0) ? overrideHr : static_cast<int>(random(68, 81));
+            message.spo2 = (overrideSpo2 >= 0) ? overrideSpo2 : static_cast<int>(random(95, 99));
             sendSensorMessage(message, "VITAL TASK");
 
             Serial.print("[VITAL TASK] HR: ");

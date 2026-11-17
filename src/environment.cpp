@@ -18,6 +18,7 @@
 
 #include "environment.h"
 #include <Arduino.h>
+#include <atomic>
 #include "state.h"
 #include "sensors.h"
 #include "watchdog.h"
@@ -25,9 +26,9 @@
 #include "parser_utils.h"
 #include "mqtt.h"
 
-static volatile float simOverrideRoomTemp = -999.0f;
-static volatile float simOverrideOxygen = -999.0f;
-static volatile int simOverrideAqi = -1;
+static std::atomic<float> simOverrideRoomTemp{-999.0f};
+static std::atomic<float> simOverrideOxygen{-999.0f};
+static std::atomic<int> simOverrideAqi{-1};
 
 /**
  * @brief FreeRTOS task running dedicated facility environment simulation at 1 Hz.
@@ -103,8 +104,8 @@ void handleSerialCommands()
             } else if (command.startsWith("SET_OXYGEN ")) {
                 String arg = command.substring(11);
                 float val = 0.0f;
-                if (!parseFloatStrict(arg.c_str(), 18.0f, 25.0f, val)) {
-                    Serial.println("[SIM CLI] Error: Facility oxygen must be a valid float between 18.0 and 25.0 %");
+                if (!parseFloatStrict(arg.c_str(), 16.0f, 25.0f, val)) {
+                    Serial.println("[SIM CLI] Error: Facility oxygen must be a valid float between 16.0 and 25.0 %");
                 } else {
                     simOverrideOxygen = val;
                     Serial.print("[SIM CLI] Facility oxygen overridden to ");
@@ -146,8 +147,8 @@ void handleSerialCommands()
             } else if (command.startsWith("SET_TEMP ")) {
                 String arg = command.substring(9);
                 float val = 0.0f;
-                if (!parseFloatStrict(arg.c_str(), 34.0f, 42.0f, val)) {
-                    Serial.println("[SIM CLI] Error: Body temperature must be a valid float between 34.0 and 42.0 C");
+                if (!parseFloatStrict(arg.c_str(), 30.0f, 42.0f, val)) {
+                    Serial.println("[SIM CLI] Error: Body temperature must be a valid float between 30.0 and 42.0 C");
                 } else {
                     setSimulatedTemperature(val);
                 }
@@ -168,7 +169,7 @@ void handleSerialCommands()
                 Serial.println("[TASK2] Facility feeds: facility-room-temperature | facility-oxygen | facility-aqi");
                 Serial.println("[TASK2] Event feed: hospital-events (alerts + summaries + status)");
             } else {
-                Serial.println("[SIM CLI] Commands: SET_ROOM <15-40>, SET_OXYGEN <18-25>, SET_AQI <0-300>, RESET_FACILITY, SET_HR <40-140>, SET_SPO2 <80-100>, SET_TEMP <34-42>, RESET_VITALS, SIM_OFFLINE [WIFI|MQTT], SIM_ONLINE, SHOW_TASK2");
+                Serial.println("[SIM CLI] Commands: SET_ROOM <15-40>, SET_OXYGEN <16-25>, SET_AQI <0-300>, RESET_FACILITY, SET_HR <40-140>, SET_SPO2 <80-100>, SET_TEMP <30-42>, RESET_VITALS, SIM_OFFLINE [WIFI|MQTT], SIM_ONLINE, SHOW_TASK2");
             }
             continue;
         }

@@ -114,6 +114,22 @@ const char *taskNameFromId(MonitoredTaskId taskId)
 void failSetup(const char *message)
 {
     Serial.println(message);
+    // Delete any tasks that were successfully created before the failure to avoid orphaned workers
+    for (int i = 0; i < TASK_MONITORED_COUNT; i++) {
+        if (monitoredHandles[i] != NULL) {
+            vTaskDelete(monitoredHandles[i]);
+            monitoredHandles[i] = NULL;
+        }
+    }
+    if (watchdogHandle != NULL) {
+        vTaskDelete(watchdogHandle);
+        watchdogHandle = NULL;
+    }
+    // Force outputs to safe unpowered state
+    pinMode(25, OUTPUT); digitalWrite(25, LOW);
+    pinMode(26, OUTPUT); digitalWrite(26, LOW);
+    pinMode(33, OUTPUT); digitalWrite(33, LOW);
+    pinMode(14, OUTPUT); digitalWrite(14, LOW);
     while (true) {
         vTaskDelay(pdMS_TO_TICKS(1000));
     }

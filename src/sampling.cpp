@@ -65,6 +65,7 @@ void samplingTask(void *parameter)
     Serial.println("[WATCHDOG] SAMPLING task registered with TWDT");
 
     SamplingAutoMode lastAutoMode = SAMPLING_MODE_UNKNOWN;
+    AlertSeverity lastSeverity = ALERT_SEVERITY_NORMAL;
     bool isManualOverride = false;
     uint32_t manualIntervalMs = AUTO_INTERVAL_STABLE_MS;
     uint32_t effectiveIntervalMs = STARTUP_CONSERVATIVE_INTERVAL_MS;
@@ -103,21 +104,35 @@ void samplingTask(void *parameter)
             continue;
         }
 
-        // 3. Evaluate clinical status using existing clinical thresholds
-        SamplingAutoMode currentAutoMode = isAbnormal(snapshot) ? SAMPLING_MODE_ABNORMAL : SAMPLING_MODE_STABLE;
+        // 3. Evaluate clinical status using tiered clinical thresholds
+        AlertSeverity currentSeverity = evaluateClinicalSeverity(snapshot);
+        SamplingAutoMode currentAutoMode = (currentSeverity != ALERT_SEVERITY_NORMAL) ? SAMPLING_MODE_ABNORMAL : SAMPLING_MODE_STABLE;
 
         // 4. State transition and priority resolution:
-        // When clinical condition changes (or on initial evaluation), automatic mode
-        // takes priority, clearing any active manual override and establishing the auto target.
-        if (currentAutoMode != lastAutoMode || initialEval) {
+        // Priority Rule: Changes in patient clinical status take precedence over manual overrides.
+        // Critical Escalation Safety: If patient escalates to CRITICAL severity (e.g. cardiac arrest, severe hypoxia, extreme fever),
+        // emergency patient safety immediately revokes any slower manual override and locks sampling to 5 s.
+        if (currentSeverity == ALERT_SEVERITY_CRITICAL && (lastSeverity != ALERT_SEVERITY_CRITICAL || (isManualOverride && manualIntervalMs > AUTO_INTERVAL_ABNORMAL_MS))) {
+            isManualOverride = false;
+            effectiveIntervalMs = AUTO_INTERVAL_ABNORMAL_MS;
             lastAutoMode = currentAutoMode;
+            lastSeverity = currentSeverity;
+            initialEval = false;
+            Serial.println("[SAMPLING TASK] CRITICAL escalation: manual override revoked, 5 s rapid monitoring enforced");
+        } else if (currentAutoMode != lastAutoMode || currentSeverity != lastSeverity || initialEval) {
+            lastAutoMode = currentAutoMode;
+            lastSeverity = currentSeverity;
             initialEval = false;
             isManualOverride = false;
             effectiveIntervalMs = (currentAutoMode == SAMPLING_MODE_ABNORMAL) ? AUTO_INTERVAL_ABNORMAL_MS : AUTO_INTERVAL_STABLE_MS;
 
             Serial.print("[SAMPLING TASK] Clinical state transition: ");
-            if (currentAutoMode == SAMPLING_MODE_ABNORMAL) {
-                Serial.print("ABNORMAL (Auto ");
+            if (currentSeverity == ALERT_SEVERITY_CRITICAL) {
+                Serial.print("CRITICAL (Auto ");
+                Serial.print(AUTO_INTERVAL_ABNORMAL_MS / 1000);
+                Serial.println(" s)");
+            } else if (currentSeverity == ALERT_SEVERITY_WARNING) {
+                Serial.print("WARNING (Auto ");
                 Serial.print(AUTO_INTERVAL_ABNORMAL_MS / 1000);
                 Serial.println(" s)");
             } else {
@@ -128,7 +143,12 @@ void samplingTask(void *parameter)
         } else {
             // Clinical state unchanged: retain active manual override if present, else auto target
             if (isManualOverride) {
-                effectiveIntervalMs = manualIntervalMs;
+                // If patient is in an active critical condition, cap manual interval to 5 s
+                if (currentSeverity == ALERT_SEVERITY_CRITICAL && manualIntervalMs > AUTO_INTERVAL_ABNORMAL_MS) {
+                    effectiveIntervalMs = AUTO_INTERVAL_ABNORMAL_MS;
+                } else {
+                    effectiveIntervalMs = manualIntervalMs;
+                }
             } else {
                 effectiveIntervalMs = (currentAutoMode == SAMPLING_MODE_ABNORMAL) ? AUTO_INTERVAL_ABNORMAL_MS : AUTO_INTERVAL_STABLE_MS;
             }

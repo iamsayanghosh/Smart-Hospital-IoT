@@ -329,7 +329,7 @@
   </p>
   <p>
     The firmware executes on FreeRTOS Symmetric Multiprocessing (SMP), allocating network protocol stacks (Wi-Fi and lwIP) to 
-    <strong>Core 0</strong> while dedicating <strong>Core 1</strong> exclusively to 13 prioritized application tasks. Inter-task 
+    <strong>Core 0</strong> while allocating <strong>Core 1</strong> to 13 prioritized application worker tasks alongside Arduino's <code>loopTask</code>. Inter-task 
     communication is strictly synchronized using thread-safe FreeRTOS mutexes, queues, and spinlocks to prevent race conditions across shared telemetry and peripherals. 
     A dual-tier watchdog supervisor couples the hardware ESP-IDF Task Watchdog Timer (TWDT) with an application heartbeat monitor to provide 
     robust supervisory fault detection and automated recovery.
@@ -441,8 +441,8 @@
   <h1>2. Concurrency Model &amp; FreeRTOS Task Scheduling (Task 1)</h1>
   <p>
     The system utilizes FreeRTOS Symmetric Multiprocessing (SMP) to execute 13 application tasks concurrently across a 
-    strict priority hierarchy. All application tasks are pinned to <strong>Core 1</strong>, dedicating <strong>Core 0</strong> 
-    exclusively to Wi-Fi and TCP/IP protocol processing.
+    strict priority hierarchy. All application tasks are pinned to <strong>Core 1</strong> (executing alongside Arduino's <code>loopTask</code>), dedicating <strong>Core 0</strong> 
+    to Espressif Wi-Fi MAC and TCP/IP (lwIP) protocol processing.
   </p>
 
   <table>
@@ -1284,8 +1284,8 @@
       </tr>
       <tr>
         <td><code>SET_TEMP &lt;val&gt;</code></td>
-        <td>34.0 to 42.0 &deg;C</td>
-        <td>Force body temperature. <code>SET_TEMP 39.8</code> &rarr; Critical hyperthermia alert.</td>
+        <td>30.0 to 42.0 &deg;C</td>
+        <td>Force body temperature. <code>SET_TEMP 33.5</code> &rarr; Critical hypothermia alert. <code>SET_TEMP 39.8</code> &rarr; Critical hyperthermia alert.</td>
       </tr>
       <tr>
         <td><code>RESET_VITALS</code></td>
@@ -1299,7 +1299,7 @@
       </tr>
       <tr>
         <td><code>SET_OXYGEN &lt;val&gt;</code></td>
-        <td>18.0 to 25.0 %</td>
+        <td>16.0 to 25.0 %</td>
         <td>Force room oxygen percentage. <code>SET_OXYGEN 17.5</code> &rarr; Critical hypoxia alarm.</td>
       </tr>
       <tr>

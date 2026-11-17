@@ -20,11 +20,12 @@
 #include "watchdog.h"
 #include "mqtt.h"
 #include "esp_task_wdt.h"
+#include <atomic>
 #include "offline_banner_gate.h"
 
-static SystemHealthState currentHealth = SYSTEM_ONLINE;       ///< Current overall system infrastructure status
+static std::atomic<SystemHealthState> currentHealth{SYSTEM_ONLINE};       ///< Current overall system infrastructure status
 static OfflineBuzzerMode currentBuzzer = BUZZER_MODE_NORMAL; ///< Current acoustic cadence demanded by network state
-static volatile bool offlineAlertConfirmed = false;
+static std::atomic<bool> offlineAlertConfirmed{false};
 
 /**
  * @brief Queries whether offline status is confirmed after boot grace (10s) and debounce hold (5s).
@@ -34,14 +35,14 @@ static volatile bool offlineAlertConfirmed = false;
  * @return true if offline status is confirmed and active.
  */
 bool isOfflineAlertConfirmed() {
-    return offlineAlertConfirmed;
+    return offlineAlertConfirmed.load();
 }
 
 /**
  * @brief Returns the current system health state.
  */
 SystemHealthState getSystemHealthState() {
-    return currentHealth;
+    return currentHealth.load();
 }
 
 static QueueHandle_t offlineBufferQueue = NULL;              ///< Thread-safe FreeRTOS queue storing buffered outbound telemetry

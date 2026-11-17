@@ -268,6 +268,14 @@ FacilityTelemetry getFacilitySnapshot();
 bool sendSensorMessage(const SensorMessage &message, const char *taskName);
 
 /**
+ * @brief Evaluates overall clinical severity of the patient (NORMAL, WARNING, CRITICAL).
+ *
+ * @param data Patient telemetry snapshot.
+ * @return AlertSeverity Highest severity among all valid patient vital parameters.
+ */
+AlertSeverity evaluateClinicalSeverity(const Telemetry &data);
+
+/**
  * @brief Analyzes patient telemetry and constructs an alert candidate if a threshold is violated.
  *
  * Evaluates physiological parameters in priority order: Heart Rate (<45 or >120 BPM Critical,

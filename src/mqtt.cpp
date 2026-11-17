@@ -35,14 +35,15 @@
 #include "esp_task_wdt.h"
 #include "adafruit_io_config.h"
 #include <PubSubClient.h>
+#include <atomic>
 #include "environment.h"
 #include "offline.h"
 
 PubSubClient mqttClient(wifiClient);
 
-static volatile bool mqttConnectedFlag = false;
-static volatile bool simForceWifiOffline = false;
-static volatile bool simForceMqttOffline = false;
+static std::atomic<bool> mqttConnectedFlag{false};
+static std::atomic<bool> simForceWifiOffline{false};
+static std::atomic<bool> simForceMqttOffline{false};
 constexpr uint32_t ALERT_ESCALATION_COOLDOWN_MS = 2000;
 
 /**
@@ -187,15 +188,15 @@ String buildFacilitySummaryPayload(float averageRoomTemperature, float averageOx
  *
  * The resulting message is published periodically through hospital-events.
  */
-String buildHospitalSummaryPayload(float averageHeartRate, int minimumSpo2, float maximumBodyTemperature,
+String buildHospitalSummaryPayload(float averageHeartRate, int minimumSpo2, const char *maxBodyTempStr,
                                   uint32_t medicalSampleCount, uint32_t medicalAbnormalCount,
                                   float averageRoomTemperature, float averageOxygen, float averageAqi,
                                   uint32_t facilitySampleCount, uint32_t facilityAbnormalCount)
 {
     char payload[620];
     snprintf(payload, sizeof(payload),
-             "HOSPITAL SUMMARY\n==============================\n\nMEDICAL SUMMARY\n\nAverage HR: %.2f BPM\nMinimum SpO2: %d %%\nMaximum Body Temperature: %.2f °C\n\nSamples: %lu\nAbnormal Readings: %lu\n\nStatus: %s\n\n\nFACILITY SUMMARY\n\nAverage Room Temperature: %.2f °C\nAverage Oxygen: %.2f %%\nAverage AQI: %.2f\n\nSnapshots: %lu\nAbnormal Readings: %lu\n\nStatus: %s",
-             averageHeartRate, minimumSpo2, maximumBodyTemperature,
+             "HOSPITAL SUMMARY\n==============================\n\nMEDICAL SUMMARY\n\nAverage HR: %.2f BPM\nMinimum SpO2: %d %%\nMaximum Body Temperature: %s\n\nSamples: %lu\nAbnormal Readings: %lu\n\nStatus: %s\n\n\nFACILITY SUMMARY\n\nAverage Room Temperature: %.2f °C\nAverage Oxygen: %.2f %%\nAverage AQI: %.2f\n\nSnapshots: %lu\nAbnormal Readings: %lu\n\nStatus: %s",
+             averageHeartRate, minimumSpo2, maxBodyTempStr,
              static_cast<unsigned long>(medicalSampleCount), static_cast<unsigned long>(medicalAbnormalCount),
              medicalAbnormalCount > 0 ? "WARNING" : "NORMAL",
              averageRoomTemperature, averageOxygen, averageAqi,
@@ -205,25 +206,44 @@ String buildHospitalSummaryPayload(float averageHeartRate, int minimumSpo2, floa
 }
 
 /**
+ * @brief Builds a condensed summary payload (<200 bytes) for safe transmission when buffer is un-enlarged.
+ */
+String buildCompactHospitalSummaryPayload(float averageHeartRate, int minimumSpo2, const char *maxBodyTempStr,
+                                         uint32_t medicalAbnormalCount, float averageOxygen, uint32_t facilityAbnormalCount)
+{
+    char payload[200];
+    snprintf(payload, sizeof(payload),
+             "SUMMARY: Med[HR:%.1f,SpO2:%d%%,Temp:%s,Abn:%lu] Fac[O2:%.1f%%,Abn:%lu]",
+             averageHeartRate, minimumSpo2, maxBodyTempStr,
+             static_cast<unsigned long>(medicalAbnormalCount),
+             averageOxygen, static_cast<unsigned long>(facilityAbnormalCount));
+    return String(payload);
+}
+
+/**
  * @brief Sizes the MQTT packet buffer for the combined hospital summary.
  *
  * The combined summary can exceed PubSubClient's default packet buffer. The
  * code therefore measures the topic and worst-case payload sizes and adds a
  * safety margin before configuring the client buffer.
+ *
+ * @return true if buffer allocation succeeded or already large enough; false otherwise.
  */
-void configureMqttBuffer()
+bool configureMqttBuffer()
 {
     String sizingPayload = buildHospitalSummaryPayload(
-        999.99f, 100, 999.99f, UINT32_MAX, UINT32_MAX,
+        999.99f, 100, "999.99 °C", UINT32_MAX, UINT32_MAX,
         999.99f, 999.99f, 999.99f, UINT32_MAX, UINT32_MAX);
     String hospitalEventsTopic = getAioFeedTopic(HOSPITAL_EVENTS_FEED);
     const uint16_t requiredPacketSize = MQTT_MAX_HEADER_SIZE + 2 + hospitalEventsTopic.length() + sizingPayload.length();
     const uint16_t configuredBufferSize = requiredPacketSize + MQTT_SUMMARY_BUFFER_MARGIN;
     const uint16_t bufferSizeBefore = mqttClient.getBufferSize();
 
+    bool success = true;
     if (bufferSizeBefore < configuredBufferSize) {
-        if (!mqttClient.setBufferSize(configuredBufferSize)) {
-            Serial.println("[MQTT] Warning: Failed to allocate enlarged MQTT packet buffer");
+        success = mqttClient.setBufferSize(configuredBufferSize);
+        if (!success) {
+            Serial.println("[MQTT] Warning: Failed to allocate enlarged MQTT packet buffer; compact fallback active");
         }
     }
 
@@ -231,6 +251,7 @@ void configureMqttBuffer()
     Serial.println(bufferSizeBefore);
     Serial.print("[MQTT] MQTT buffer size: ");
     Serial.println(mqttClient.getBufferSize());
+    return success;
 }
 
 // MQTT TASK SUPPORT & MESSAGE ROUTING
@@ -397,7 +418,8 @@ bool connectMqtt()
         bool sub3 = mqttClient.subscribe(bedAngleTopic.c_str());
         mqttClient.loop();
         if (!sub1 || !sub2 || !sub3) {
-            Serial.println("[MQTT TASK] Warning: One or more topic subscriptions failed");
+            Serial.println("[MQTT TASK] Warning: One or more topic subscriptions failed; disconnecting socket to retry cleanly");
+            mqttClient.disconnect();
             return false;
         }
         Serial.println("[MQTT TASK] Connected and subscribed to Adafruit IO broker");
@@ -414,7 +436,7 @@ bool connectMqtt()
  * Operational Logic:
  * - If offline is true: Enqueues directly to offline buffer via enqueueBufferedTelemetry().
  * - If online: Attempts mqttClient.publish(). If the TCP transport fails, diverts the message
- *   to the offline buffer to guarantee zero data loss during silent connection drops.
+ *   to the bounded offline FIFO buffer (capacity 64) for best-effort delivery under QoS 0.
  *
  * @param topic Destination Adafruit IO feed topic string.
  * @param payload Telemetry or event message payload.
@@ -658,23 +680,41 @@ void publishSummaryData(bool offline)
 
     const float medicalAverageHeartRate = medicalSummaryStats.sampleCount > 0 ? medicalSummaryStats.heartRateTotal / medicalSummaryStats.sampleCount : static_cast<float>(snapshot.heartRate);
     const int medicalMinSpo2 = medicalSummaryStats.sampleCount > 0 ? medicalSummaryStats.minSpo2 : snapshot.spo2;
-    const float medicalMaxBodyTemperature = medicalSummaryStats.temperatureSampleCount > 0 ? medicalSummaryStats.maxBodyTemperature : (snapshot.temperatureValid ? snapshot.temperature : 0.0f);
+    char maxTempBuf[32];
+    if (medicalSummaryStats.temperatureSampleCount > 0) {
+        snprintf(maxTempBuf, sizeof(maxTempBuf), "%.2f °C", medicalSummaryStats.maxBodyTemperature);
+    } else if (snapshot.temperatureValid) {
+        snprintf(maxTempBuf, sizeof(maxTempBuf), "%.2f °C", snapshot.temperature);
+    } else {
+        snprintf(maxTempBuf, sizeof(maxTempBuf), "N/A");
+    }
 
     const float facilityAverageRoomTemperature = facilitySummaryStats.sampleCount > 0 ? facilitySummaryStats.roomTemperatureTotal / facilitySummaryStats.sampleCount : facilitySnapshot.roomTemperature;
     const float facilityAverageOxygen = facilitySummaryStats.sampleCount > 0 ? facilitySummaryStats.oxygenTotal / facilitySummaryStats.sampleCount : facilitySnapshot.oxygenLevel;
     const float facilityAverageAqi = facilitySummaryStats.sampleCount > 0 ? facilitySummaryStats.aqiTotal / facilitySummaryStats.sampleCount : static_cast<float>(facilitySnapshot.aqi);
 
-    String hospitalSummaryPayload = buildHospitalSummaryPayload(
-        medicalAverageHeartRate,
-        medicalMinSpo2,
-        medicalMaxBodyTemperature,
-        medicalSummaryStats.sampleCount,
-        medicalSummaryStats.abnormalCount,
-        facilityAverageRoomTemperature,
-        facilityAverageOxygen,
-        facilityAverageAqi,
-        facilitySummaryStats.sampleCount,
-        facilitySummaryStats.abnormalCount);
+    String hospitalSummaryPayload;
+    if (mqttClient.getBufferSize() >= 400) {
+        hospitalSummaryPayload = buildHospitalSummaryPayload(
+            medicalAverageHeartRate,
+            medicalMinSpo2,
+            maxTempBuf,
+            medicalSummaryStats.sampleCount,
+            medicalSummaryStats.abnormalCount,
+            facilityAverageRoomTemperature,
+            facilityAverageOxygen,
+            facilityAverageAqi,
+            facilitySummaryStats.sampleCount,
+            facilitySummaryStats.abnormalCount);
+    } else {
+        hospitalSummaryPayload = buildCompactHospitalSummaryPayload(
+            medicalAverageHeartRate,
+            medicalMinSpo2,
+            maxTempBuf,
+            medicalSummaryStats.abnormalCount,
+            facilityAverageOxygen,
+            facilitySummaryStats.abnormalCount);
+    }
 
     Serial.print("[MQTT] Hospital summary payload length: ");
     Serial.print(hospitalSummaryPayload.length());
@@ -685,10 +725,10 @@ void publishSummaryData(bool offline)
     Serial.print("[MQTT] hospital summary publish result: ");
     Serial.println(hospitalSummaryPublishResult ? "SUCCESS" : "FAILURE");
     if (!hospitalSummaryPublishResult) {
-        Serial.println("[MQTT TASK] Failed to publish hospital summary");
+        Serial.println("[MQTT TASK] Failed to deliver/buffer hospital summary; retaining statistics for next window");
+    } else {
+        resetSummaryStats();
     }
-
-    resetSummaryStats();
 }
 
 // ============================================================================

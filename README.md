@@ -116,20 +116,20 @@ graph TD
   * **Sleeping Rest (10°):** Normal baseline physiological status.
   * **Breathing Support (45°):** Semi-Fowler's positioning automatically triggered by hypoxia ($\text{SpO}_2 \in [88\%, 91\%]$).
   * **Emergency (90°):** Resuscitation positioning triggered by critical vitals ($\text{SpO}_2 < 88\%$, $\text{HR} < 45$ or $> 120\text{ BPM}$, extreme body temperature $<34.0^\circ\text{C}$ or $>39.5^\circ\text{C}$).
-* **Clinician-in-the-Loop Override Primacy:** Clinicians can command angles ($0 - 90^\circ$) via `bed-angle` with full medical override authority (e.g. flattening the bed to $0^\circ$ supine for emergency CPR chest compressions during a cardiac arrest). Any subsequent shift in clinical status re-triggers automatic positioning.
+* **Clinician-in-the-Loop Override Primacy:** Clinicians can command angles ($0 - 90^\circ$) via `bed-angle` with full medical override authority (e.g. flattening the bed to $0^\circ$ supine for emergency CPR chest compressions during a cardiac arrest). Any subsequent transition in the patient's bed posture category (`SLEEPING` ↔ `BREATHING_SUPPORT` ↔ `EMERGENCY`) automatically cancels manual override and re-evaluates posture.
 
 ### Task 5: Smart Dynamic Sampling Rate (Adaptive Monitoring)
 * **Energy-Efficient Stable Mode:** Sets vital and temperature acquisition to **60 seconds** when all physiological markers are normal.
 * **Acute Crisis Mode:** Automatically accelerates sampling to **5 seconds** upon any abnormal vital sign.
-* **Manual Slider Override:** Doctor can adjust sampling interval (5 s to 60 s) via `sampling-rate`. Shifts in patient status take precedence.
+* **Manual Slider Override:** Doctor can adjust sampling interval (5 s to 60 s) via `sampling-rate`. Clinical severity transitions take precedence: an acute escalation to `CRITICAL` severity immediately cancels any slower manual override and enforces rapid 5-second monitoring.
 
 ### Task 6: Fault-Tolerant Offline Detection & Buffering
 * **Three Health States:** `SYSTEM_ONLINE`, `SYSTEM_DEGRADED` (detected when transport is online but a worker task misses its watchdog heartbeat), and `SYSTEM_OFFLINE` (Wi-Fi or MQTT disconnected).
 * **Unified Quiet Bootup & Debounce:** An `OfflineBannerGate` suppresses the offline banner and buzzer during the first 10 seconds of power-up and ignores transient network hiccups under 5 seconds.
 * **Non-Clobbering OLED Banner:** When offline, an inverted ticker bar (`LOGGING OFFLINE`) renders on the bottom row (`y = 54..63`) while medication dosage remains visible.
 * **Acoustic Cadences:** Distinct failure cadences for Wi-Fi failure (rapid double-pip) vs. MQTT broker failure (slow beep). Medication critical alarms take absolute priority over network beeps.
-* **Offline SRAM Buffer:** Outgoing telemetry packets are diverted to a 64-item **bounded FIFO queue** (sized up to 512 bytes per packet). If network disconnection persists beyond 64 messages (~3.2 minutes of continuous telemetry), the queue preserves earlier historical data and drops newest incoming entries until reconnection.
-* **Reconnection Replay:** Replays missed records in strict FIFO order, sharing the 3000 ms round-robin slot to remain safely within Adafruit IO's 30 msgs/min quota.
+* **Offline SRAM Buffer:** Outgoing telemetry packets are diverted to a 64-item **bounded FIFO queue** (sized up to 512 bytes per packet). Provides best-effort local data retention during outages under QoS 0 at-most-once delivery. If network disconnection persists beyond 64 messages, the queue safely preserves earlier historical data.
+* **Reconnection Replay:** Replays missed records in strict FIFO order, sharing the 3000 ms round-robin slot (20 msgs/min baseline) to stay safely within Adafruit IO's 30 msgs/min account-wide quota.
 
 ---
 
@@ -213,12 +213,12 @@ The firmware includes an interactive Serial Command Line Interface (115200 baud)
 ### Patient Vitals Simulation Commands:
 * `SET_HR <40-140>`: Force patient heart rate (e.g. `SET_HR 105` for Warning, `SET_HR 130` for Emergency).
 * `SET_SPO2 <80-100>`: Force blood oxygen saturation (e.g. `SET_SPO2 90` to trigger 45° Breathing Support; `SET_SPO2 85` to trigger 90° Emergency).
-* `SET_TEMP <34-42>`: Force body temperature in °C (e.g. `SET_TEMP 39.8` to trigger critical hyperthermia).
+* `SET_TEMP <30-42>`: Force body temperature in °C (e.g. `SET_TEMP 33.5` for critical hypothermia, `SET_TEMP 39.8` for critical hyperthermia).
 * `RESET_VITALS`: Clear all vital overrides and resume nominal random physiological vitals.
 
 ### Facility Simulation Commands (Persist until RESET):
 * `SET_ROOM <15-40>`: Force simulated ambient room temperature.
-* `SET_OXYGEN <18-25>`: Force ambient facility oxygen percentage.
+* `SET_OXYGEN <16-25>`: Force ambient facility oxygen percentage (e.g. `SET_OXYGEN 17.5` for critical hypoxia alarm).
 * `SET_AQI <0-300>`: Force Air Quality Index.
 * `RESET_FACILITY`: Clears environmental overrides; simulation resumes nominal baselines with random variation around 22.0 °C, 20.8% O2, and 35 AQI.
 * `SHOW_TASK2`: Print MQTT topic mappings in the console.

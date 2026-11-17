@@ -217,7 +217,14 @@ AlertCandidate evaluateMedicalAlert(const Telemetry &snapshot)
     return bestCandidate;
 }
 
-
+/**
+ * @brief Evaluates overall clinical severity of the patient (NORMAL, WARNING, CRITICAL).
+ */
+AlertSeverity evaluateClinicalSeverity(const Telemetry &data)
+{
+    AlertCandidate alert = evaluateMedicalAlert(data);
+    return alert.active ? alert.severity : ALERT_SEVERITY_NORMAL;
+}
 
 /**
  * @brief Selects the most severe active facility alert in a telemetry snapshot.
