@@ -224,8 +224,6 @@ void motionTask(void *parameter)
  *   (5 s to 60 s), adjusting sampling frequency based on patient clinical stability.
  * - Watchdog Polling: Runs an inner 500 ms evaluation loop to feed its TWDT heartbeat
  *   frequently, preventing watchdog timeouts during 60-second stable periods.
- * - Facility Sync: Calls simulateFacilityData() upon each vital sample generation to advance
- *   ambient room parameters in lockstep.
  *
  * @param parameter Unused FreeRTOS task parameter pointer (NULL).
  */

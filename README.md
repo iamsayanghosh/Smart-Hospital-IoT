@@ -271,7 +271,7 @@ pio test -e esp32dev --without-uploading --without-testing
 | Metric | Measured Value | Budget / Limit | Utilization |
 | :--- | :--- | :--- | :--- |
 | **RAM (SRAM)** | 49,432 Bytes | 327,680 Bytes | **15.1%** |
-| **Flash Memory** | 1,047,262 Bytes | 1,310,720 Bytes | **79.9%** |
+| **Flash Memory** | 1,047,410 Bytes | 1,310,720 Bytes | **79.9%** |
 | **FreeRTOS Application Tasks** | 13 tasks (all Core 1) | Dual Core Xtensa | Dedicated application core |
 | **Watchdog Timeout** | 8000 ms (Hardware TWDT) | 6000 ms (Heartbeat) | 100% monitored |
 | **Blocking Delays** | 0 ms (Zero `delay()`) | 0 allowed | Fully non-blocking |

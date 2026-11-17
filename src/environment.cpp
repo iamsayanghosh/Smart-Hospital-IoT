@@ -37,7 +37,12 @@ static volatile int simOverrideAqi = -1;
 void environmentTask(void *parameter)
 {
     (void)parameter;
-    esp_task_wdt_add(NULL);
+    esp_err_t wdtResult = esp_task_wdt_add(NULL);
+    if (wdtResult != ESP_OK) {
+        Serial.print("[WATCHDOG] ENVIRONMENT registration failed: ");
+        Serial.println(esp_err_to_name(wdtResult));
+        return;
+    }
     Serial.println("[WATCHDOG] ENVIRONMENT task registered with TWDT");
 
     while (true) {
@@ -207,12 +212,13 @@ void simulateFacilityData()
     }
 
     portENTER_CRITICAL(&telemetryMux);
-    facilityTelemetry = nextState;
     const bool wasAbnormal = facilityTelemetry.alertActive;
-    facilityTelemetry.alertActive = isFacilityAbnormal(facilityTelemetry);
+    const bool isNowAbnormal = isFacilityAbnormal(nextState);
+    nextState.alertActive = isNowAbnormal;
+    facilityTelemetry = nextState;
     portEXIT_CRITICAL(&telemetryMux);
 
-    if (facilityTelemetry.alertActive && !wasAbnormal) {
+    if (isNowAbnormal && !wasAbnormal) {
         xSemaphoreGive(alertSemaphore);
     }
 }

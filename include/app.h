@@ -2,6 +2,7 @@
 
 #include <Arduino.h>
 #include "state.h"
+#include "watchdog.h"
 
 /**
  * @file app.h
@@ -66,12 +67,3 @@ uint32_t getSamplePeriodMs(MonitoredTaskId taskId);
  * @return const char* String representation (e.g. "TEMP", "VITAL", "MQTT").
  */
 const char *taskNameFromId(MonitoredTaskId taskId);
-
-/**
- * @brief Records an alive timestamp for the calling task in the watchdog heartbeat table.
- *
- * Safe to call from any monitored FreeRTOS task; synchronizes access using heartbeatMutex.
- *
- * @param taskId Enum representing the reporting task.
- */
-void reportTaskHeartbeat(MonitoredTaskId taskId);

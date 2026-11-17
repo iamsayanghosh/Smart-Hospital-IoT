@@ -77,7 +77,7 @@ bool isAbnormal(const Telemetry &data)
            data.heartRate < medicalThresholds.heartRate.low ||
            data.heartRate > medicalThresholds.heartRate.high ||
            data.spo2 < medicalThresholds.spo2.low ||
-           data.ecgRate < medicalThresholds.heartRate.low || data.ecgRate > medicalThresholds.heartRate.high;
+           data.ecgRate < medicalThresholds.ecgRate.low || data.ecgRate > medicalThresholds.ecgRate.high;
 }
 
 
@@ -190,11 +190,11 @@ AlertCandidate evaluateMedicalAlert(const Telemetry &snapshot)
         return candidate;
     }
 
-    if (snapshot.ecgRate < medicalThresholds.heartRate.low || snapshot.ecgRate > medicalThresholds.heartRate.high) {
+    if (snapshot.ecgRate < medicalThresholds.ecgRate.low || snapshot.ecgRate > medicalThresholds.ecgRate.high) {
         candidate.active = true;
         candidate.parameter = "ecgRate";
         candidate.value = static_cast<float>(snapshot.ecgRate);
-        candidate.message = snapshot.ecgRate < medicalThresholds.heartRate.low ? "Low ECG rate" : "High ECG rate";
+        candidate.message = snapshot.ecgRate < medicalThresholds.ecgRate.low ? "Low ECG rate" : "High ECG rate";
         candidate.severity = (snapshot.ecgRate < medicalThresholds.ecgRate.criticalLow || snapshot.ecgRate > medicalThresholds.ecgRate.criticalHigh) 
                              ? ALERT_SEVERITY_CRITICAL : ALERT_SEVERITY_WARNING;
         return candidate;

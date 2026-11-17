@@ -150,7 +150,12 @@ size_t getBufferedTelemetryCount() {
  */
 void offlineTask(void *parameter) {
     (void)parameter;
-    esp_task_wdt_add(NULL);
+    esp_err_t wdtResult = esp_task_wdt_add(NULL);
+    if (wdtResult != ESP_OK) {
+        Serial.print("[WATCHDOG] OFFLINE registration failed: ");
+        Serial.println(esp_err_to_name(wdtResult));
+        return;
+    }
     Serial.println("[WATCHDOG] OFFLINE task registered with TWDT");
 
     OfflineBannerGate buzzerGate(OFFLINE_HOLD_DEBOUNCE_MS, OFFLINE_BOOT_GRACE_MS);

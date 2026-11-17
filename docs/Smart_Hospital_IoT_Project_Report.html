@@ -339,7 +339,7 @@
     <strong>Key Project Accomplishments:</strong>
     <ul>
       <li><strong>Unified Single-Project Integration:</strong> All 6 assigned internship tasks run simultaneously in one firmware image without blocking delays (0 ms <code>delay()</code>).</li>
-      <li><strong>Resource Efficiency:</strong> RAM utilization measured at <strong>15.1%</strong> (49,432 B of 327,680 B) and Flash at <strong>79.9%</strong> (1,047,262 B of 1,310,720 B).</li>
+      <li><strong>Resource Efficiency:</strong> RAM utilization measured at <strong>15.1%</strong> (49,432 B of 327,680 B) and Flash at <strong>79.9%</strong> (1,047,410 B of 1,310,720 B).</li>
       <li><strong>Automated Test Suite:</strong> 15 unit tests covering strict numeric string parsers and medication dosage safety clamping are build-verified for the ESP32 platform via PlatformIO Unity.</li>
       <li><strong>Open Source &amp; Credentials Safety:</strong> Released under the MIT License with complete credential isolation (private keys never committed to Git).</li>
     </ul>
@@ -1128,7 +1128,7 @@
     Dallas DS18B20 1-Wire sensor on <code>GPIO 4</code> using a non-blocking two-state machine (<code>TEMP_IDLE</code> &rarr; 
     <code>TEMP_CONVERTING</code>). This ensures the &ge;800 ms 12-bit conversion delay (checked via non-blocking <code>millis()</code> gate in <code>sensors.cpp</code>) never stalls 
     the FreeRTOS scheduler. Optical Photoplethysmogram (PPG) vitals (Heart Rate 50-100 BPM, SpO2 92-100%) and a 5 Hz Gaussian 
-    ECG waveform model are synthesized concurrently. Dual-tier watchdog protection couples the hardware ESP-IDF TWDT (8000 ms hardware panic) 
+    ECG waveform model are synthesized concurrently with independent tiered threshold monitoring across all vital modalities (Heart Rate, ECG Rate, SpO2, and Body Temperature). Dual-tier watchdog protection couples the hardware ESP-IDF TWDT (8000 ms hardware panic) 
     with a software heartbeat monitor (<code>watchdogTask</code>) auditing the 12 FreeRTOS worker tasks every 1000 ms against a 6000 ms silence limit while servicing its own hardware TWDT registration.
   </p>
 
@@ -1143,8 +1143,10 @@
   </ul>
   <p>
     Every 60 seconds, <code>mqttTask</code> computes cumulative statistical metrics across all sensors, publishing a structured multi-line 
-    diagnostic summary (<code>HOSPITAL SUMMARY</code>) to <code>hospital-events</code> containing average, minimum, and maximum vitals, total samples, 
-    and abnormal counts, and resets the accumulators after each transmission.
+    diagnostic summary (<code>HOSPITAL SUMMARY</code>) to <code>hospital-events</code>. The summary explicitly distinguishes discrete physiological sensor 
+    acquisitions (<code>Samples:</code> accumulated only when fresh clinical vital packets arrive &mdash; ~1/min in stable mode, ~12/min in abnormal mode) 
+    from facility supervisory observations (<code>Snapshots:</code> sampled every 3-second MQTT evaluation tick &mdash; ~20/min), alongside anomaly 
+    counts and physiological extrema, resetting the accumulators after each transmission.
   </p>
 
   <h2>Task 3: Smart Medication Dosage Adjustment System</h2>
@@ -1216,7 +1218,7 @@
       </tr>
       <tr>
         <td><strong>Flash Memory</strong></td>
-        <td>1,047,262 Bytes</td>
+        <td>1,047,410 Bytes</td>
         <td>1,310,720 Bytes</td>
         <td><strong>79.9%</strong></td>
         <td>Fits comfortably within default 1.31 MB application partition (app0).</td>
@@ -1239,6 +1241,7 @@
     <li><strong>Bounded FIFO RAM Buffer:</strong> The offline buffer utilizes an in-memory FreeRTOS queue holding up to 64 records of 576 bytes each (~36.8 KB SRAM). When capacity is reached, it drops newest incoming records to protect initial fault events. It is RAM-only and volatile upon power cycle or hardware reset.</li>
     <li><strong>Task Watchdog &amp; SYSTEM_DEGRADED Window:</strong> <code>SYSTEM_DEGRADED</code> indicates an internal FreeRTOS worker task has starved its heartbeat while transport remains active. The ESP-IDF Task Watchdog Timer (TWDT) enforces an 8000 ms panic threshold; if a task hangs permanently, the chip resets ~2 seconds after entering <code>SYSTEM_DEGRADED</code> to provide automatic recovery (simulation only).</li>
     <li><strong>Simulated Sensor Telemetry:</strong> In simulation mode, physiological vitals (PPG, ECG) and ambient facility conditions (Room Temp, Oxygen %, AQI) are synthesized via mathematical models (e.g. Gaussian superposition) and UART CLI overrides (<code>SET_HR</code>, <code>SET_SPO2</code>, <code>SET_TEMP</code>, <code>SET_ROOM</code>, <code>SET_OXYGEN</code>, <code>SET_AQI</code>).</li>
+    <li><strong>Timer Rollover &amp; Reconnection Hygiene:</strong> Network retry timers employ signed modular delta arithmetic (<code>(int32_t)(now - nextRetryMs) &ge; 0</code>) combined with active timestamp refreshes during healthy connectivity (<code>nextRetryMs = now;</code>), systematically preventing both 49.7-day 32-bit <code>millis()</code> rollover lockups and long-uptime signed subtraction stalls.</li>
   </ol>
 </div>
 

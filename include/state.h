@@ -219,7 +219,7 @@ extern bool facilityAlertStateKnown;
 /**
  * @brief Evaluates whether a patient's vitals violate medical threshold limits.
  *
- * Checks heart rate [50 - 100 BPM], SpO2 [>= 92%], and body temperature [36.0 - 38.0 °C].
+ * Checks heart rate [50 - 100 BPM], SpO2 [>= 92%], ECG rate [50 - 100 BPM], and body temperature [36.0 - 38.0 °C].
  *
  * @param data Telemetry snapshot to assess.
  * @return true if any vital is outside safe physiological range; false if normal.
@@ -258,11 +258,11 @@ Telemetry getTelemetrySnapshot();
 FacilityTelemetry getFacilitySnapshot();
 
 /**
- * @brief Dispatches a SensorMessage to sensorQueue with a 10 ms wait timeout.
+ * @brief Dispatches a SensorMessage to sensorQueue non-blockingly (0 timeout).
  *
  * @param message Sensor reading payload to enqueue.
  * @param taskName Diagnostic task name string for queue overflow warning logs.
- * @return true if enqueued; false if queue was full after 10 ms timeout.
+ * @return true if enqueued; false if queue was full (sample dropped).
  */
 bool sendSensorMessage(const SensorMessage &message, const char *taskName);
 

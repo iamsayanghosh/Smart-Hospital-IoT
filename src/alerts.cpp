@@ -63,9 +63,6 @@ void alertTask(void *parameter)
             Serial.print(facilitySnapshot.oxygenLevel, 1);
             Serial.print("% AQI=");
             Serial.println(facilitySnapshot.aqi);
-
-        } else {
-            vTaskDelay(pdMS_TO_TICKS(50));
         }
     }
 }

@@ -55,7 +55,7 @@ MedicationSafetyLevel getMedicationSafetyLevel(float dosage)
     if (dosage > MEDICATION_CRITICAL_DOSAGE_THRESHOLD) {
         return MEDICATION_SAFETY_CRITICAL;
     }
-    if (fabsf(dosage - MEDICATION_CRITICAL_DOSAGE_THRESHOLD) < 0.1f) {
+    if (fabsf(dosage - MEDICATION_CRITICAL_DOSAGE_THRESHOLD) < 0.001f) {
         return MEDICATION_SAFETY_WARNING;
     }
     return MEDICATION_SAFETY_NORMAL;
