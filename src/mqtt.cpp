@@ -512,6 +512,7 @@ void resetLiveFeedPublishState()
 }
 
 static bool medicalSensorFaultActive = false;
+static uint32_t lastSensorStatePublishMs = 0;
 
 /**
  * @brief Publishes medical alert or normal-status events when state changes.
@@ -525,27 +526,29 @@ void publishMedicalAlertIfNeeded(const Telemetry &snapshot, bool offline)
     const uint32_t now = millis();
 
     // 1. Independent Sensor Availability State Machine
-    // Distinguish INITIALIZING vs SENSOR FAULT vs READY
+    // Evaluates confirmed hardware faults independently of the overall channel initialization state (P2 fix).
+    // State transitions are committed only upon successful MQTT delivery or FIFO buffering (Point C).
+    const bool isTempFault = isMedicalTemperatureFault(snapshot);
+    const bool isFullyValid = isMedicalTelemetryFullyValid(snapshot);
     const bool isInitializing = isMedicalTelemetryInitializing(snapshot);
 
-    if (!isInitializing) {
-        if (isMedicalTemperatureFault(snapshot)) {
-            // Confirmed sensor failure (measurement attempt failed/disconnected)
-            if (!medicalSensorFaultActive) {
-                const char *faultPayload = "MEDICAL STATUS: SENSOR FAULT\nBody temperature sensor unavailable; clinical status unknown.";
-                if (safePublish(getAioFeedTopic(HOSPITAL_EVENTS_FEED), String(faultPayload), offline)) {
-                    medicalSensorFaultActive = true;
-                    lastMedicalAlertPublishMs = now;
-                }
-            }
-        } else if (medicalSensorFaultActive) {
-            // Sensor recovery transition
-            const char *restoredPayload = "MEDICAL STATUS: SENSOR RESTORED\nBody temperature sensor operational; clinical telemetry restored.";
-            if (safePublish(getAioFeedTopic(HOSPITAL_EVENTS_FEED), String(restoredPayload), offline)) {
-                medicalSensorFaultActive = false;
-                medicalNormalPending = true;
-                lastMedicalAlertPublishMs = now;
-            }
+    SensorFaultTransition trans = evaluateSensorFaultTransition(
+        isTempFault,
+        isFullyValid,
+        medicalSensorFaultActive
+    );
+
+    if (trans == SensorFaultTransition::TRIGGER_FAULT) {
+        const char *faultPayload = "MEDICAL STATUS: SENSOR FAULT\nBody temperature sensor unavailable; clinical status unknown.";
+        if (safePublish(getAioFeedTopic(HOSPITAL_EVENTS_FEED), String(faultPayload), offline)) {
+            applySensorFaultTransition(trans, medicalSensorFaultActive, medicalNormalPending);
+            lastSensorStatePublishMs = now;
+        }
+    } else if (trans == SensorFaultTransition::TRIGGER_RECOVERY) {
+        const char *restoredPayload = "MEDICAL STATUS: SENSOR RESTORED\nBody temperature sensor operational; clinical telemetry restored.";
+        if (safePublish(getAioFeedTopic(HOSPITAL_EVENTS_FEED), String(restoredPayload), offline)) {
+            applySensorFaultTransition(trans, medicalSensorFaultActive, medicalNormalPending);
+            lastSensorStatePublishMs = now;
         }
     }
 
@@ -553,8 +556,8 @@ void publishMedicalAlertIfNeeded(const Telemetry &snapshot, bool offline)
     AlertCandidate candidate = evaluateMedicalAlert(snapshot);
 
     if (!candidate.active) {
-        // Suppress false NORMAL if sensor fault is active or system is still initializing
-        if (medicalSensorFaultActive || isInitializing) {
+        // Suppress false NORMAL if sensor fault is active, system is initializing, or telemetry is not fully valid
+        if (medicalSensorFaultActive || isInitializing || !isFullyValid) {
             return;
         }
 
@@ -564,7 +567,7 @@ void publishMedicalAlertIfNeeded(const Telemetry &snapshot, bool offline)
         }
 
         if (!medicalAlertStateKnown || medicalNormalPending) {
-            if (!medicalAlertStateKnown || now - lastMedicalAlertPublishMs >= ALERT_PUBLISH_INTERVAL_MS) {
+            if (!medicalAlertStateKnown || medicalNormalPending || now - lastMedicalAlertPublishMs >= ALERT_PUBLISH_INTERVAL_MS) {
                 const char *normalPayload = "MEDICAL STATUS: NORMAL\nNo active medical alerts.";
                 if (safePublish(getAioFeedTopic(HOSPITAL_EVENTS_FEED), String(normalPayload), offline)) {
                     lastMedicalAlertPublishMs = now;

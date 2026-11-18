@@ -164,22 +164,22 @@ void test_medical_telemetry_validity_distinguishes_normal_from_fault() {
     TEST_ASSERT_FALSE(isMedicalTelemetryFullyValid(snap));
     TEST_ASSERT_FALSE(isMedicalTemperatureFault(snap));
 
-    // 2. Vitals received only
-    snap.initialVitalsProcessed = true;
-    TEST_ASSERT_TRUE(isMedicalTelemetryInitializing(snap));
-    TEST_ASSERT_FALSE(isMedicalTelemetryFullyValid(snap));
-    TEST_ASSERT_FALSE(isMedicalTemperatureFault(snap));
-
-    // 3. Vitals and ECG received
-    snap.initialEcgProcessed = true;
-    TEST_ASSERT_TRUE(isMedicalTelemetryInitializing(snap));
-    TEST_ASSERT_FALSE(isMedicalTelemetryFullyValid(snap));
-    TEST_ASSERT_FALSE(isMedicalTemperatureFault(snap));
-
-    // 4. All attempted, temp failed: SENSOR FAULT
+    // 2. Confirmed temperature fault during boot before vitals/ECG arrive
     snap.initialTempProcessed = true;
     snap.temperatureValid = false;
     snap.temperature = DEVICE_DISCONNECTED_C;
+    TEST_ASSERT_TRUE(isMedicalTelemetryInitializing(snap));
+    TEST_ASSERT_TRUE(isMedicalTemperatureFault(snap));
+    TEST_ASSERT_FALSE(isMedicalTelemetryFullyValid(snap));
+
+    // 3. Vitals received while temp still faulted
+    snap.initialVitalsProcessed = true;
+    TEST_ASSERT_TRUE(isMedicalTelemetryInitializing(snap));
+    TEST_ASSERT_TRUE(isMedicalTemperatureFault(snap));
+    TEST_ASSERT_FALSE(isMedicalTelemetryFullyValid(snap));
+
+    // 4. Vitals and ECG received, temp still faulted
+    snap.initialEcgProcessed = true;
     TEST_ASSERT_FALSE(isMedicalTelemetryInitializing(snap));
     TEST_ASSERT_TRUE(isMedicalTemperatureFault(snap));
     TEST_ASSERT_FALSE(isMedicalTelemetryFullyValid(snap));
@@ -204,20 +204,41 @@ void test_medical_sensor_fault_state_machine_and_recovery() {
     bool sensorFaultActive = false;
     bool normalPending = false;
 
-    // 1. Boot: INITIALIZING suppresses fault & normal
-    TEST_ASSERT_TRUE(isMedicalTelemetryInitializing(snap));
+    // Unit test of state-transition bookkeeping functions (evaluateSensorFaultTransition,
+    // applySensorFaultTransition); does not exercise MQTT network transport.
+
+    // 1. Boot: INITIALIZING without temp attempt -> no transition
+    SensorFaultTransition trans = evaluateSensorFaultTransition(
+        isMedicalTemperatureFault(snap),
+        isMedicalTelemetryFullyValid(snap),
+        sensorFaultActive
+    );
+    TEST_ASSERT_EQUAL(SensorFaultTransition::NONE, trans);
     TEST_ASSERT_FALSE(sensorFaultActive);
 
-    // 2. Acquisition complete with failed temp
-    snap.initialVitalsProcessed = true;
-    snap.initialEcgProcessed = true;
+    // 2. Confirmed temp failure during boot triggers FAULT
     snap.initialTempProcessed = true;
     snap.temperatureValid = false;
     snap.temperature = DEVICE_DISCONNECTED_C;
-    if (isMedicalTemperatureFault(snap) && !sensorFaultActive) {
-        sensorFaultActive = true;
-    }
+    trans = evaluateSensorFaultTransition(
+        isMedicalTemperatureFault(snap),
+        isMedicalTelemetryFullyValid(snap),
+        sensorFaultActive
+    );
+    TEST_ASSERT_EQUAL(SensorFaultTransition::TRIGGER_FAULT, trans);
+
+    // Commit state transition (simulating safePublish / FIFO acceptance)
+    TEST_ASSERT_TRUE(applySensorFaultTransition(trans, sensorFaultActive, normalPending));
     TEST_ASSERT_TRUE(sensorFaultActive);
+    TEST_ASSERT_FALSE(normalPending);
+
+    // Redundant evaluation while fault is active returns NONE
+    trans = evaluateSensorFaultTransition(
+        isMedicalTemperatureFault(snap),
+        isMedicalTelemetryFullyValid(snap),
+        sensorFaultActive
+    );
+    TEST_ASSERT_EQUAL(SensorFaultTransition::NONE, trans);
 
     // 3. While faulted, acute vitals abnormalities preserved
     snap.heartRate = 135;
@@ -228,14 +249,22 @@ void test_medical_sensor_fault_state_machine_and_recovery() {
     bool normalAllowed = !sensorFaultActive && isMedicalTelemetryFullyValid(snap);
     TEST_ASSERT_FALSE(normalAllowed);
 
-    // 4. Recovery: SENSOR RESTORED transition
+    // 4. Recovery: Temperature valid and all channels ready triggers RECOVERY
+    snap.initialVitalsProcessed = true;
+    snap.initialEcgProcessed = true;
     snap.temperatureValid = true;
     snap.temperature = 36.8f;
     TEST_ASSERT_TRUE(isMedicalTelemetryFullyValid(snap));
-    if (sensorFaultActive && isMedicalTelemetryFullyValid(snap)) {
-        sensorFaultActive = false;
-        normalPending = true;
-    }
+
+    trans = evaluateSensorFaultTransition(
+        isMedicalTemperatureFault(snap),
+        isMedicalTelemetryFullyValid(snap),
+        sensorFaultActive
+    );
+    TEST_ASSERT_EQUAL(SensorFaultTransition::TRIGGER_RECOVERY, trans);
+
+    // Commit recovery transition
+    TEST_ASSERT_TRUE(applySensorFaultTransition(trans, sensorFaultActive, normalPending));
     TEST_ASSERT_FALSE(sensorFaultActive);
     TEST_ASSERT_TRUE(normalPending);
 
@@ -246,29 +275,26 @@ void test_medical_sensor_fault_state_machine_and_recovery() {
 
 void test_temperature_sensor_disconnect_queue_retry() {
     bool pendingTempDisconnectMessage = false;
-    bool mockQueueFull = true;
 
-    // 1. Initial state
+    // Unit test of queue-retry bookkeeping helper (updateQueueRetryState);
+    // does not exercise FreeRTOS queue saturation or IPC primitives.
+
+    // 1. Initial state: no retry pending
     TEST_ASSERT_FALSE(pendingTempDisconnectMessage);
 
-    // 2. Disconnect with full queue retains pending state
-    float rawTemp = DEVICE_DISCONNECTED_C;
-    if (rawTemp == DEVICE_DISCONNECTED_C) {
-        pendingTempDisconnectMessage = mockQueueFull;
-    }
+    // 2. Queue full on initial disconnect dispatch (sendSuccess = false)
+    bool changed = updateQueueRetryState(false, pendingTempDisconnectMessage);
+    TEST_ASSERT_TRUE(changed);
     TEST_ASSERT_TRUE(pendingTempDisconnectMessage);
 
-    // 3. Subsequent cycle with full queue remains pending
-    if (pendingTempDisconnectMessage && !mockQueueFull) {
-        pendingTempDisconnectMessage = false;
-    }
+    // 3. Subsequent cycle with queue still full (sendSuccess = false) retains pending flag
+    changed = updateQueueRetryState(false, pendingTempDisconnectMessage);
+    TEST_ASSERT_FALSE(changed);
     TEST_ASSERT_TRUE(pendingTempDisconnectMessage);
 
-    // 4. Queue drains: delivered and cleared
-    mockQueueFull = false;
-    if (pendingTempDisconnectMessage && !mockQueueFull) {
-        pendingTempDisconnectMessage = false;
-    }
+    // 4. Queue drains: successful dispatch (sendSuccess = true) clears pending flag
+    changed = updateQueueRetryState(true, pendingTempDisconnectMessage);
+    TEST_ASSERT_TRUE(changed);
     TEST_ASSERT_FALSE(pendingTempDisconnectMessage);
 }
 

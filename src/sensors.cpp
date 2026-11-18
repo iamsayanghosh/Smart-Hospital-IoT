@@ -140,9 +140,8 @@ void temperatureTask(void *parameter) {
       SensorMessage retryMsg = {};
       retryMsg.type = TEMP_DATA;
       retryMsg.temperature = DEVICE_DISCONNECTED_C;
-      if (sendSensorMessage(retryMsg, "TEMP TASK")) {
-        pendingTempDisconnectMessage = false;
-      }
+      bool sent = sendSensorMessage(retryMsg, "TEMP TASK");
+      updateQueueRetryState(sent, pendingTempDisconnectMessage);
     }
 
     // Consume immediate sample request unconditionally to prevent duplicate samples
@@ -191,11 +190,8 @@ void temperatureTask(void *parameter) {
           SensorMessage message = {};
           message.type = TEMP_DATA;
           message.temperature = DEVICE_DISCONNECTED_C;
-          if (!sendSensorMessage(message, "TEMP TASK")) {
-            pendingTempDisconnectMessage = true;
-          } else {
-            pendingTempDisconnectMessage = false;
-          }
+          bool sent = sendSensorMessage(message, "TEMP TASK");
+          updateQueueRetryState(sent, pendingTempDisconnectMessage);
         }
       } else if (rawTemp == DEVICE_DISCONNECTED_C || rawTemp <= -55.0f ||
                  rawTemp > 125.0f) {
@@ -204,11 +200,8 @@ void temperatureTask(void *parameter) {
         SensorMessage message = {};
         message.type = TEMP_DATA;
         message.temperature = DEVICE_DISCONNECTED_C;
-        if (!sendSensorMessage(message, "TEMP TASK")) {
-          pendingTempDisconnectMessage = true;
-        } else {
-          pendingTempDisconnectMessage = false;
-        }
+        bool sent = sendSensorMessage(message, "TEMP TASK");
+        updateQueueRetryState(sent, pendingTempDisconnectMessage);
       } else {
         hasReadValidTemperature = true;
         pendingTempDisconnectMessage = false;

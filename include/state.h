@@ -331,6 +331,77 @@ inline bool isMedicalTelemetryFullyValid(const Telemetry &data)
            data.temperatureValid;
 }
 
+enum class SensorFaultTransition {
+    NONE,
+    TRIGGER_FAULT,
+    TRIGGER_RECOVERY
+};
+
+/**
+ * @brief Evaluates whether a sensor availability state transition is required.
+ *
+ * Distinguishes confirmed sensor failures from startup initialization:
+ * - When isTempFault is true and faultActive is false, triggers a FAULT transition.
+ * - When isTempFault is false, faultActive is true, and isFullyValid is true, triggers a RECOVERY transition.
+ *
+ * @param isTempFault True if confirmed temperature hardware fault.
+ * @param isFullyValid True if all required telemetry channels are initialized and valid.
+ * @param faultActive Current sensor fault state.
+ * @return SensorFaultTransition State transition candidate (NONE, TRIGGER_FAULT, TRIGGER_RECOVERY).
+ */
+inline SensorFaultTransition evaluateSensorFaultTransition(bool isTempFault, bool isFullyValid, bool faultActive)
+{
+    if (isTempFault && !faultActive) {
+        return SensorFaultTransition::TRIGGER_FAULT;
+    }
+    if (!isTempFault && faultActive && isFullyValid) {
+        return SensorFaultTransition::TRIGGER_RECOVERY;
+    }
+    return SensorFaultTransition::NONE;
+}
+
+/**
+ * @brief Applies sensor fault state machine mutations upon successful event commit.
+ *
+ * Invoked ONLY after safePublish() confirms MQTT dispatch or FIFO buffer acceptance.
+ *
+ * @param transition State transition to apply.
+ * @param faultActive In/out reference to active sensor fault flag.
+ * @param normalPending In/out reference to pending normal evaluation flag.
+ * @return true if state was mutated; false otherwise.
+ */
+inline bool applySensorFaultTransition(SensorFaultTransition transition, bool &faultActive, bool &normalPending)
+{
+    if (transition == SensorFaultTransition::TRIGGER_FAULT) {
+        faultActive = true;
+        return true;
+    }
+    if (transition == SensorFaultTransition::TRIGGER_RECOVERY) {
+        faultActive = false;
+        normalPending = true;
+        return true;
+    }
+    return false;
+}
+
+/**
+ * @brief Updates queue retry pending state based on transmission outcome.
+ *
+ * Manages FIFO queue retry bookkeeping for critical telemetry frames:
+ * - If send fails (e.g. queue full), retains or sets pending flag.
+ * - If send succeeds, clears pending flag.
+ *
+ * @param sendSuccess True if queue send operation succeeded.
+ * @param pendingState In/out reference to pending retry flag.
+ * @return true if pending state changed; false otherwise.
+ */
+inline bool updateQueueRetryState(bool sendSuccess, bool &pendingState)
+{
+    bool prevState = pendingState;
+    pendingState = !sendSuccess;
+    return prevState != pendingState;
+}
+
 /**
  * @brief Analyzes patient telemetry and constructs an alert candidate if a threshold is violated.
  *
