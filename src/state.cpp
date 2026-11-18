@@ -163,62 +163,6 @@ bool sendSensorMessage(const SensorMessage &message, const char *taskName)
 
 
 
-/**
- * @brief Selects the highest-severity active medical alert in a telemetry snapshot.
- *
- * Evaluates physiological parameters in clinical priority order: SpO2 (hypoxia / airway),
- * Heart Rate, ECG Rate, and Body Temperature with severity weighting (critical abnormalities
- * supersede warning-level deviations).
- */
-AlertCandidate evaluateMedicalAlert(const Telemetry &snapshot)
-{
-    AlertCandidate bestCandidate;
-
-    auto checkCandidate = [&](const char* param, float val, const char* msg, AlertSeverity sev) {
-        if (!bestCandidate.active || (sev > bestCandidate.severity)) {
-            bestCandidate.active = true;
-            bestCandidate.parameter = param;
-            bestCandidate.value = val;
-            bestCandidate.message = msg;
-            bestCandidate.severity = sev;
-        }
-    };
-
-    // 1. SpO2 (Hypoxia / critical airway priority)
-    if (snapshot.spo2 < medicalThresholds.spo2.low) {
-        AlertSeverity sev = (snapshot.spo2 < medicalThresholds.spo2.criticalLow) 
-                            ? ALERT_SEVERITY_CRITICAL : ALERT_SEVERITY_WARNING;
-        checkCandidate("spo2", static_cast<float>(snapshot.spo2), "Low SpO2", sev);
-    }
-
-    // 2. Heart Rate
-    if (snapshot.heartRate < medicalThresholds.heartRate.low || snapshot.heartRate > medicalThresholds.heartRate.high) {
-        AlertSeverity sev = (snapshot.heartRate < medicalThresholds.heartRate.criticalLow || snapshot.heartRate > medicalThresholds.heartRate.criticalHigh) 
-                            ? ALERT_SEVERITY_CRITICAL : ALERT_SEVERITY_WARNING;
-        const char *msg = snapshot.heartRate < medicalThresholds.heartRate.low ? "Low heart rate" : "High heart rate";
-        checkCandidate("heartRate", static_cast<float>(snapshot.heartRate), msg, sev);
-    }
-
-    // 3. ECG Rate
-    if (snapshot.ecgRate < medicalThresholds.ecgRate.low || snapshot.ecgRate > medicalThresholds.ecgRate.high) {
-        AlertSeverity sev = (snapshot.ecgRate < medicalThresholds.ecgRate.criticalLow || snapshot.ecgRate > medicalThresholds.ecgRate.criticalHigh) 
-                            ? ALERT_SEVERITY_CRITICAL : ALERT_SEVERITY_WARNING;
-        const char *msg = snapshot.ecgRate < medicalThresholds.ecgRate.low ? "Low ECG rate" : "High ECG rate";
-        checkCandidate("ecgRate", static_cast<float>(snapshot.ecgRate), msg, sev);
-    }
-
-    // 4. Body Temperature (only evaluated if sensor is valid/connected)
-    if (snapshot.temperatureValid) {
-        if (snapshot.temperature < medicalThresholds.bodyTemperature.low || snapshot.temperature > medicalThresholds.bodyTemperature.high) {
-            AlertSeverity sev = (snapshot.temperature < medicalThresholds.bodyTemperature.criticalLow || snapshot.temperature > medicalThresholds.bodyTemperature.criticalHigh) 
-                                ? ALERT_SEVERITY_CRITICAL : ALERT_SEVERITY_WARNING;
-            const char *msg = snapshot.temperature < medicalThresholds.bodyTemperature.low ? "Low body temperature" : "High body temperature";
-            checkCandidate("bodyTemperature", snapshot.temperature, msg, sev);
-        }
-    }
-
-    return bestCandidate;
-}
 
 /**
  * @brief Evaluates overall clinical severity of the patient (NORMAL, WARNING, CRITICAL).

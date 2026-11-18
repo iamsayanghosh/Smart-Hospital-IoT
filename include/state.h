@@ -412,7 +412,57 @@ inline bool updateQueueRetryState(bool sendSuccess, bool &pendingState)
  * @param snapshot Evaluated patient vitals snapshot.
  * @return AlertCandidate Populated candidate descriptor.
  */
-AlertCandidate evaluateMedicalAlert(const Telemetry &snapshot);
+inline AlertCandidate evaluateMedicalAlert(const Telemetry &snapshot)
+{
+    AlertCandidate bestCandidate;
+
+    auto checkCandidate = [&](const char* param, float val, const char* msg, AlertSeverity sev) {
+        if (!bestCandidate.active || (sev > bestCandidate.severity)) {
+            bestCandidate.active = true;
+            bestCandidate.parameter = param;
+            bestCandidate.value = val;
+            bestCandidate.message = msg;
+            bestCandidate.severity = sev;
+        }
+    };
+
+    MedicalThresholdConfig thresholds;
+
+    // 1. SpO2 (Hypoxia / critical airway priority)
+    if (snapshot.spo2 < thresholds.spo2.low) {
+        AlertSeverity sev = (snapshot.spo2 < thresholds.spo2.criticalLow) 
+                            ? ALERT_SEVERITY_CRITICAL : ALERT_SEVERITY_WARNING;
+        checkCandidate("spo2", static_cast<float>(snapshot.spo2), "Low SpO2", sev);
+    }
+
+    // 2. Heart Rate
+    if (snapshot.heartRate < thresholds.heartRate.low || snapshot.heartRate > thresholds.heartRate.high) {
+        AlertSeverity sev = (snapshot.heartRate < thresholds.heartRate.criticalLow || snapshot.heartRate > thresholds.heartRate.criticalHigh) 
+                            ? ALERT_SEVERITY_CRITICAL : ALERT_SEVERITY_WARNING;
+        const char *msg = snapshot.heartRate < thresholds.heartRate.low ? "Low heart rate" : "High heart rate";
+        checkCandidate("heartRate", static_cast<float>(snapshot.heartRate), msg, sev);
+    }
+
+    // 3. ECG Rate
+    if (snapshot.ecgRate < thresholds.ecgRate.low || snapshot.ecgRate > thresholds.ecgRate.high) {
+        AlertSeverity sev = (snapshot.ecgRate < thresholds.ecgRate.criticalLow || snapshot.ecgRate > thresholds.ecgRate.criticalHigh) 
+                            ? ALERT_SEVERITY_CRITICAL : ALERT_SEVERITY_WARNING;
+        const char *msg = snapshot.ecgRate < thresholds.ecgRate.low ? "Low ECG rate" : "High ECG rate";
+        checkCandidate("ecgRate", static_cast<float>(snapshot.ecgRate), msg, sev);
+    }
+
+    // 4. Body Temperature (only evaluated if sensor is valid/connected)
+    if (snapshot.temperatureValid) {
+        if (snapshot.temperature < thresholds.bodyTemperature.low || snapshot.temperature > thresholds.bodyTemperature.high) {
+            AlertSeverity sev = (snapshot.temperature < thresholds.bodyTemperature.criticalLow || snapshot.temperature > thresholds.bodyTemperature.criticalHigh) 
+                                ? ALERT_SEVERITY_CRITICAL : ALERT_SEVERITY_WARNING;
+            const char *msg = snapshot.temperature < thresholds.bodyTemperature.low ? "Low body temperature" : "High body temperature";
+            checkCandidate("bodyTemperature", snapshot.temperature, msg, sev);
+        }
+    }
+
+    return bestCandidate;
+}
 
 /**
  * @brief Analyzes room telemetry and constructs an alert candidate if environmental limits fail.

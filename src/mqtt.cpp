@@ -512,7 +512,6 @@ void resetLiveFeedPublishState()
 }
 
 static bool medicalSensorFaultActive = false;
-static uint32_t lastSensorStatePublishMs = 0;
 
 /**
  * @brief Publishes medical alert or normal-status events when state changes.
@@ -542,13 +541,11 @@ void publishMedicalAlertIfNeeded(const Telemetry &snapshot, bool offline)
         const char *faultPayload = "MEDICAL STATUS: SENSOR FAULT\nBody temperature sensor unavailable; clinical status unknown.";
         if (safePublish(getAioFeedTopic(HOSPITAL_EVENTS_FEED), String(faultPayload), offline)) {
             applySensorFaultTransition(trans, medicalSensorFaultActive, medicalNormalPending);
-            lastSensorStatePublishMs = now;
         }
     } else if (trans == SensorFaultTransition::TRIGGER_RECOVERY) {
         const char *restoredPayload = "MEDICAL STATUS: SENSOR RESTORED\nBody temperature sensor operational; clinical telemetry restored.";
         if (safePublish(getAioFeedTopic(HOSPITAL_EVENTS_FEED), String(restoredPayload), offline)) {
             applySensorFaultTransition(trans, medicalSensorFaultActive, medicalNormalPending);
-            lastSensorStatePublishMs = now;
         }
     }
 

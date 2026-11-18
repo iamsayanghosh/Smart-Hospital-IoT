@@ -240,9 +240,12 @@ void test_medical_sensor_fault_state_machine_and_recovery() {
     );
     TEST_ASSERT_EQUAL(SensorFaultTransition::NONE, trans);
 
-    // 3. While faulted, acute vitals abnormalities preserved
+    // 3. While faulted, acute vitals abnormalities preserved and detected by production evaluator
     snap.heartRate = 135;
-    TEST_ASSERT_TRUE(snap.heartRate < 45 || snap.heartRate > 120);
+    AlertCandidate candidate = evaluateMedicalAlert(snap);
+    TEST_ASSERT_TRUE(candidate.active);
+    TEST_ASSERT_EQUAL_STRING("heartRate", candidate.parameter);
+    TEST_ASSERT_EQUAL(ALERT_SEVERITY_CRITICAL, candidate.severity);
 
     // When acute abnormality resolves, normal blocked by fault
     snap.heartRate = 75;
