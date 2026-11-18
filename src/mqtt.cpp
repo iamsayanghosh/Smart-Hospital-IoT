@@ -253,10 +253,6 @@ bool configureMqttBuffer()
         }
     }
 
-    Serial.print("[MQTT] MQTT buffer size before fix: ");
-    Serial.println(bufferSizeBefore);
-    Serial.print("[MQTT] MQTT buffer size: ");
-    Serial.println(mqttClient.getBufferSize());
     return success;
 }
 
@@ -557,6 +553,8 @@ void resetLiveFeedPublishState()
     }
 }
 
+static bool medicalSensorFaultActive = false;
+
 /**
  * @brief Publishes medical alert or normal-status events when state changes.
  *
@@ -566,24 +564,45 @@ void resetLiveFeedPublishState()
  */
 void publishMedicalAlertIfNeeded(const Telemetry &snapshot, bool offline)
 {
-    AlertCandidate candidate = evaluateMedicalAlert(snapshot);
     const uint32_t now = millis();
-    if (!candidate.active) {
-        if (!isMedicalTelemetryFullyValid(snapshot)) {
-            // Missing telemetry is not evidence of normal status: suppress false NORMAL
-            if (medicalAlertPublished && lastMedicalAlertParameter == "bodyTemperature") {
-                if (!medicalAlertStateKnown || now - lastMedicalAlertPublishMs >= ALERT_PUBLISH_INTERVAL_MS) {
-                    const char *faultPayload = "MEDICAL STATUS: SENSOR FAULT\nBody temperature sensor unavailable; clinical status unknown.";
-                    if (safePublish(getAioFeedTopic(HOSPITAL_EVENTS_FEED), String(faultPayload), offline)) {
-                        lastMedicalAlertPublishMs = now;
-                        medicalAlertStateKnown = true;
-                        medicalAlertPublished = false;
-                        medicalNormalPending = false;
-                        lastMedicalAlertParameter = "bodyTemperatureSensor";
-                        lastMedicalAlertSeverity = ALERT_SEVERITY_WARNING;
-                    }
+
+    // 1. Independent Sensor Availability State Machine (Task 1 & Task 2)
+    // Distinguish INITIALIZING vs SENSOR FAULT vs READY:
+    // Only report SENSOR FAULT if a measurement attempt has confirmed sensor failure
+    if (snapshot.initialTempProcessed && !snapshot.temperatureValid) {
+        if (!medicalSensorFaultActive) {
+            if (!medicalAlertStateKnown || now - lastMedicalAlertPublishMs >= ALERT_ESCALATION_COOLDOWN_MS) {
+                const char *faultPayload = "MEDICAL STATUS: SENSOR FAULT\nBody temperature sensor unavailable; clinical status unknown.";
+                if (safePublish(getAioFeedTopic(HOSPITAL_EVENTS_FEED), String(faultPayload), offline)) {
+                    lastMedicalAlertPublishMs = now;
+                    medicalAlertStateKnown = true;
+                    medicalSensorFaultActive = true;
+                    medicalNormalPending = false;
                 }
             }
+        }
+    } else if (snapshot.initialTempProcessed && snapshot.temperatureValid) {
+        if (medicalSensorFaultActive) {
+            if (!medicalAlertStateKnown || now - lastMedicalAlertPublishMs >= ALERT_ESCALATION_COOLDOWN_MS) {
+                const char *restorePayload = "MEDICAL STATUS: SENSOR RESTORED\nBody temperature sensor operational; clinical telemetry restored.";
+                if (safePublish(getAioFeedTopic(HOSPITAL_EVENTS_FEED), String(restorePayload), offline)) {
+                    lastMedicalAlertPublishMs = now;
+                    medicalAlertStateKnown = true;
+                    medicalSensorFaultActive = false;
+                    medicalNormalPending = true; // Prompt immediate clinical re-evaluation
+                }
+            }
+        }
+    }
+
+    // 2. Clinical Alert Evaluation (Independent of Sensor Fault)
+    // Available sensors continue generating alerts (e.g. HR tachycardia, SpO2 hypoxia)
+    AlertCandidate candidate = evaluateMedicalAlert(snapshot);
+
+    if (!candidate.active) {
+        // Clinical vitals are nominal.
+        // Gating: suppress false NORMAL if any mandatory sensor is not yet ready or in fault
+        if (!isMedicalTelemetryFullyValid(snapshot)) {
             return;
         }
 

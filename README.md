@@ -44,46 +44,6 @@ All application worker tasks are pinned to **Core 1** (coexisting alongside Ardu
                                           └─────────────────────────────────────────┘
 ```
 
-### FreeRTOS Subsystem & Data Pipeline
-```mermaid
-graph TD
-    subgraph "Core 0: Network Stacks"
-        WIFI_STACK["Espressif Wi-Fi MAC / PHY"]
-        LWIP["lwIP TCP/IP Stack"]
-        WIFI_STACK <--> LWIP
-    end
-
-    subgraph "Core 1: FreeRTOS Application Tasks"
-        P4["P4: watchdogTask (Auditor 1000 ms)"]
-        P3_1["P3: medicationTask (50 Hz / 20 ms)"]
-        P3_2["P3: vitalTask (PPG 5s-60s)"]
-        P3_3["P3: ecgTask (Fixed 5 Hz / 200 ms)"]
-        P2_1["P2: temperatureTask (DS18B20 5s-60s)"]
-        P2_2["P2: motionTask (PIR 1000 ms)"]
-        P2_3["P2: environmentTask (Facility 1000 ms)"]
-        P2_4["P2: bedTask (Servo 50 Hz / 20 ms)"]
-        P2_5["P2: mqttTask (Adafruit IO 3000 ms)"]
-        P2_6["P2: samplingTask (Adaptive 1000 ms)"]
-        P2_7["P2: alertTask (Binary Semaphore)"]
-        P2_8["P2: offlineTask (Health & Cadence 50 ms)"]
-        P1["P1: displayTask (SSD1306 OLED 100 ms)"]
-    end
-
-    subgraph "Hardware & Peripherals"
-        HW_OLED["SSD1306 OLED (I2C: 21, 22)"]
-        HW_SENS["DS18B20 (4), PIR (27), Button (13)"]
-        HW_ACT["Servo (18), Buzzer (14), LEDs (25, 26, 33)"]
-    end
-
-    %% Hardware Input / Output Flows
-    HW_SENS --> P2_1 & P2_2 & P3_1
-    P1 --> HW_OLED
-    P2_4 & P3_1 & P2_8 --> HW_ACT
-
-    %% Inter-Core Network Flow
-    P2_5 <--> LWIP
-```
-
 ---
 
 ## 2. Assignment Task Implementation
@@ -139,7 +99,7 @@ graph TD
 | Peripheral | Component ID | ESP32 GPIO | Description / Mode |
 | :--- | :--- | :--- | :--- |
 | **OLED Display** | `oled1` | `GPIO 21` (SDA)<br>`GPIO 22` (SCL) | SSD1306 128x64 I2C monochrome at address `0x3C` |
-| **Body Temperature** | `temp1` | `GPIO 4` | Dallas DS18B20 1-Wire Bus (4.7kΩ pull-up required on physical hardware; internally simulated in Wokwi) |
+| **Body Temperature** | `temp1` | `GPIO 4` | Dallas DS18B20 1-Wire Bus (4.7kΩ pull-up; simulated in Wokwi) |
 | **Motion Detector** | `pir1` | `GPIO 27` | HC-SR501 PIR sensor (Digital Input) |
 | **Bed Elevation Servo** | `servo1` | `GPIO 18` | SG90 50 Hz PWM Servo Actuator (0 - 90°) |
 | **Bedside Button** | `btn1` | `GPIO 13` | Momentary pushbutton with internal pull-up (Active-LOW) |
@@ -154,56 +114,25 @@ graph TD
 
 ```
 Smart-Hospital-IoT/
-├── include/                          # Modular C/C++ Header Files
-│   ├── adafruit_io_config.h          # Dynamic credential loader with fallback
-│   ├── adafruit_io_config.local.h.example # Credentials template
-│   ├── alerts.h                      # Clinical & facility event logger
-│   ├── app.h                         # FreeRTOS setup & task supervisory declarations
-│   ├── bed.h                         # Remote bed elevation servo declarations
-│   ├── connectivity.h                # Network client transport configuration
-│   ├── display.h                     # SSD1306 OLED UI & sensorQueue consumer
-│   ├── environment.h                 # Facility simulation & CLI declarations
-│   ├── medication.h                  # Infusion safety state machine & clamping
-│   ├── mqtt.h                        # Adafruit IO MQTT communications
-│   ├── offline.h                     # Offline detection, FIFO buffer & health
-│   ├── offline_banner_gate.h         # Debounce hold & boot grace gate
-│   ├── outputs.h                     # LED & buzzer actuator drivers
-│   ├── parser_utils.h                # Strict float & long parsing utilities
-│   ├── sampling.h                    # Dynamic adaptive sampling rate supervisor
-│   ├── sensors.h                     # Multi-sensor acquisition & simulation
-│   ├── state.h                       # Centralized data structures, mutexes & IPC
-│   └── watchdog.h                    # Dual-tier watchdog & task health table
-├── src/                              # Modular Implementation Files
-│   ├── alerts.cpp                    # Asynchronous alert logging
-│   ├── app.cpp                       # Core 1 task spawning & initialization
-│   ├── bed.cpp                       # Bed elevation kinematic controller
-│   ├── connectivity.cpp              # Connectivity configuration
-│   ├── display.cpp                   # Dual-zone OLED rendering
-│   ├── environment.cpp               # Facility data generator & serial parser
-│   ├── main.cpp                      # Application entry point (setup, loop, task start)
-│   ├── medication.cpp                # Dosage rate-limiting & button interlock
-│   ├── mqtt.cpp                      # Throttled publishing & FIFO replay
-│   ├── offline.cpp                   # Health supervision & buffer queue
-│   ├── outputs.cpp                   # Priority-arbitrated LED/buzzer driver
-│   ├── sampling.cpp                  # Adaptive rate arbitration
-│   ├── sensors.cpp                   # DS18B20, PIR, PPG, ECG tasks
-│   ├── state.cpp                     # Concurrency helpers & thresholds
-│   └── watchdog.cpp                  # TWDT reset & task audit loop
-├── docs/                             # Engineering Documentation & Deliverables
+├── include/                          # Subsystem Header Declarations & System Interfaces (18 headers)
+├── src/                              # Modular FreeRTOS Application Implementations (15 source files)
+├── docs/                             # Engineering Documentation (Repository / GitHub hosted)
 │   ├── Smart_Hospital_IoT_Project_Report.pdf # Comprehensive Technical Report (PDF)
-│   └── diagrams/                     # High-Resolution Architectural & Dataflow Diagrams
+│   └── diagrams/                     # Architectural & Dataflow Blueprints (SVG/PNG)
 │       ├── system_architecture.svg   # Dual-Core SMP Architecture Blueprint
 │       ├── system_architecture.png   # High-DPI Architecture Diagram
 │       ├── workflow_block_diagram.svg # End-to-End Workflow & Dataflow
 │       └── workflow_block_diagram.png # High-DPI Workflow Diagram
 ├── test/                             # Automated Unit Tests
-│   └── test_main.cpp                 # 22 Unity test cases
+│   └── test_main.cpp                 # 24 Unity test cases
 ├── diagram.json                      # Wokwi circuit schematic wiring
 ├── libraries.txt                     # Wokwi library manifest
 ├── platformio.ini                    # PlatformIO project configuration
 ├── wokwi.toml                        # Local Wokwi VS Code extension config
 └── LICENSE                           # MIT Open Source License
 ```
+
+> **Documentation Assets Note:** Full PDF reports and vector architecture diagrams are maintained under `docs/` on the [GitHub repository](https://github.com/iamsayanghosh/Smart-Hospital-IoT/tree/main/docs) to ensure standalone source packages remain lightweight (<80 KB) and focused strictly on compilable firmware and configuration manifests.
 
 ---
 
@@ -225,9 +154,9 @@ The firmware includes an interactive Serial Command Line Interface (115200 baud)
 * `SHOW_TASK2`: Print MQTT topic mappings in the console.
 
 ### Offline & Replay Simulation Commands (Task 6 in Wokwi):
-* `SIM_OFFLINE WIFI` (or `SIM_OFFLINE`): Simulates a Wi-Fi link drop (`WiFi.disconnect()`), activating the rapid double-pip acoustic cadence (`BUZZER_MODE_WIFI_FAIL`), bottom OLED warning banner (`LOGGING OFFLINE`), and routing outbound telemetry into the 64-record FIFO RAM buffer.
-* `SIM_OFFLINE MQTT`: Simulates an MQTT broker disconnect while maintaining Wi-Fi association, activating the slow single-beep cadence (`BUZZER_MODE_MQTT_FAIL`), bottom OLED warning banner, and FIFO RAM buffering.
-* `SIM_ONLINE`: Restores network connectivity, allowing background re-registration and orderly FIFO replay of all buffered records to Adafruit IO.
+* `SIM_OFFLINE WIFI` (or `SIM_OFFLINE`): Simulates Wi-Fi link drop, activating rapid double-pip acoustic cadence, bottom OLED banner, and FIFO RAM buffering.
+* `SIM_OFFLINE MQTT`: Simulates broker disconnect, activating slow single-beep cadence, bottom OLED banner, and FIFO RAM buffering.
+* `SIM_ONLINE`: Restores network connectivity, triggering exponential backoff and orderly FIFO buffer replay to Adafruit IO.
 
 ---
 
@@ -250,29 +179,17 @@ The firmware includes an interactive Serial Command Line Interface (115200 baud)
 
 ## 7. How to Build & Run
 
-### Compile Firmware
 ```bash
+# Compile complete firmware image (src/):
 pio run
-```
-The compiled binaries will be output to:
-* `.pio/build/esp32dev/firmware.bin`
-* `.pio/build/esp32dev/firmware.factory.bin`
 
-### Upload to Physical ESP32
-```bash
+# Compile unit test runner binary (test/):
+pio test -e esp32dev --without-uploading --without-testing
+
+# Upload firmware to physical ESP32:
 pio run --target upload
 ```
-
-### Build & Automated Unit Testing
-* **Compile Complete Application (`src/`):**
-  ```bash
-  pio run -e esp32dev
-  ```
-* **Compile Unit Test Binary (`test/`):**
-  ```bash
-  pio test -e esp32dev --without-uploading --without-testing
-  ```
-  Unit tests are implemented under `test/test_main.cpp` covering 22 test cases for strict numeric string parsers (NaN, Inf, float integers, negative boundary handling), medication dosage safety clamping, slew-rate timing mechanics, and telemetry validity guards.
+  Unit tests are implemented under `test/test_main.cpp` covering 24 test cases for strict numeric string parsers (NaN, Inf, float integers, negative boundary handling), medication dosage safety clamping, slew-rate timing mechanics, telemetry validity guards, sensor-fault lifecycle transitions, and queue retry resilience.
 
 ---
 
@@ -281,7 +198,7 @@ pio run --target upload
 | Metric | Measured Value | Budget / Limit | Utilization |
 | :--- | :--- | :--- | :--- |
 | **Static RAM (SRAM)** | 49,536 Bytes | 327,680 Bytes | **15.1%** |
-| **Flash Memory** | 1,051,002 Bytes | 1,310,720 Bytes | **80.2%** |
+| **Flash Memory** | 1,051,230 Bytes | 1,310,720 Bytes | **80.2%** |
 | **FreeRTOS Application Tasks** | 13 tasks (all Core 1) | Dual Core Xtensa | Pinned to Core 1 (with loopTask) |
 | **Watchdog Timeout** | 8000 ms (Hardware TWDT) | 6000 ms (Heartbeat) | 100% monitored |
 | **Task Scheduling Delays** | 0 ms (Zero Arduino `delay()`) | Cooperative yielding | FreeRTOS `vTaskDelay` (peripheral I/O remains synchronous) |

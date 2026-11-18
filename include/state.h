@@ -137,6 +137,7 @@ struct Telemetry {
     bool alertActive = false;
     bool initialVitalsProcessed = false;
     bool initialEcgProcessed = false;
+    bool initialTempProcessed = false;
     uint32_t vitalSampleCount = 0;
 };
 
@@ -283,7 +284,7 @@ AlertSeverity evaluateClinicalSeverity(const Telemetry &data);
 /**
  * @brief Assesses whether all mandatory medical vitals are available for full clinical clearance.
  *
- * Requires both initial vital signs acquisition and an active, valid temperature reading.
+ * Requires initial vital signs acquisition, initial ECG acquisition, and an active, valid temperature reading.
  * An unavailable or disconnected sensor precludes asserting a definitive NORMAL status.
  *
  * @param data Patient telemetry snapshot.
@@ -291,7 +292,9 @@ AlertSeverity evaluateClinicalSeverity(const Telemetry &data);
  */
 inline bool isMedicalTelemetryFullyValid(const Telemetry &data)
 {
-    return data.initialVitalsProcessed && data.temperatureValid;
+    return data.initialVitalsProcessed &&
+           data.initialEcgProcessed &&
+           data.temperatureValid;
 }
 
 /**

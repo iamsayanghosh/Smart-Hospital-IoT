@@ -131,6 +131,7 @@ void updateTelemetry(const SensorMessage &message)
         telemetry.temperature = message.temperature;
         telemetry.temperatureValid = isfinite(message.temperature) &&
                                      message.temperature != DEVICE_DISCONNECTED_C;
+        telemetry.initialTempProcessed = true;
     } else if (message.type == MOTION_DATA) {
         telemetry.motion = message.motion;
     } else if (message.type == VITAL_DATA) {
