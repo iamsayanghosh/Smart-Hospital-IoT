@@ -40,8 +40,6 @@ void medicationTask(void *parameter);
 
 constexpr float MEDICATION_DOSAGE_MIN = 0.0f;                    ///< Minimum valid dosage (0 mg/hr = infusion stopped)
 constexpr float MEDICATION_DOSAGE_MAX = 100.0f;                  ///< Maximum hardware delivery limit (100 mg/hr)
-constexpr float MEDICATION_CRITICAL_DOSAGE_THRESHOLD = 80.0f;    ///< Boundary above which physical confirmation is mandatory
-constexpr float MEDICATION_RATE_LIMIT_STEP_MG_PER_SEC = 5.0f;   ///< Maximum allowable dosage slew rate (+5.0 mg/hr per second)
 
 /**
  * @brief Constrains a requested dosage value to the valid infusion scale [0.0 - 100.0 mg/hr].
@@ -62,52 +60,8 @@ inline float clampMedicationDosage(float value)
     return value;
 }
 
-/**
- * @brief Computes rate-limited dosage progression toward a goal.
- *
- * Implements asymmetric rate limiting:
- * - Downward adjustments are applied immediately.
- * - Upward adjustments are constrained to MEDICATION_RATE_LIMIT_STEP_MG_PER_SEC (+5.0 mg/hr per sec).
- * - Initial call or zero timestamp establishes the baseline timestamp with zero initial step.
- * - Interruptions >= 60,000 ms re-anchor the timestamp without catch-up increase to prevent runaway dosing.
- * - Unsigned 32-bit math safely handles millis() rollover at ~49.7 days.
- *
- * @param currentApplied Current delivered dosage in mg/hr.
- * @param goal Target dosage in mg/hr.
- * @param now Current timestamp in milliseconds.
- * @param lastRateLimitUpdateMs Reference to baseline timestamp (updated on progression/re-anchor).
- * @return float New applied dosage in mg/hr.
- */
-inline float stepMedicationSlewRate(float currentApplied, float goal, uint32_t now, uint32_t &lastRateLimitUpdateMs)
-{
-    if (goal > currentApplied) {
-        float elapsedSeconds = 0.0f;
-        if (lastRateLimitUpdateMs != 0U) {
-            uint32_t deltaMs = now - lastRateLimitUpdateMs;
-            if (deltaMs > 0U && deltaMs < 60000U) {
-                elapsedSeconds = static_cast<float>(deltaMs) / 1000.0f;
-            } else if (deltaMs >= 60000U) {
-                // Task was delayed or suspended >= 60s: refresh baseline timestamp without catch-up spike
-                lastRateLimitUpdateMs = now;
-            }
-        } else {
-            // First upward adjustment initializes baseline timestamp without an instantaneous step
-            lastRateLimitUpdateMs = now;
-        }
-
-        if (elapsedSeconds > 0.0f) {
-            const float maxIncrease = MEDICATION_RATE_LIMIT_STEP_MG_PER_SEC * elapsedSeconds;
-            const float allowedIncrease = min(maxIncrease, goal - currentApplied);
-            currentApplied += allowedIncrease;
-            lastRateLimitUpdateMs = now;
-        }
-    } else {
-        currentApplied = goal;
-        lastRateLimitUpdateMs = now;
-    }
-
-    return constrain(currentApplied, MEDICATION_DOSAGE_MIN, MEDICATION_DOSAGE_MAX);
-}
+constexpr float MEDICATION_CRITICAL_DOSAGE_THRESHOLD = 80.0f;    ///< Boundary above which physical confirmation is mandatory
+constexpr float MEDICATION_RATE_LIMIT_STEP_MG_PER_SEC = 5.0f;   ///< Maximum allowable dosage slew rate (+5.0 mg/hr per second)
 
 /**
  * @brief Classifies an applied dosage into its clinical risk tier.
@@ -147,6 +101,50 @@ inline const char *getMedicationSafetyLabel(float dosage)
         default:
             return "NORMAL";
     }
+}
+
+/**
+ * @brief Computes one rate-limited upward step for medication infusion (Task 3).
+ *
+ * Implements max +5.0 mg/hr/s ramping. Rejects zero elapsed time, handles unsigned
+ * 32-bit timer rollover gracefully, and refreshes the baseline timestamp without
+ * an abrupt jump if the task is interrupted or starved for >= 60 seconds.
+ *
+ * @param current Currently applied dosage in mg/hr.
+ * @param goal Target dosage limit in mg/hr.
+ * @param lastUpdateMs Reference to the previous timestamp in milliseconds (in/out).
+ * @param now Current timestamp in milliseconds.
+ * @return float Updated dosage in mg/hr.
+ */
+inline float calculateSlewStep(float current, float goal, uint32_t &lastUpdateMs, uint32_t now)
+{
+    if (goal <= current) {
+        lastUpdateMs = now;
+        return goal;
+    }
+
+    float elapsedSeconds = 0.0f;
+    if (lastUpdateMs != 0U) {
+        uint32_t deltaMs = now - lastUpdateMs;
+        if (deltaMs > 0U && deltaMs < 60000U) {
+            elapsedSeconds = static_cast<float>(deltaMs) / 1000.0f;
+        } else if (deltaMs >= 60000U) {
+            // Task was interrupted or starved for >= 60s: refresh baseline timestamp without jump
+            lastUpdateMs = now;
+        }
+    } else {
+        // First upward adjustment initializes baseline timestamp without an instantaneous step
+        lastUpdateMs = now;
+    }
+
+    if (elapsedSeconds > 0.0f) {
+        const float maxIncrease = MEDICATION_RATE_LIMIT_STEP_MG_PER_SEC * elapsedSeconds;
+        const float allowedIncrease = min(maxIncrease, goal - current);
+        current += allowedIncrease;
+        lastUpdateMs = now;
+    }
+
+    return current;
 }
 
 #endif

@@ -189,7 +189,6 @@ void handleSerialCommands()
 void simulateFacilityData()
 {
     FacilityTelemetry nextState = getFacilitySnapshot();
-    nextState.initialFacilityProcessed = true;
 
     const float roomDelta = random(-4, 5) * 0.4f;
     const float oxygenDelta = random(-3, 3) * 0.2f;
@@ -212,6 +211,8 @@ void simulateFacilityData()
     } else {
         nextState.aqi = constrain(35 + aqiDelta, 0, 200);
     }
+
+    nextState.initialFacilityProcessed = true;
 
     portENTER_CRITICAL(&telemetryMux);
     const bool wasAbnormal = facilityTelemetry.alertActive;

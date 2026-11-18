@@ -34,14 +34,6 @@ void medicationInit()
     pinMode(PUSHBUTTON_PIN, INPUT_PULLUP);
 }
 
-/**
- * @brief Validates and constrains medication dosage within safe physical boundaries.
- *
- * @param value Desired dosage in mg/hr.
- * @return float Clamped value between 0.0 and 100.0 mg/hr (non-finite values return 0.0).
- */
-// clampMedicationDosage, getMedicationSafetyLevel, getMedicationSafetyLabel,
-// and stepMedicationSlewRate are declared inline in medication.h for zero-overhead unit testing.
 
 /**
  * @brief Advances dosage rate towards requested target subject to safety limits and confirmation.
@@ -49,14 +41,12 @@ void medicationInit()
  * Algorithm Details:
  * 1. Reads current control state under spinlock critical section.
  * 2. Clamps requested target between 0.0 and 100.0 mg/hr.
- * 3. Enforces Critical Confirmation Interlock (Range Authorization Policy):
+ * 3. Enforces Critical Confirmation Interlock:
  *    - If target > 80.0 mg/hr and not yet confirmed, state.criticalConfirmationPending is set true
  *      and effective goal is capped at 80.0 mg/hr.
- *    - Once confirmed via physical pushbutton, the entire critical range (>80.0 mg/hr) remains
- *      authorized until target dosage is reduced <= 80.0 mg/hr.
- *    - If target is reduced <= 80.0 mg/hr, pending and confirmed statuses are automatically cleared.
+ *    - If target is reduced <= 80.0 mg/hr, pending status is automatically cleared.
  * 4. Asymmetric Rate Limiting:
- *    - Upward adjustments are rate-limited to +5.0 mg/hr per second based on elapsed time via stepMedicationSlewRate().
+ *    - Upward adjustments are rate-limited to +5.0 mg/hr per second based on elapsed time.
  *    - Downward adjustments occur immediately to allow instant cessation or reduction of infusion.
  * 5. Commits updated applied dosage and control flags back under spinlock critical section.
  */
@@ -87,7 +77,9 @@ static void updateMedicationDosageFromRequest()
     }
 
     const float goal = state.criticalConfirmationPending ? MEDICATION_CRITICAL_DOSAGE_THRESHOLD : targetDosage;
-    state.applied = stepMedicationSlewRate(state.applied, goal, now, state.lastRateLimitUpdateMs);
+    state.applied = calculateSlewStep(state.applied, goal, state.lastRateLimitUpdateMs, now);
+
+    state.applied = constrain(state.applied, MEDICATION_DOSAGE_MIN, MEDICATION_DOSAGE_MAX);
 
     portENTER_CRITICAL(&telemetryMux);
     medicationDosageControl.applied = state.applied;

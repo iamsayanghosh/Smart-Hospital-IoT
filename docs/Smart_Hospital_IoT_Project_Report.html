@@ -328,8 +328,9 @@
     role-based cloud publishing via MQTT, closed-loop safety actuation, and an advanced fault-tolerant offline detection and replay engine.
   </p>
   <p>
-    The firmware executes on FreeRTOS Symmetric Multiprocessing (SMP), allocating network protocol stacks (Wi-Fi 802.11 and lwIP TCP/IP) to 
-    <strong>Core 0</strong> while pinning all 13 prioritized application tasks to <strong>Core 1</strong> (where the Arduino background <code>loopTask</code> also resides). Inter-task 
+    The firmware executes on FreeRTOS Symmetric Multiprocessing (SMP), allocating network protocol stacks (Wi-Fi and lwIP) to 
+    <strong>Core 0</strong> while assigning all 13 prioritized application tasks (coexisting with Arduino's low-overhead <code>loopTask</code>) to 
+    <strong>Core 1</strong>. Inter-task 
     communication is strictly synchronized using thread-safe FreeRTOS mutexes, queues, and spinlocks to prevent race conditions across shared telemetry and peripherals. 
     A dual-tier watchdog supervisor couples the hardware ESP-IDF Task Watchdog Timer (TWDT) with an application heartbeat monitor to provide 
     robust supervisory fault detection and automated recovery.
@@ -339,8 +340,8 @@
     <strong>Key Project Accomplishments:</strong>
     <ul>
       <li><strong>Unified Single-Project Integration:</strong> All 6 assigned internship tasks run simultaneously in one firmware image without blocking delays (0 ms Arduino <code>delay()</code>).</li>
-      <li><strong>Resource Efficiency:</strong> Static RAM utilization measured at <strong>15.1%</strong> (49,536 B of 327,680 B data SRAM budget; 520 KB physical on-chip SRAM) and Flash at <strong>80.1%</strong> (1,050,290 B of 1,310,720 B), leaving healthy runtime dynamic heap for FreeRTOS queues.</li>
-      <li><strong>Automated Test Suite:</strong> 21 unit tests covering strict numeric string parsing, boundary limits, medication safety clamping, and slew rate progression (including 20 ms increments, 60-second interruption recovery, and rollover safety) are build-verified for the ESP32 platform via PlatformIO Unity.</li>
+      <li><strong>Resource Efficiency:</strong> Static RAM utilization measured at <strong>15.1%</strong> (49,536 B of 327,680 B data SRAM budget; 520 KB physical on-chip SRAM) and Flash at <strong>80.2%</strong> (1,050,606 B of 1,310,720 B), leaving healthy runtime dynamic heap for FreeRTOS queues.</li>
+      <li><strong>Automated Test Suite:</strong> 21 unit tests covering strict numeric string parsers, medication dosage safety clamping, discrete clinical tiers, and rate-limiting slew mechanics (20 ms increments, long interruption recovery, timer rollover, immediate downward adjustment) are build-verified for the ESP32 platform via PlatformIO Unity.</li>
       <li><strong>Open Source &amp; Credentials Safety:</strong> Released under the MIT License with complete credential isolation (private keys never committed to Git).</li>
     </ul>
   </div>
@@ -388,7 +389,7 @@
         <td>Digital Input</td>
         <td><code>GPIO 13</code></td>
         <td>Internal pull-up, active-low, 50 ms debounce</td>
-        <td>Task 3: Physical remote-request/local-confirmation interlock for dosage &gt;80 mg/hr</td>
+        <td>Task 3: Dual-channel physical bedside confirmation interlock for dosage &gt;80 mg/hr</td>
       </tr>
       <tr>
         <td><strong>Red Indicator LED</strong></td>
@@ -415,7 +416,7 @@
         <td><strong>Piezo Buzzer</strong></td>
         <td>PWM Tone Output</td>
         <td><code>GPIO 14</code></td>
-        <td>1200 Hz tone generator (&le;20 mA direct drive on GPIO 14, or buffered via external NPN driver for physical buzzer coils)</td>
+        <td>Direct drive, 1200 Hz tone generator</td>
         <td>Task 3 critical alarm &amp; Task 6 network failure cadences</td>
       </tr>
       <tr>
@@ -441,8 +442,8 @@
   <h1>2. Concurrency Model &amp; FreeRTOS Task Scheduling (Task 1)</h1>
   <p>
     The system utilizes FreeRTOS Symmetric Multiprocessing (SMP) to execute 13 application tasks concurrently across a 
-    strict priority hierarchy. All 13 application tasks are pinned to <strong>Core 1</strong> (sharing scheduler cycles with the Arduino background <code>loopTask</code>), while <strong>Core 0</strong> 
-    executes the ESP-IDF radio stack (Wi-Fi and lwIP TCP/IP protocol processing).
+    strict priority hierarchy. All application worker tasks are pinned to <strong>Core 1</strong> (coexisting alongside Arduino's minimal <code>loopTask</code>), dedicating <strong>Core 0</strong> 
+    exclusively to Wi-Fi and TCP/IP protocol processing.
   </p>
 
   <table>
@@ -666,7 +667,7 @@
     <text x="15" y="568" fill="#6ee7b7" font-size="12" font-weight="bold">ESP32 DevKit v4 SoC Specs</text>
     <text x="15" y="586" fill="#ecfdf5" font-size="11">&#8226; Dual Tensilica Xtensa LX6 @ 240 MHz</text>
     <text x="15" y="602" fill="#ecfdf5" font-size="11">&#8226; 320 KB SRAM (15.1% static / 49.5 KB)</text>
-    <text x="15" y="618" fill="#ecfdf5" font-size="11">&#8226; 1.31 MB app partition (80.1% utilized / 1.05 MB)</text>
+    <text x="15" y="618" fill="#ecfdf5" font-size="11">&#8226; 1.31 MB app partition (80.2% utilized / 1.05 MB)</text>
     <text x="15" y="634" fill="#ecfdf5" font-size="11">&#8226; Hardware TWDT (8000 ms panic)</text>
     <text x="15" y="650" fill="#ecfdf5" font-size="11">&#8226; 0 ms Arduino delay() &#8226; FreeRTOS Task Yielding</text>
   </g>
@@ -1156,7 +1157,7 @@
   <ul>
     <li><strong>Safety Tiers:</strong> Normal (0.0 - 79.9 mg/hr, Solid Green LED), Warning (80.0 mg/hr, Solid Yellow LED), and Critical (&gt;80.0 mg/hr).</li>
     <li><strong>Rate Limiting:</strong> Maximum upward slew rate clamped to <strong>+5.0 mg/hr per second</strong> (<code>MEDICATION_RATE_LIMIT_STEP_MG_PER_SEC = 5.0f</code>), preventing abrupt dosage spikes.</li>
-    <li><strong>Remote-Request / Local-Physical-Confirmation Interlock:</strong> Any commanded dosage &gt;80 mg/hr clamps the applied rate at 80.0 mg/hr, enters a pending confirmation state, flashes the Red LED and 1200 Hz buzzer rapidly at ~3.3 Hz (300 ms period: 150 ms ON / 150 ms OFF), and prompts <code>PRESS BUTTON</code> on the OLED. Under the firmware's <em>Range Authorization Policy</em>, once confirmed by physical pushbutton press on <code>GPIO 13</code>, the entire critical range (&gt;80 mg/hr) remains authorized until dosage is reduced &le;80 mg/hr, upon which authorization auto-clears. If the physician reduces target dosage &le;80 mg/hr while pending, the pending confirmation state immediately cancels.</li>
+    <li><strong>Dual-Channel Physical Bedside Interlock:</strong> Any commanded dosage &gt;80 mg/hr clamps the applied rate at 80.0 mg/hr, flashes the Red LED and 1200 Hz buzzer rapidly at ~3.3 Hz (300 ms period: 150 ms ON / 150 ms OFF), and prompts <code>PRESS BUTTON</code> on the OLED. The applied dosage remains held at 80.0 mg/hr indefinitely until the clinician physically confirms the override by pressing the bedside button on <code>GPIO 13</code> or reduces the target dosage back to &le;80 mg/hr. <em>Range Authorization Policy:</em> Once physically confirmed at bedside for a critical rate, adjustments within the critical band (&gt;80.0 mg/hr) remain authorized without re-prompting; dropping dosage back to &le;80.0 mg/hr automatically clears confirmation and re-arms the interlock.</li>
   </ul>
 
   <h2>Task 4: Intelligent Remote Bed Elevation Control</h2>
@@ -1173,12 +1174,12 @@
 
   <h2>Task 5: Smart Dynamic Sampling Rate (Adaptive Monitoring)</h2>
   <p>
-    To optimize battery life and bus utilization, <code>samplingTask</code> dynamically adjusts the patient vital/temperature acquisition (sampling) interval based on patient stability, while ECG (100 Hz / 10 ms), PIR motion (1 Hz), and MQTT telemetry transmission (independent 3-second round-robin cycle) remain on their fixed schedules:
+    To optimize battery life and bus utilization, <code>samplingTask</code> dynamically adjusts the sensor acquisition (sampling) interval based on patient stability (while MQTT telemetry transmission remains on its independent 3-second round-robin cycle):
   </p>
   <ul>
-    <li><strong>Abnormal State:</strong> Once an abnormal vital sign is acquired, vital/temperature sampling automatically accelerates to <strong>5 seconds</strong>. (During 60-second stable mode, discrete sampling introduces an acquisition latency of up to 60 seconds before an acute vital fluctuation is sampled).</li>
-    <li><strong>Stable State:</strong> Automatically relaxes vital/temperature sampling to <strong>60 seconds</strong> (<code>AUTO_INTERVAL_STABLE_MS = 60000</code>) when vitals return to normal.</li>
-    <li><strong>Manual Override:</strong> Dashboard slider permits clinician adjustments between 5 and 60 seconds. Clinical severity escalation to Critical immediately revokes slower overrides and forces 5-second sampling.</li>
+    <li><strong>Abnormal State:</strong> Once an abnormal vital sign is acquired, sampling automatically accelerates to <strong>5 seconds</strong>. (During 60-second stable mode, discrete sampling introduces an acquisition latency of up to 60 seconds before an acute vital fluctuation is sampled).</li>
+    <li><strong>Stable State:</strong> Automatically relaxes sampling to <strong>60 seconds</strong> (<code>AUTO_INTERVAL_STABLE_MS = 60000</code>) when vitals return to normal.</li>
+    <li><strong>Manual Override:</strong> Dashboard slider permits clinician adjustments between 5 and 60 seconds. Clinical severity escalation to Critical immediately revokes slower overrides.</li>
   </ul>
 
   <h2>Task 6: Advanced Offline Detection (Fault-Tolerant System)</h2>
@@ -1218,9 +1219,9 @@
       </tr>
       <tr>
         <td><strong>Flash Memory</strong></td>
-        <td>1,050,290 Bytes</td>
+        <td>1,050,606 Bytes</td>
         <td>1,310,720 Bytes</td>
-        <td><strong>80.1%</strong></td>
+        <td><strong>80.2%</strong></td>
         <td>Fits comfortably within default 1.31 MB application partition (app0).</td>
       </tr>
       <tr>
@@ -1253,9 +1254,8 @@
 
   <h2>Automated Unit Testing (PlatformIO Unity)</h2>
   <p>
-    Unit tests implemented under <code>test/test_main.cpp</code> define 21 test cases covering strict numeric string parsing 
-    (validating against NaN, Infinity, negative boundaries, float integers, and trailing characters), medication dosage clamping, 
-    risk tier categorization, and asymmetric slew rate progression (20 ms normal increments, zero initial step, 60-second task interruption re-anchoring, and millis() rollover handling).
+    Unit tests implemented under <code>test/test_main.cpp</code> define 21 test cases covering strict numeric string parsers 
+    (validating against NaN, Infinity, negative boundaries, float integers, and trailing characters), medication dosage safety clamping, discrete clinical tiers, and rate-limiting slew mechanics (20 ms increments, long interruption recovery, timer rollover, immediate downward adjustment).
   </p>
   <p>
     The test suite is build-verified using PlatformIO:

@@ -190,19 +190,19 @@ String buildFacilitySummaryPayload(float averageRoomTemperature, float averageOx
  */
 String buildHospitalSummaryPayload(const char *averageHeartRateStr, const char *minimumSpo2Str, const char *maxBodyTempStr,
                                   uint32_t medicalSampleCount, uint32_t medicalAbnormalCount, uint32_t medicalCriticalCount,
-                                  float averageRoomTemperature, float averageOxygen, float averageAqi,
+                                  const char *averageRoomTempStr, const char *averageOxygenStr, const char *averageAqiStr,
                                   uint32_t facilitySampleCount, uint32_t facilityAbnormalCount, uint32_t facilityCriticalCount)
 {
-    const char *medicalStatus = (medicalCriticalCount > 0) ? "CRITICAL" : (medicalAbnormalCount > 0 ? "WARNING" : (medicalSampleCount > 0 ? "NORMAL" : "N/A"));
-    const char *facilityStatus = (facilityCriticalCount > 0) ? "CRITICAL" : (facilityAbnormalCount > 0 ? "WARNING" : (facilitySampleCount > 0 ? "NORMAL" : "N/A"));
+    const char *medicalStatus = (medicalSampleCount == 0 && medicalCriticalCount == 0 && medicalAbnormalCount == 0) ? "N/A" : ((medicalCriticalCount > 0) ? "CRITICAL" : (medicalAbnormalCount > 0 ? "WARNING" : "NORMAL"));
+    const char *facilityStatus = (facilitySampleCount == 0 && facilityCriticalCount == 0 && facilityAbnormalCount == 0) ? "N/A" : ((facilityCriticalCount > 0) ? "CRITICAL" : (facilityAbnormalCount > 0 ? "WARNING" : "NORMAL"));
 
     char payload[620];
     snprintf(payload, sizeof(payload),
-             "HOSPITAL SUMMARY\n==============================\n\nMEDICAL SUMMARY\n\nAverage HR: %s\nMinimum SpO2: %s\nMaximum Body Temperature: %s\n\nSamples: %lu\nAbnormal Readings: %lu\n\nStatus: %s\n\n\nFACILITY SUMMARY\n\nAverage Room Temperature: %.2f °C\nAverage Oxygen: %.2f %%\nAverage AQI: %.2f\n\nSnapshots: %lu\nAbnormal Readings: %lu\n\nStatus: %s",
+             "HOSPITAL SUMMARY\n==============================\n\nMEDICAL SUMMARY\n\nAverage HR: %s\nMinimum SpO2: %s\nMaximum Body Temperature: %s\n\nSamples: %lu\nAbnormal Readings: %lu\n\nStatus: %s\n\n\nFACILITY SUMMARY\n\nAverage Room Temperature: %s\nAverage Oxygen: %s\nAverage AQI: %s\n\nSnapshots: %lu\nAbnormal Readings: %lu\n\nStatus: %s",
              averageHeartRateStr, minimumSpo2Str, maxBodyTempStr,
              static_cast<unsigned long>(medicalSampleCount), static_cast<unsigned long>(medicalAbnormalCount),
              medicalStatus,
-             averageRoomTemperature, averageOxygen, averageAqi,
+             averageRoomTempStr, averageOxygenStr, averageAqiStr,
              static_cast<unsigned long>(facilitySampleCount), static_cast<unsigned long>(facilityAbnormalCount),
              facilityStatus);
     return String(payload);
@@ -213,16 +213,16 @@ String buildHospitalSummaryPayload(const char *averageHeartRateStr, const char *
  */
 String buildCompactHospitalSummaryPayload(const char *averageHeartRateStr, const char *minimumSpo2Str, const char *maxBodyTempStr,
                                          uint32_t medicalAbnormalCount, uint32_t medicalCriticalCount,
-                                         float averageOxygen, uint32_t facilityAbnormalCount, uint32_t facilityCriticalCount)
+                                         const char *averageOxygenStr, uint32_t facilityAbnormalCount, uint32_t facilityCriticalCount)
 {
     const char *medStat = (medicalCriticalCount > 0) ? "CRIT" : (medicalAbnormalCount > 0 ? "WARN" : "NORM");
     const char *facStat = (facilityCriticalCount > 0) ? "CRIT" : (facilityAbnormalCount > 0 ? "WARN" : "NORM");
 
     char payload[220];
     snprintf(payload, sizeof(payload),
-             "SUMMARY: Med[HR:%s,SpO2:%s,Temp:%s,%s] Fac[O2:%.1f%%,%s]",
+             "SUMMARY: Med[HR:%s,SpO2:%s,Temp:%s,%s] Fac[O2:%s,%s]",
              averageHeartRateStr, minimumSpo2Str, maxBodyTempStr, medStat,
-             averageOxygen, facStat);
+             averageOxygenStr, facStat);
     return String(payload);
 }
 
@@ -239,7 +239,7 @@ bool configureMqttBuffer()
 {
     String sizingPayload = buildHospitalSummaryPayload(
         "999.99 BPM", "100 %", "999.99 °C", UINT32_MAX, UINT32_MAX, UINT32_MAX,
-        999.99f, 999.99f, 999.99f, UINT32_MAX, UINT32_MAX, UINT32_MAX);
+        "999.99 °C", "999.99 %", "999.99", UINT32_MAX, UINT32_MAX, UINT32_MAX);
     String hospitalEventsTopic = getAioFeedTopic(HOSPITAL_EVENTS_FEED);
     const uint16_t requiredPacketSize = MQTT_MAX_HEADER_SIZE + 2 + hospitalEventsTopic.length() + sizingPayload.length();
     const uint16_t configuredBufferSize = requiredPacketSize + MQTT_SUMMARY_BUFFER_MARGIN;
@@ -724,9 +724,22 @@ void publishSummaryData(bool offline)
         snprintf(maxTempBuf, sizeof(maxTempBuf), "N/A");
     }
 
-    const float facilityAverageRoomTemperature = facilitySummaryStats.sampleCount > 0 ? facilitySummaryStats.roomTemperatureTotal / facilitySummaryStats.sampleCount : (facilitySnapshot.initialFacilityProcessed ? facilitySnapshot.roomTemperature : 0.0f);
-    const float facilityAverageOxygen = facilitySummaryStats.sampleCount > 0 ? facilitySummaryStats.oxygenTotal / facilitySummaryStats.sampleCount : (facilitySnapshot.initialFacilityProcessed ? facilitySnapshot.oxygenLevel : 0.0f);
-    const float facilityAverageAqi = facilitySummaryStats.sampleCount > 0 ? facilitySummaryStats.aqiTotal / facilitySummaryStats.sampleCount : (facilitySnapshot.initialFacilityProcessed ? static_cast<float>(facilitySnapshot.aqi) : 0.0f);
+    char roomTempBuf[32];
+    char oxygenBuf[32];
+    char aqiBuf[32];
+    if (facilitySummaryStats.sampleCount > 0) {
+        snprintf(roomTempBuf, sizeof(roomTempBuf), "%.2f °C", facilitySummaryStats.roomTemperatureTotal / facilitySummaryStats.sampleCount);
+        snprintf(oxygenBuf, sizeof(oxygenBuf), "%.2f %%", facilitySummaryStats.oxygenTotal / facilitySummaryStats.sampleCount);
+        snprintf(aqiBuf, sizeof(aqiBuf), "%.2f", facilitySummaryStats.aqiTotal / facilitySummaryStats.sampleCount);
+    } else if (facilitySnapshot.initialFacilityProcessed) {
+        snprintf(roomTempBuf, sizeof(roomTempBuf), "%.2f °C", facilitySnapshot.roomTemperature);
+        snprintf(oxygenBuf, sizeof(oxygenBuf), "%.2f %%", facilitySnapshot.oxygenLevel);
+        snprintf(aqiBuf, sizeof(aqiBuf), "%d", facilitySnapshot.aqi);
+    } else {
+        snprintf(roomTempBuf, sizeof(roomTempBuf), "N/A");
+        snprintf(oxygenBuf, sizeof(oxygenBuf), "N/A");
+        snprintf(aqiBuf, sizeof(aqiBuf), "N/A");
+    }
 
     String hospitalSummaryPayload;
     if (mqttClient.getBufferSize() >= 400) {
@@ -737,9 +750,9 @@ void publishSummaryData(bool offline)
             medicalSummaryStats.sampleCount,
             medicalSummaryStats.abnormalCount,
             medicalSummaryStats.criticalCount,
-            facilityAverageRoomTemperature,
-            facilityAverageOxygen,
-            facilityAverageAqi,
+            roomTempBuf,
+            oxygenBuf,
+            aqiBuf,
             facilitySummaryStats.sampleCount,
             facilitySummaryStats.abnormalCount,
             facilitySummaryStats.criticalCount);
@@ -750,7 +763,7 @@ void publishSummaryData(bool offline)
             maxTempBuf,
             medicalSummaryStats.abnormalCount,
             medicalSummaryStats.criticalCount,
-            facilityAverageOxygen,
+            oxygenBuf,
             facilitySummaryStats.abnormalCount,
             facilitySummaryStats.criticalCount);
     }
