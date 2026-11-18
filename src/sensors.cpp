@@ -146,10 +146,20 @@ void temperatureTask(void *parameter) {
   uint32_t lastSampleMs = 0;
   uint32_t requestStartMs = 0;
   bool hasReadValidTemperature = false;
+  bool pendingTempDisconnectMessage = false;
 
   while (true) {
     uint32_t now = millis();
     uint32_t period = getSamplePeriodMs(TASK_TEMP);
+
+    if (pendingTempDisconnectMessage) {
+      SensorMessage retryMsg = {};
+      retryMsg.type = TEMP_DATA;
+      retryMsg.temperature = DEVICE_DISCONNECTED_C;
+      if (sendSensorMessage(retryMsg, "TEMP TASK")) {
+        pendingTempDisconnectMessage = false;
+      }
+    }
 
     // Consume immediate sample request unconditionally to prevent duplicate samples
     bool forced = simImmediateTempSample.exchange(false);
@@ -164,6 +174,7 @@ void temperatureTask(void *parameter) {
       float overrideTemp = simOverrideTemperature.load();
       if (overrideTemp > -100.0f) {
         hasReadValidTemperature = true;
+        pendingTempDisconnectMessage = false;
         SensorMessage message = {};
         message.type = TEMP_DATA;
         message.temperature = overrideTemp;
@@ -187,7 +198,7 @@ void temperatureTask(void *parameter) {
 
       // Distinguish initial cold-boot scratchpad (+85.0 C) from runtime sensor reset
       if (abs(rawTemp - 85.0f) <= 0.05f) {
-        if (!hasReadValidTemperature) {
+        if (!hasReadValidTemperature && !pendingTempDisconnectMessage) {
           Serial.println("[TEMP TASK] Ignored initial DS18B20 power-on reset scratchpad "
                          "reading (85.0 C)");
         } else {
@@ -196,7 +207,11 @@ void temperatureTask(void *parameter) {
           SensorMessage message = {};
           message.type = TEMP_DATA;
           message.temperature = DEVICE_DISCONNECTED_C;
-          sendSensorMessage(message, "TEMP TASK");
+          if (!sendSensorMessage(message, "TEMP TASK")) {
+            pendingTempDisconnectMessage = true;
+          } else {
+            pendingTempDisconnectMessage = false;
+          }
         }
       } else if (rawTemp == DEVICE_DISCONNECTED_C || rawTemp <= -55.0f ||
                  rawTemp > 125.0f) {
@@ -205,9 +220,14 @@ void temperatureTask(void *parameter) {
         SensorMessage message = {};
         message.type = TEMP_DATA;
         message.temperature = DEVICE_DISCONNECTED_C;
-        sendSensorMessage(message, "TEMP TASK");
+        if (!sendSensorMessage(message, "TEMP TASK")) {
+          pendingTempDisconnectMessage = true;
+        } else {
+          pendingTempDisconnectMessage = false;
+        }
       } else {
         hasReadValidTemperature = true;
+        pendingTempDisconnectMessage = false;
         SensorMessage message = {};
         message.type = TEMP_DATA;
         message.temperature = rawTemp;

@@ -79,7 +79,11 @@ void alertTask(void *parameter)
             }
 
             if (!medAbnormal && !facAbnormal) {
-                Serial.println("[ALERT TASK] Alert status cleared: All clinical and facility parameters nominal");
+                if (snapshot.temperatureValid) {
+                    Serial.println("[ALERT TASK] Alert status cleared: All clinical and facility parameters nominal");
+                } else {
+                    Serial.println("[ALERT TASK] Alert status: Body temperature sensor unavailable; cannot confirm nominal status");
+                }
             }
         }
     }

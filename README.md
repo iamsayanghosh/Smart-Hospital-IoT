@@ -5,18 +5,18 @@
 [![PlatformIO](https://img.shields.io/badge/Build-PlatformIO%20Passing-brightgreen.svg)](https://platformio.org/)
 [![Wokwi Simulation](https://img.shields.io/badge/Simulation-Wokwi%20Live-orange.svg)](https://wokwi.com/projects/479638666615150593)
 [![License](https://img.shields.io/badge/License-MIT-lightgrey.svg)](LICENSE)
-[![Project Report](https://img.shields.io/badge/Report-PDF%20Available-red.svg)](docs/Smart_Hospital_IoT_Project_Report.pdf)
+[![Project Report](https://img.shields.io/badge/Report-PDF%20Available-red.svg)](https://github.com/iamsayanghosh/Smart-Hospital-IoT/blob/main/docs/Smart_Hospital_IoT_Project_Report.pdf)
 
 A concurrent medical telemetry and facility management firmware prototype implemented on the ESP32 microcontroller using the Arduino framework and FreeRTOS SMP.
 
 * **Live Wokwi Simulation:** [wokwi.com/projects/479638666615150593](https://wokwi.com/projects/479638666615150593)
 * **GitHub Repository:** [github.com/iamsayanghosh/Smart-Hospital-IoT](https://github.com/iamsayanghosh/Smart-Hospital-IoT)
 * **Target Hardware:** Espressif ESP32 DevKit v4 (Dual-Core Xtensa 240 MHz, 320 KB SRAM)
-* **Project Report (PDF):** [docs/Smart_Hospital_IoT_Project_Report.pdf](docs/Smart_Hospital_IoT_Project_Report.pdf)
+* **Project Report (PDF):** [Smart_Hospital_IoT_Project_Report.pdf](https://github.com/iamsayanghosh/Smart-Hospital-IoT/blob/main/docs/Smart_Hospital_IoT_Project_Report.pdf)
 
 > **Disclaimer:** This project is an embedded systems engineering prototype and educational simulation developed for academic and technical evaluation. It is not a certified medical device and must not be used for actual clinical diagnosis, life support, or operational medical administration.
-* **System Architecture Blueprint:** [docs/diagrams/system_architecture.svg](docs/diagrams/system_architecture.svg) | [PNG](docs/diagrams/system_architecture.png)
-* **System Workflow Diagram:** [docs/diagrams/workflow_block_diagram.svg](docs/diagrams/workflow_block_diagram.svg) | [PNG](docs/diagrams/workflow_block_diagram.png)
+* **System Architecture Blueprint:** [system_architecture.svg](https://github.com/iamsayanghosh/Smart-Hospital-IoT/blob/main/docs/diagrams/system_architecture.svg) | [PNG](https://github.com/iamsayanghosh/Smart-Hospital-IoT/blob/main/docs/diagrams/system_architecture.png)
+* **System Workflow Diagram:** [workflow_block_diagram.svg](https://github.com/iamsayanghosh/Smart-Hospital-IoT/blob/main/docs/diagrams/workflow_block_diagram.svg) | [PNG](https://github.com/iamsayanghosh/Smart-Hospital-IoT/blob/main/docs/diagrams/workflow_block_diagram.png)
 
 ---
 
@@ -197,7 +197,7 @@ Smart-Hospital-IoT/
 │       ├── workflow_block_diagram.svg # End-to-End Workflow & Dataflow
 │       └── workflow_block_diagram.png # High-DPI Workflow Diagram
 ├── test/                             # Automated Unit Tests
-│   └── test_main.cpp                 # 15 Unity test cases
+│   └── test_main.cpp                 # 22 Unity test cases
 ├── diagram.json                      # Wokwi circuit schematic wiring
 ├── libraries.txt                     # Wokwi library manifest
 ├── platformio.ini                    # PlatformIO project configuration
@@ -272,7 +272,7 @@ pio run --target upload
   ```bash
   pio test -e esp32dev --without-uploading --without-testing
   ```
-  Unit tests are implemented under `test/test_main.cpp` covering 15 test cases for strict numeric string parsers (NaN, Inf, float integers, negative boundary handling) and medication dosage safety clamping.
+  Unit tests are implemented under `test/test_main.cpp` covering 22 test cases for strict numeric string parsers (NaN, Inf, float integers, negative boundary handling), medication dosage safety clamping, slew-rate timing mechanics, and telemetry validity guards.
 
 ---
 
@@ -281,7 +281,7 @@ pio run --target upload
 | Metric | Measured Value | Budget / Limit | Utilization |
 | :--- | :--- | :--- | :--- |
 | **Static RAM (SRAM)** | 49,536 Bytes | 327,680 Bytes | **15.1%** |
-| **Flash Memory** | 1,050,606 Bytes | 1,310,720 Bytes | **80.2%** |
+| **Flash Memory** | 1,051,002 Bytes | 1,310,720 Bytes | **80.2%** |
 | **FreeRTOS Application Tasks** | 13 tasks (all Core 1) | Dual Core Xtensa | Pinned to Core 1 (with loopTask) |
 | **Watchdog Timeout** | 8000 ms (Hardware TWDT) | 6000 ms (Heartbeat) | 100% monitored |
 | **Task Scheduling Delays** | 0 ms (Zero Arduino `delay()`) | Cooperative yielding | FreeRTOS `vTaskDelay` (peripheral I/O remains synchronous) |

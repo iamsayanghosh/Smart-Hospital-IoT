@@ -281,6 +281,20 @@ bool sendSensorMessage(const SensorMessage &message, const char *taskName);
 AlertSeverity evaluateClinicalSeverity(const Telemetry &data);
 
 /**
+ * @brief Assesses whether all mandatory medical vitals are available for full clinical clearance.
+ *
+ * Requires both initial vital signs acquisition and an active, valid temperature reading.
+ * An unavailable or disconnected sensor precludes asserting a definitive NORMAL status.
+ *
+ * @param data Patient telemetry snapshot.
+ * @return true if all required measurements are valid; false otherwise.
+ */
+inline bool isMedicalTelemetryFullyValid(const Telemetry &data)
+{
+    return data.initialVitalsProcessed && data.temperatureValid;
+}
+
+/**
  * @brief Analyzes patient telemetry and constructs an alert candidate if a threshold is violated.
  *
  * Evaluates physiological parameters in priority order: Heart Rate (<45 or >120 BPM Critical,

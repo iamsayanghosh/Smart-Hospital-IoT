@@ -569,6 +569,24 @@ void publishMedicalAlertIfNeeded(const Telemetry &snapshot, bool offline)
     AlertCandidate candidate = evaluateMedicalAlert(snapshot);
     const uint32_t now = millis();
     if (!candidate.active) {
+        if (!isMedicalTelemetryFullyValid(snapshot)) {
+            // Missing telemetry is not evidence of normal status: suppress false NORMAL
+            if (medicalAlertPublished && lastMedicalAlertParameter == "bodyTemperature") {
+                if (!medicalAlertStateKnown || now - lastMedicalAlertPublishMs >= ALERT_PUBLISH_INTERVAL_MS) {
+                    const char *faultPayload = "MEDICAL STATUS: SENSOR FAULT\nBody temperature sensor unavailable; clinical status unknown.";
+                    if (safePublish(getAioFeedTopic(HOSPITAL_EVENTS_FEED), String(faultPayload), offline)) {
+                        lastMedicalAlertPublishMs = now;
+                        medicalAlertStateKnown = true;
+                        medicalAlertPublished = false;
+                        medicalNormalPending = false;
+                        lastMedicalAlertParameter = "bodyTemperatureSensor";
+                        lastMedicalAlertSeverity = ALERT_SEVERITY_WARNING;
+                    }
+                }
+            }
+            return;
+        }
+
         if (medicalAlertPublished) {
             medicalAlertPublished = false;
             medicalNormalPending = true;

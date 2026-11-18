@@ -6,7 +6,7 @@
  * fulfilling all six course tasks:
  * - Task 1: Multi-Sensor Expansion Using FreeRTOS (DS18B20 temp, PIR motion, PPG vitals, ECG waveform).
  * - Task 2: Dual-Role IoT Monitoring System (Separate clinical vitals and facility environment feeds).
- * - Task 3: Smart Medication Dosage Safety (Rate-limited infusion pump with two-factor physical confirmation).
+ * - Task 3: Smart Medication Dosage Safety (Rate-limited infusion pump with remote-request / physical bedside confirmation interlock).
  * - Task 4: Intelligent Remote Bed Elevation (Automatic emergency/breathing elevation with doctor override).
  * - Task 5: Smart Dynamic Sampling Rate (60 s stable vs 5 s abnormal adaptive monitoring with doctor slider).
  * - Task 6: Advanced Offline Detection (Network failure sensing, local queue buffering, and acoustic alerts).

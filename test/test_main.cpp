@@ -157,6 +157,29 @@ void test_medication_safety_levels() {
     TEST_ASSERT_EQUAL(MEDICATION_SAFETY_CRITICAL, getMedicationSafetyLevel(100.0f));
 }
 
+void test_medical_telemetry_validity_distinguishes_normal_from_fault() {
+    Telemetry snap = {};
+    snap.initialVitalsProcessed = false;
+    snap.temperatureValid = false;
+
+    // 1. Initial boot: uninitialized telemetry is NOT fully valid (prevents false early NORMAL)
+    TEST_ASSERT_FALSE(isMedicalTelemetryFullyValid(snap));
+
+    // 2. Vitals active but temperature sensor disconnected: NOT fully valid (SENSOR FAULT / UNAVAILABLE)
+    snap.initialVitalsProcessed = true;
+    snap.temperatureValid = false;
+    TEST_ASSERT_FALSE(isMedicalTelemetryFullyValid(snap));
+
+    // 3. All sensors active and valid: fully valid for clinical clearance
+    snap.temperatureValid = true;
+    snap.temperature = 36.8f;
+    TEST_ASSERT_TRUE(isMedicalTelemetryFullyValid(snap));
+
+    // 4. Runtime DS18B20 85 C reset or disconnect: validity revoked immediately (prevents false NORMAL on fault)
+    snap.temperatureValid = false;
+    TEST_ASSERT_FALSE(isMedicalTelemetryFullyValid(snap));
+}
+
 void setup() {
     UNITY_BEGIN();
     RUN_TEST(test_parse_float_strict_valid);
@@ -180,6 +203,7 @@ void setup() {
     RUN_TEST(test_medication_slew_near_uint32_max_rollover);
     RUN_TEST(test_medication_downward_immediate);
     RUN_TEST(test_medication_safety_levels);
+    RUN_TEST(test_medical_telemetry_validity_distinguishes_normal_from_fault);
     UNITY_END();
 }
 
