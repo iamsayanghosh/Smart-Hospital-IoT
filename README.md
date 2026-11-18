@@ -185,7 +185,7 @@ Smart-Hospital-IoT/
 └── LICENSE                           # MIT Open Source License
 ```
 
-> **Documentation Assets Note:** Full PDF reports and vector architecture diagrams are maintained under `docs/` on the [GitHub repository](https://github.com/iamsayanghosh/Smart-Hospital-IoT/tree/main/docs) to ensure standalone source packages remain lightweight (<80 KB) and focused strictly on compilable firmware and configuration manifests.
+> **Documentation Assets Note:** Full PDF reports and vector architecture diagrams are maintained under `docs/` on the [GitHub repository](https://github.com/iamsayanghosh/Smart-Hospital-IoT/tree/main/docs) to ensure standalone source packages remain lightweight and focused strictly on compilable firmware, tests, and configuration manifests.
 
 ---
 
