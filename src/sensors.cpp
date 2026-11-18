@@ -192,6 +192,7 @@ void temperatureTask(void *parameter) {
                          "reading (85.0 C)");
         } else {
           Serial.println("[TEMP TASK] Warning: DS18B20 reset during operation (85.0 C scratchpad); marking unavailable");
+          hasReadValidTemperature = false;
           SensorMessage message = {};
           message.type = TEMP_DATA;
           message.temperature = DEVICE_DISCONNECTED_C;

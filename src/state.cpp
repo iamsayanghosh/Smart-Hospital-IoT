@@ -326,6 +326,10 @@ void updateMedicalSummaryStats(const Telemetry &snapshot)
  */
 void updateFacilitySummaryStats(const FacilityTelemetry &snapshot)
 {
+    if (!snapshot.initialFacilityProcessed) {
+        return;
+    }
+
     facilitySummaryStats.sampleCount += 1;
     facilitySummaryStats.roomTemperatureTotal += snapshot.roomTemperature;
     facilitySummaryStats.oxygenTotal += snapshot.oxygenLevel;

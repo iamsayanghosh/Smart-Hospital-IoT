@@ -105,6 +105,70 @@ void test_medication_clamping() {
     TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.0f, clampMedicationDosage(NAN));
 }
 
+void test_medication_slew_initial_zero() {
+    uint32_t lastUpdateMs = 0;
+    float applied = 10.0f;
+    float goal = 50.0f;
+    float result = stepMedicationSlewRate(applied, goal, 1000U, lastUpdateMs);
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 10.0f, result);
+    TEST_ASSERT_EQUAL_UINT32(1000U, lastUpdateMs);
+}
+
+void test_medication_slew_20ms_normal() {
+    uint32_t lastUpdateMs = 1000U;
+    float applied = 10.0f;
+    float goal = 50.0f;
+    // 20 ms elapsed: maxIncrease = 5.0 mg/hr/s * 0.020 s = 0.10 mg/hr
+    float result = stepMedicationSlewRate(applied, goal, 1020U, lastUpdateMs);
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 10.10f, result);
+    TEST_ASSERT_EQUAL_UINT32(1020U, lastUpdateMs);
+}
+
+void test_medication_slew_60s_interruption() {
+    uint32_t lastUpdateMs = 1000U;
+    float applied = 10.0f;
+    float goal = 50.0f;
+    // Interruption of 60,000 ms: should re-anchor timestamp without catch-up spike
+    float result = stepMedicationSlewRate(applied, goal, 61000U, lastUpdateMs);
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 10.0f, result);
+    TEST_ASSERT_EQUAL_UINT32(61000U, lastUpdateMs);
+
+    // Next 20 ms cycle resumes normal slew limiting
+    result = stepMedicationSlewRate(result, goal, 61020U, lastUpdateMs);
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 10.10f, result);
+    TEST_ASSERT_EQUAL_UINT32(61020U, lastUpdateMs);
+}
+
+void test_medication_slew_millis_wraparound() {
+    // uint32_t wraps at 4294967295. Set baseline 16 ms before wrap.
+    uint32_t lastUpdateMs = 0xFFFFFFF0U;
+    float applied = 10.0f;
+    float goal = 50.0f;
+    // now = 10 ms after wrap. Total deltaMs = 16 + 10 = 26 ms.
+    // maxIncrease = 5.0 * 0.026 = 0.13 mg/hr
+    float result = stepMedicationSlewRate(applied, goal, 10U, lastUpdateMs);
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 10.13f, result);
+    TEST_ASSERT_EQUAL_UINT32(10U, lastUpdateMs);
+}
+
+void test_medication_downward_immediate() {
+    uint32_t lastUpdateMs = 1000U;
+    float applied = 60.0f;
+    float goal = 20.0f;
+    // Downward adjustment is applied immediately without slew rate limiting
+    float result = stepMedicationSlewRate(applied, goal, 1020U, lastUpdateMs);
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 20.0f, result);
+    TEST_ASSERT_EQUAL_UINT32(1020U, lastUpdateMs);
+}
+
+void test_medication_safety_levels() {
+    TEST_ASSERT_EQUAL(MEDICATION_SAFETY_NORMAL, getMedicationSafetyLevel(0.0f));
+    TEST_ASSERT_EQUAL(MEDICATION_SAFETY_NORMAL, getMedicationSafetyLevel(79.9f));
+    TEST_ASSERT_EQUAL(MEDICATION_SAFETY_WARNING, getMedicationSafetyLevel(80.0f));
+    TEST_ASSERT_EQUAL(MEDICATION_SAFETY_CRITICAL, getMedicationSafetyLevel(80.1f));
+    TEST_ASSERT_EQUAL(MEDICATION_SAFETY_CRITICAL, getMedicationSafetyLevel(100.0f));
+}
+
 void setup() {
     UNITY_BEGIN();
     RUN_TEST(test_parse_float_strict_valid);
@@ -122,6 +186,12 @@ void setup() {
     RUN_TEST(test_parse_long_strict_invalid_negative);
     RUN_TEST(test_parse_long_strict_invalid_trailing);
     RUN_TEST(test_medication_clamping);
+    RUN_TEST(test_medication_slew_initial_zero);
+    RUN_TEST(test_medication_slew_20ms_normal);
+    RUN_TEST(test_medication_slew_60s_interruption);
+    RUN_TEST(test_medication_slew_millis_wraparound);
+    RUN_TEST(test_medication_downward_immediate);
+    RUN_TEST(test_medication_safety_levels);
     UNITY_END();
 }
 

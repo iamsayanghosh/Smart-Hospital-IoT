@@ -145,6 +145,7 @@ struct FacilityTelemetry {
     float oxygenLevel = 20.8f;
     int aqi = 35;
     bool alertActive = false;
+    bool initialFacilityProcessed = false;
 };
 
 struct MedicationDosageControl {

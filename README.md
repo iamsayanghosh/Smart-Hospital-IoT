@@ -272,7 +272,7 @@ pio run --target upload
   ```bash
   pio test -e esp32dev --without-uploading --without-testing
   ```
-  Unit tests are implemented under `test/test_main.cpp` covering 15 test cases for strict numeric string parsers (NaN, Inf, float integers, negative boundary handling) and medication dosage safety clamping.
+  Unit tests are implemented under `test/test_main.cpp` covering 21 test cases for strict numeric string parsers (NaN, Inf, float integers, negative boundary handling), medication dosage safety clamping, risk tier categorization, and slew rate progression (20 ms normal increments, zero initial step, 60-second interruption recovery, and rollover safety).
 
 ---
 
@@ -281,8 +281,8 @@ pio run --target upload
 | Metric | Measured Value | Budget / Limit | Utilization |
 | :--- | :--- | :--- | :--- |
 | **Static RAM (SRAM)** | 49,536 Bytes | 327,680 Bytes | **15.1%** |
-| **Flash Memory** | 1,050,258 Bytes | 1,310,720 Bytes | **80.1%** |
-| **FreeRTOS Application Tasks** | 13 tasks (all Core 1) | Dual Core Xtensa | Dedicated application core |
+| **Flash Memory** | 1,050,290 Bytes | 1,310,720 Bytes | **80.1%** |
+| **FreeRTOS Application Tasks** | 13 tasks (pinned to Core 1) | Dual Core Xtensa | Pinned application core |
 | **Watchdog Timeout** | 8000 ms (Hardware TWDT) | 6000 ms (Heartbeat) | 100% monitored |
 | **Task Scheduling Delays** | 0 ms (Zero Arduino `delay()`) | Cooperative yielding | FreeRTOS `vTaskDelay` (peripheral I/O remains synchronous) |
 

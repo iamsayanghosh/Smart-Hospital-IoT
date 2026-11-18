@@ -23,8 +23,6 @@
 #include <math.h>
 #include "esp_task_wdt.h"
 
-static constexpr float MEDICATION_CRITICAL_DOSAGE_THRESHOLD = 80.0f;    ///< Boundary above which physical confirmation is mandatory
-static constexpr float MEDICATION_RATE_LIMIT_STEP_MG_PER_SEC = 5.0f;   ///< Maximum allowable dosage slew rate (+5.0 mg/hr per second)
 static constexpr uint32_t MEDICATION_BUTTON_DEBOUNCE_MS = 50;           ///< Pushbutton contact debounce interval in milliseconds
 #define PUSHBUTTON_PIN 13                                               ///< GPIO pin for active-low confirmation pushbutton
 
@@ -42,43 +40,8 @@ void medicationInit()
  * @param value Desired dosage in mg/hr.
  * @return float Clamped value between 0.0 and 100.0 mg/hr (non-finite values return 0.0).
  */
-// clampMedicationDosage is inlined in medication.h
-
-/**
- * @brief Categorizes dosage rate into discrete safety levels.
- *
- * @param dosage Current infusion rate in mg/hr.
- * @return MedicationSafetyLevel NORMAL (<80), WARNING (80), or CRITICAL (>80).
- */
-MedicationSafetyLevel getMedicationSafetyLevel(float dosage)
-{
-    if (dosage > MEDICATION_CRITICAL_DOSAGE_THRESHOLD) {
-        return MEDICATION_SAFETY_CRITICAL;
-    }
-    if (fabsf(dosage - MEDICATION_CRITICAL_DOSAGE_THRESHOLD) < 0.001f) {
-        return MEDICATION_SAFETY_WARNING;
-    }
-    return MEDICATION_SAFETY_NORMAL;
-}
-
-/**
- * @brief Converts safety level enum to human-readable string.
- *
- * @param dosage Current infusion rate in mg/hr.
- * @return const char* "NORMAL", "WARNING", or "CRITICAL".
- */
-const char *getMedicationSafetyLabel(float dosage)
-{
-    switch (getMedicationSafetyLevel(dosage)) {
-        case MEDICATION_SAFETY_WARNING:
-            return "WARNING";
-        case MEDICATION_SAFETY_CRITICAL:
-            return "CRITICAL";
-        default:
-            return "NORMAL";
-    }
-}
-
+// clampMedicationDosage, getMedicationSafetyLevel, getMedicationSafetyLabel,
+// and stepMedicationSlewRate are declared inline in medication.h for zero-overhead unit testing.
 
 /**
  * @brief Advances dosage rate towards requested target subject to safety limits and confirmation.
@@ -86,12 +49,14 @@ const char *getMedicationSafetyLabel(float dosage)
  * Algorithm Details:
  * 1. Reads current control state under spinlock critical section.
  * 2. Clamps requested target between 0.0 and 100.0 mg/hr.
- * 3. Enforces Critical Confirmation Interlock:
+ * 3. Enforces Critical Confirmation Interlock (Range Authorization Policy):
  *    - If target > 80.0 mg/hr and not yet confirmed, state.criticalConfirmationPending is set true
  *      and effective goal is capped at 80.0 mg/hr.
- *    - If target is reduced <= 80.0 mg/hr, pending status is automatically cleared.
+ *    - Once confirmed via physical pushbutton, the entire critical range (>80.0 mg/hr) remains
+ *      authorized until target dosage is reduced <= 80.0 mg/hr.
+ *    - If target is reduced <= 80.0 mg/hr, pending and confirmed statuses are automatically cleared.
  * 4. Asymmetric Rate Limiting:
- *    - Upward adjustments are rate-limited to +5.0 mg/hr per second based on elapsed time.
+ *    - Upward adjustments are rate-limited to +5.0 mg/hr per second based on elapsed time via stepMedicationSlewRate().
  *    - Downward adjustments occur immediately to allow instant cessation or reduction of infusion.
  * 5. Commits updated applied dosage and control flags back under spinlock critical section.
  */
@@ -122,30 +87,7 @@ static void updateMedicationDosageFromRequest()
     }
 
     const float goal = state.criticalConfirmationPending ? MEDICATION_CRITICAL_DOSAGE_THRESHOLD : targetDosage;
-    if (goal > state.applied) {
-        float elapsedSeconds = 0.0f;
-        if (state.lastRateLimitUpdateMs != 0U) {
-            uint32_t deltaMs = now - state.lastRateLimitUpdateMs;
-            if (deltaMs > 0U && deltaMs < 60000U) {
-                elapsedSeconds = static_cast<float>(deltaMs) / 1000.0f;
-            }
-        } else {
-            // First upward adjustment initializes baseline timestamp without an instantaneous step
-            state.lastRateLimitUpdateMs = now;
-        }
-
-        if (elapsedSeconds > 0.0f) {
-            const float maxIncrease = MEDICATION_RATE_LIMIT_STEP_MG_PER_SEC * elapsedSeconds;
-            const float allowedIncrease = min(maxIncrease, goal - state.applied);
-            state.applied += allowedIncrease;
-            state.lastRateLimitUpdateMs = now;
-        }
-    } else {
-        state.applied = goal;
-        state.lastRateLimitUpdateMs = now;
-    }
-
-    state.applied = constrain(state.applied, MEDICATION_DOSAGE_MIN, MEDICATION_DOSAGE_MAX);
+    state.applied = stepMedicationSlewRate(state.applied, goal, now, state.lastRateLimitUpdateMs);
 
     portENTER_CRITICAL(&telemetryMux);
     medicationDosageControl.applied = state.applied;

@@ -189,6 +189,7 @@ void handleSerialCommands()
 void simulateFacilityData()
 {
     FacilityTelemetry nextState = getFacilitySnapshot();
+    nextState.initialFacilityProcessed = true;
 
     const float roomDelta = random(-4, 5) * 0.4f;
     const float oxygenDelta = random(-3, 3) * 0.2f;

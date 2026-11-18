@@ -193,8 +193,8 @@ String buildHospitalSummaryPayload(const char *averageHeartRateStr, const char *
                                   float averageRoomTemperature, float averageOxygen, float averageAqi,
                                   uint32_t facilitySampleCount, uint32_t facilityAbnormalCount, uint32_t facilityCriticalCount)
 {
-    const char *medicalStatus = (medicalCriticalCount > 0) ? "CRITICAL" : (medicalAbnormalCount > 0 ? "WARNING" : "NORMAL");
-    const char *facilityStatus = (facilityCriticalCount > 0) ? "CRITICAL" : (facilityAbnormalCount > 0 ? "WARNING" : "NORMAL");
+    const char *medicalStatus = (medicalCriticalCount > 0) ? "CRITICAL" : (medicalAbnormalCount > 0 ? "WARNING" : (medicalSampleCount > 0 ? "NORMAL" : "N/A"));
+    const char *facilityStatus = (facilityCriticalCount > 0) ? "CRITICAL" : (facilityAbnormalCount > 0 ? "WARNING" : (facilitySampleCount > 0 ? "NORMAL" : "N/A"));
 
     char payload[620];
     snprintf(payload, sizeof(payload),
@@ -695,7 +695,7 @@ void publishSummaryData(bool offline)
         medicalSummaryStats.minSpo2 = snapshot.spo2;
     }
 
-    if (facilitySummaryStats.sampleCount == 0) {
+    if (facilitySummaryStats.sampleCount == 0 && facilitySnapshot.initialFacilityProcessed) {
         facilitySummaryStats.sampleCount = 1;
         facilitySummaryStats.roomTemperatureTotal = facilitySnapshot.roomTemperature;
         facilitySummaryStats.oxygenTotal = facilitySnapshot.oxygenLevel;
@@ -724,9 +724,9 @@ void publishSummaryData(bool offline)
         snprintf(maxTempBuf, sizeof(maxTempBuf), "N/A");
     }
 
-    const float facilityAverageRoomTemperature = facilitySummaryStats.sampleCount > 0 ? facilitySummaryStats.roomTemperatureTotal / facilitySummaryStats.sampleCount : facilitySnapshot.roomTemperature;
-    const float facilityAverageOxygen = facilitySummaryStats.sampleCount > 0 ? facilitySummaryStats.oxygenTotal / facilitySummaryStats.sampleCount : facilitySnapshot.oxygenLevel;
-    const float facilityAverageAqi = facilitySummaryStats.sampleCount > 0 ? facilitySummaryStats.aqiTotal / facilitySummaryStats.sampleCount : static_cast<float>(facilitySnapshot.aqi);
+    const float facilityAverageRoomTemperature = facilitySummaryStats.sampleCount > 0 ? facilitySummaryStats.roomTemperatureTotal / facilitySummaryStats.sampleCount : (facilitySnapshot.initialFacilityProcessed ? facilitySnapshot.roomTemperature : 0.0f);
+    const float facilityAverageOxygen = facilitySummaryStats.sampleCount > 0 ? facilitySummaryStats.oxygenTotal / facilitySummaryStats.sampleCount : (facilitySnapshot.initialFacilityProcessed ? facilitySnapshot.oxygenLevel : 0.0f);
+    const float facilityAverageAqi = facilitySummaryStats.sampleCount > 0 ? facilitySummaryStats.aqiTotal / facilitySummaryStats.sampleCount : (facilitySnapshot.initialFacilityProcessed ? static_cast<float>(facilitySnapshot.aqi) : 0.0f);
 
     String hospitalSummaryPayload;
     if (mqttClient.getBufferSize() >= 400) {
