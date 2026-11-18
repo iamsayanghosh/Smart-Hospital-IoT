@@ -8,11 +8,13 @@ void test_parse_float_strict_valid() {
     TEST_ASSERT_TRUE(parseFloatStrict("36.5", 34.0f, 42.0f, val));
     TEST_ASSERT_FLOAT_WITHIN(0.01f, 36.5f, val);
 }
+
 void test_parse_float_strict_whitespace() {
     float val = 0.0f;
     TEST_ASSERT_TRUE(parseFloatStrict("  \t 37.2 \r\n", 34.0f, 42.0f, val));
     TEST_ASSERT_FLOAT_WITHIN(0.01f, 37.2f, val);
 }
+
 void test_parse_float_strict_boundary() {
     float val = 0.0f;
     TEST_ASSERT_TRUE(parseFloatStrict("34.0", 34.0f, 42.0f, val));
@@ -20,17 +22,20 @@ void test_parse_float_strict_boundary() {
     TEST_ASSERT_TRUE(parseFloatStrict("42.0", 34.0f, 42.0f, val));
     TEST_ASSERT_FLOAT_WITHIN(0.01f, 42.0f, val);
 }
+
 void test_parse_float_strict_out_of_range() {
     float val = 0.0f;
     TEST_ASSERT_FALSE(parseFloatStrict("33.9", 34.0f, 42.0f, val));
     TEST_ASSERT_FALSE(parseFloatStrict("42.1", 34.0f, 42.0f, val));
 }
+
 void test_parse_float_strict_invalid_trailing() {
     float val = 0.0f;
     TEST_ASSERT_FALSE(parseFloatStrict("12abc", 0.0f, 100.0f, val));
     TEST_ASSERT_FALSE(parseFloatStrict("36.5x", 34.0f, 42.0f, val));
     TEST_ASSERT_FALSE(parseFloatStrict("36.5.2", 34.0f, 42.0f, val));
 }
+
 void test_parse_float_strict_non_finite() {
     float val = 0.0f;
     TEST_ASSERT_FALSE(parseFloatStrict("nan", 0.0f, 100.0f, val));
@@ -38,22 +43,26 @@ void test_parse_float_strict_non_finite() {
     TEST_ASSERT_FALSE(parseFloatStrict("inf", 0.0f, 100.0f, val));
     TEST_ASSERT_FALSE(parseFloatStrict("-inf", -100.0f, 100.0f, val));
 }
+
 void test_parse_float_strict_negative_rejected_when_min_non_negative() {
     float val = 0.0f;
     TEST_ASSERT_FALSE(parseFloatStrict("-5.0", 0.0f, 100.0f, val));
     TEST_ASSERT_FALSE(parseFloatStrict("-0.01", 0.0f, 100.0f, val));
 }
+
 void test_parse_float_strict_empty_or_null() {
     float val = 0.0f;
     TEST_ASSERT_FALSE(parseFloatStrict(nullptr, 0.0f, 100.0f, val));
     TEST_ASSERT_FALSE(parseFloatStrict("", 0.0f, 100.0f, val));
     TEST_ASSERT_FALSE(parseFloatStrict("   ", 0.0f, 100.0f, val));
 }
+
 void test_parse_long_strict_valid() {
     long val = 0;
     TEST_ASSERT_TRUE(parseLongStrict("75", 40, 140, val));
     TEST_ASSERT_EQUAL_INT32(75, val);
 }
+
 void test_parse_long_strict_boundary() {
     long val = 0;
     TEST_ASSERT_TRUE(parseLongStrict("40", 40, 140, val));
@@ -61,20 +70,24 @@ void test_parse_long_strict_boundary() {
     TEST_ASSERT_TRUE(parseLongStrict("140", 40, 140, val));
     TEST_ASSERT_EQUAL_INT32(140, val);
 }
+
 void test_parse_long_strict_out_of_range() {
     long val = 0;
     TEST_ASSERT_FALSE(parseLongStrict("39", 40, 140, val));
     TEST_ASSERT_FALSE(parseLongStrict("141", 40, 140, val));
 }
+
 void test_parse_long_strict_rejects_float_string() {
     long val = 0;
     TEST_ASSERT_FALSE(parseLongStrict("30.0", 0, 100, val));
     TEST_ASSERT_FALSE(parseLongStrict("75.5", 40, 140, val));
 }
+
 void test_parse_long_strict_invalid_negative() {
     long val = 0;
     TEST_ASSERT_FALSE(parseLongStrict("-5", 5, 60, val));
 }
+
 void test_parse_long_strict_invalid_trailing() {
     long val = 0;
     TEST_ASSERT_FALSE(parseLongStrict("60secs", 5, 60, val));
@@ -146,119 +159,116 @@ void test_medication_safety_levels() {
 
 void test_medical_telemetry_validity_distinguishes_normal_from_fault() {
     Telemetry snap = {};
-    snap.initialVitalsProcessed = false;
-    snap.initialEcgProcessed = false;
-    snap.initialTempProcessed = false;
-    snap.temperatureValid = false;
-
-    // 1. Initial boot: uninitialized telemetry is NOT fully valid (prevents false early NORMAL)
+    // 1. Initial boot: INITIALIZING
+    TEST_ASSERT_TRUE(isMedicalTelemetryInitializing(snap));
     TEST_ASSERT_FALSE(isMedicalTelemetryFullyValid(snap));
+    TEST_ASSERT_FALSE(isMedicalTemperatureFault(snap));
 
-    // 2. Vitals active, but ECG and temp missing: NOT fully valid
+    // 2. Vitals received only
     snap.initialVitalsProcessed = true;
+    TEST_ASSERT_TRUE(isMedicalTelemetryInitializing(snap));
     TEST_ASSERT_FALSE(isMedicalTelemetryFullyValid(snap));
+    TEST_ASSERT_FALSE(isMedicalTemperatureFault(snap));
 
-    // 3. Vitals and ECG active, but temperature sensor disconnected: NOT fully valid (SENSOR FAULT / UNAVAILABLE)
+    // 3. Vitals and ECG received
     snap.initialEcgProcessed = true;
+    TEST_ASSERT_TRUE(isMedicalTelemetryInitializing(snap));
+    TEST_ASSERT_FALSE(isMedicalTelemetryFullyValid(snap));
+    TEST_ASSERT_FALSE(isMedicalTemperatureFault(snap));
+
+    // 4. All attempted, temp failed: SENSOR FAULT
     snap.initialTempProcessed = true;
     snap.temperatureValid = false;
+    snap.temperature = DEVICE_DISCONNECTED_C;
+    TEST_ASSERT_FALSE(isMedicalTelemetryInitializing(snap));
+    TEST_ASSERT_TRUE(isMedicalTemperatureFault(snap));
     TEST_ASSERT_FALSE(isMedicalTelemetryFullyValid(snap));
 
-    // 4. All three sensors active and valid: fully valid for clinical clearance (READY)
+    // 5. All valid: READY for clinical clearance
     snap.temperatureValid = true;
     snap.temperature = 36.8f;
+    TEST_ASSERT_FALSE(isMedicalTelemetryInitializing(snap));
+    TEST_ASSERT_FALSE(isMedicalTemperatureFault(snap));
     TEST_ASSERT_TRUE(isMedicalTelemetryFullyValid(snap));
 
-    // 5. Runtime DS18B20 85 C reset or disconnect: validity revoked immediately (prevents false NORMAL on fault)
+    // 6. Runtime disconnect: revoked
     snap.temperatureValid = false;
+    snap.temperature = DEVICE_DISCONNECTED_C;
+    TEST_ASSERT_FALSE(isMedicalTelemetryInitializing(snap));
+    TEST_ASSERT_TRUE(isMedicalTemperatureFault(snap));
     TEST_ASSERT_FALSE(isMedicalTelemetryFullyValid(snap));
 }
 
 void test_medical_sensor_fault_state_machine_and_recovery() {
     Telemetry snap = {};
-    snap.heartRate = 75;
-    snap.spo2 = 98;
-    snap.ecgRate = 72;
-    snap.temperature = 36.8f;
+    bool sensorFaultActive = false;
+    bool normalPending = false;
 
-    // Step 1: INITIALIZING state (waiting for initial measurements)
-    snap.initialVitalsProcessed = false;
-    snap.initialEcgProcessed = false;
-    snap.initialTempProcessed = false;
-    snap.temperatureValid = false;
-    bool isFault = snap.initialTempProcessed && !snap.temperatureValid;
-    TEST_ASSERT_FALSE(isFault); // Must not trigger SENSOR FAULT while initializing
-    TEST_ASSERT_FALSE(isMedicalTelemetryFullyValid(snap));
+    // 1. Boot: INITIALIZING suppresses fault & normal
+    TEST_ASSERT_TRUE(isMedicalTelemetryInitializing(snap));
+    TEST_ASSERT_FALSE(sensorFaultActive);
 
-    // Step 2: Measurements complete, DS18B20 disconnected -> SENSOR FAULT
+    // 2. Acquisition complete with failed temp
     snap.initialVitalsProcessed = true;
     snap.initialEcgProcessed = true;
     snap.initialTempProcessed = true;
     snap.temperatureValid = false;
-    isFault = snap.initialTempProcessed && !snap.temperatureValid;
-    TEST_ASSERT_TRUE(isFault); // Confirmed measurement failure triggers SENSOR FAULT
-    TEST_ASSERT_FALSE(isMedicalTelemetryFullyValid(snap)); // Suppresses false NORMAL
+    snap.temperature = DEVICE_DISCONNECTED_C;
+    if (isMedicalTemperatureFault(snap) && !sensorFaultActive) {
+        sensorFaultActive = true;
+    }
+    TEST_ASSERT_TRUE(sensorFaultActive);
 
-    // Step 3: Concurrent acute vital alert during SENSOR FAULT (e.g. Tachycardia 135 BPM)
+    // 3. While faulted, acute vitals abnormalities preserved
     snap.heartRate = 135;
-    bool isAcuteAlert = (snap.heartRate > HEART_RATE_CRITICAL_HIGH || snap.heartRate < HEART_RATE_CRITICAL_LOW);
-    TEST_ASSERT_TRUE(isAcuteAlert); // Acute vital alert remains active and detectable
+    TEST_ASSERT_TRUE(snap.heartRate < 45 || snap.heartRate > 120);
 
-    // Step 4: Vitals nominal again, but sensor still faulty -> still cannot declare NORMAL
+    // When acute abnormality resolves, normal blocked by fault
     snap.heartRate = 75;
-    isAcuteAlert = (snap.heartRate > HEART_RATE_CRITICAL_HIGH || snap.heartRate < HEART_RATE_CRITICAL_LOW);
-    TEST_ASSERT_FALSE(isAcuteAlert);
-    TEST_ASSERT_FALSE(isMedicalTelemetryFullyValid(snap)); // Normal clearance withheld
+    bool normalAllowed = !sensorFaultActive && isMedicalTelemetryFullyValid(snap);
+    TEST_ASSERT_FALSE(normalAllowed);
 
-    // Step 5: SENSOR RESTORED (Temperature sensor recovers to 36.8 C)
+    // 4. Recovery: SENSOR RESTORED transition
     snap.temperatureValid = true;
     snap.temperature = 36.8f;
-    bool isRestored = snap.initialTempProcessed && snap.temperatureValid;
-    TEST_ASSERT_TRUE(isRestored);
-    TEST_ASSERT_TRUE(isMedicalTelemetryFullyValid(snap)); // Clinical clearance enabled
+    TEST_ASSERT_TRUE(isMedicalTelemetryFullyValid(snap));
+    if (sensorFaultActive && isMedicalTelemetryFullyValid(snap)) {
+        sensorFaultActive = false;
+        normalPending = true;
+    }
+    TEST_ASSERT_FALSE(sensorFaultActive);
+    TEST_ASSERT_TRUE(normalPending);
+
+    // 5. Clinical clearance allowed
+    normalAllowed = !sensorFaultActive && isMedicalTelemetryFullyValid(snap);
+    TEST_ASSERT_TRUE(normalAllowed);
 }
 
 void test_temperature_sensor_disconnect_queue_retry() {
-    // Simulates the non-blocking pendingTempDisconnectMessage retry mechanism in sensors.cpp
     bool pendingTempDisconnectMessage = false;
-    bool hasReadValidTemperature = true;
+    bool mockQueueFull = true;
 
-    // 1. Runtime 85 C scratchpad reset or disconnect detected
-    float rawTemp = 85.0f;
-    bool queueFull = true; // Simulate saturated FreeRTOS sensorQueue
+    // 1. Initial state
+    TEST_ASSERT_FALSE(pendingTempDisconnectMessage);
 
-    if (abs(rawTemp - 85.0f) <= 0.05f) {
-        hasReadValidTemperature = false;
-        // Attempt sendSensorMessage; fails because queue is full
-        if (queueFull) {
-            pendingTempDisconnectMessage = true;
-        }
+    // 2. Disconnect with full queue retains pending state
+    float rawTemp = DEVICE_DISCONNECTED_C;
+    if (rawTemp == DEVICE_DISCONNECTED_C) {
+        pendingTempDisconnectMessage = mockQueueFull;
     }
-    TEST_ASSERT_FALSE(hasReadValidTemperature);
-    TEST_ASSERT_TRUE(pendingTempDisconnectMessage); // Event retained across task iterations
+    TEST_ASSERT_TRUE(pendingTempDisconnectMessage);
 
-    // 2. Next task iteration: queue is still full -> retry remains pending
-    if (pendingTempDisconnectMessage) {
-        if (queueFull) {
-            // sendSensorMessage fails again
-        } else {
-            pendingTempDisconnectMessage = false;
-        }
+    // 3. Subsequent cycle with full queue remains pending
+    if (pendingTempDisconnectMessage && !mockQueueFull) {
+        pendingTempDisconnectMessage = false;
     }
-    TEST_ASSERT_TRUE(pendingTempDisconnectMessage); // Not dropped!
+    TEST_ASSERT_TRUE(pendingTempDisconnectMessage);
 
-    // 3. Subsequent iteration: queue space frees up -> message delivered
-    queueFull = false;
-    if (pendingTempDisconnectMessage) {
-        if (!queueFull) {
-            pendingTempDisconnectMessage = false; // Successfully enqueued
-        }
+    // 4. Queue drains: delivered and cleared
+    mockQueueFull = false;
+    if (pendingTempDisconnectMessage && !mockQueueFull) {
+        pendingTempDisconnectMessage = false;
     }
-    TEST_ASSERT_FALSE(pendingTempDisconnectMessage); // Cleared upon confirmed delivery
-
-    // 4. Valid temperature reading recovers sensor state
-    hasReadValidTemperature = true;
-    TEST_ASSERT_TRUE(hasReadValidTemperature);
     TEST_ASSERT_FALSE(pendingTempDisconnectMessage);
 }
 

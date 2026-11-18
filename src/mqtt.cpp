@@ -2,27 +2,9 @@
  * @file mqtt.cpp
  * @brief Adafruit IO MQTT communications, subscription handlers, and publication coordinator.
  *
- * Responsibilities:
- * 1. Network & Broker Lifecycle:
- *    - Reconnects Wi-Fi and MQTT with exponential backoff (1000 ms to 30000 ms).
- *    - Automatically resubscribes to control topics upon reconnection.
- * 2. Inbound Control Handlers:
- *    - "medication-dosage": Decodes and clamps dosage requests into medicationDosageControl.
- *    - "sampling-rate": Decodes doctor-specified sampling interval [5 - 60 s] and pushes to samplingQueue.
- *    - "bed-angle": Decodes doctor-specified bed angle [0 - 90 deg] and pushes to bedQueue.
- * 3. Rate-Limited Live Feed Publication & Offline Replay:
- *    - Rotates round-robin across 6 feeds every 3000 ms (MQTT_TASK_INTERVAL_MS).
- *    - Suppresses unchanged sensor readings; live telemetry and buffer replay share the 3000 ms slot (max 20 msgs/min).
- *    - Replay alternates via syncTurn or takes idle slots when live readings are unchanged.
- * 4. Alerts and Periodic Summaries:
- *    - Publishes clinical and facility threshold alerts to "hospital-events" (independent 60 s cooldown).
- *    - Publishes aggregated statistical summaries of patient vitals and room conditions every 60000 ms.
- *    - Nominal aggregate publishing rate is ~23 msgs/min derived from these paths and scheduling assumptions.
- *    - Note: Multiple publications (up to 4) can occur consecutively in one task iteration if timers coincide;
- *      firmware pacing targets Adafruit IO's 30 data points/min free quota, but cannot govern account-wide consumption.
- * 5. Offline Recovery & Buffer Synchronization:
- *    - safePublish() diverts outgoing payloads to the bounded 64-item offline FreeRTOS FIFO queue when disconnected.
- *    - Replays buffered records in FIFO order into the 3000 ms dispatch slot upon connection restoration.
+ * Handles Wi-Fi/MQTT reconnection with exponential backoff, inbound command subscriptions,
+ * round-robin sensor publishing (3s period), clinical and facility event publishing,
+ * 60s summary reports, and local 64-record FIFO queuing and replay during transport drop.
  */
 
 #include "mqtt.h"
@@ -156,34 +138,6 @@ String buildAlertPayload(const char *role, const char *parameter, float value, A
 }
 
 /**
- * @brief Formats accumulated medical readings for summary reporting.
- */
-String buildMedicalSummaryPayload(float averageHeartRate, int minimumSpo2, float maximumBodyTemperature, uint32_t sampleCount, uint32_t abnormalCount)
-{
-    char payload[280];
-    snprintf(payload, sizeof(payload),
-             "MEDICAL SUMMARY\n\nAverage HR: %.2f BPM\nMinimum SpO2: %d %%\nMaximum Body Temperature: %.2f °C\n\nSamples: %lu\nAbnormal Readings: %lu\n\nStatus: %s",
-             averageHeartRate, minimumSpo2, maximumBodyTemperature,
-             static_cast<unsigned long>(sampleCount), static_cast<unsigned long>(abnormalCount),
-             abnormalCount > 0 ? "WARNING" : "NORMAL");
-    return String(payload);
-}
-
-/**
- * @brief Formats accumulated facility readings for summary reporting.
- */
-String buildFacilitySummaryPayload(float averageRoomTemperature, float averageOxygen, float averageAqi, uint32_t sampleCount, uint32_t abnormalCount)
-{
-    char payload[280];
-    snprintf(payload, sizeof(payload),
-             "FACILITY SUMMARY\n\nAverage Room Temperature: %.2f °C\nAverage Oxygen: %.2f %%\nAverage AQI: %.2f\n\nSamples: %lu\nAbnormal Readings: %lu\n\nStatus: %s",
-             averageRoomTemperature, averageOxygen, averageAqi,
-             static_cast<unsigned long>(sampleCount), static_cast<unsigned long>(abnormalCount),
-             abnormalCount > 0 ? "WARNING" : "NORMAL");
-    return String(payload);
-}
-
-/**
  * @brief Combines aggregated medical and facility snapshots into one payload.
  *
  * The resulting message is published periodically through hospital-events.
@@ -253,6 +207,10 @@ bool configureMqttBuffer()
         }
     }
 
+    Serial.print("[MQTT] MQTT buffer size before fix: ");
+    Serial.println(bufferSizeBefore);
+    Serial.print("[MQTT] MQTT buffer size: ");
+    Serial.println(mqttClient.getBufferSize());
     return success;
 }
 
@@ -566,43 +524,37 @@ void publishMedicalAlertIfNeeded(const Telemetry &snapshot, bool offline)
 {
     const uint32_t now = millis();
 
-    // 1. Independent Sensor Availability State Machine (Task 1 & Task 2)
-    // Distinguish INITIALIZING vs SENSOR FAULT vs READY:
-    // Only report SENSOR FAULT if a measurement attempt has confirmed sensor failure
-    if (snapshot.initialTempProcessed && !snapshot.temperatureValid) {
-        if (!medicalSensorFaultActive) {
-            if (!medicalAlertStateKnown || now - lastMedicalAlertPublishMs >= ALERT_ESCALATION_COOLDOWN_MS) {
+    // 1. Independent Sensor Availability State Machine
+    // Distinguish INITIALIZING vs SENSOR FAULT vs READY
+    const bool isInitializing = isMedicalTelemetryInitializing(snapshot);
+
+    if (!isInitializing) {
+        if (isMedicalTemperatureFault(snapshot)) {
+            // Confirmed sensor failure (measurement attempt failed/disconnected)
+            if (!medicalSensorFaultActive) {
                 const char *faultPayload = "MEDICAL STATUS: SENSOR FAULT\nBody temperature sensor unavailable; clinical status unknown.";
                 if (safePublish(getAioFeedTopic(HOSPITAL_EVENTS_FEED), String(faultPayload), offline)) {
-                    lastMedicalAlertPublishMs = now;
-                    medicalAlertStateKnown = true;
                     medicalSensorFaultActive = true;
-                    medicalNormalPending = false;
+                    lastMedicalAlertPublishMs = now;
                 }
             }
-        }
-    } else if (snapshot.initialTempProcessed && snapshot.temperatureValid) {
-        if (medicalSensorFaultActive) {
-            if (!medicalAlertStateKnown || now - lastMedicalAlertPublishMs >= ALERT_ESCALATION_COOLDOWN_MS) {
-                const char *restorePayload = "MEDICAL STATUS: SENSOR RESTORED\nBody temperature sensor operational; clinical telemetry restored.";
-                if (safePublish(getAioFeedTopic(HOSPITAL_EVENTS_FEED), String(restorePayload), offline)) {
-                    lastMedicalAlertPublishMs = now;
-                    medicalAlertStateKnown = true;
-                    medicalSensorFaultActive = false;
-                    medicalNormalPending = true; // Prompt immediate clinical re-evaluation
-                }
+        } else if (medicalSensorFaultActive) {
+            // Sensor recovery transition
+            const char *restoredPayload = "MEDICAL STATUS: SENSOR RESTORED\nBody temperature sensor operational; clinical telemetry restored.";
+            if (safePublish(getAioFeedTopic(HOSPITAL_EVENTS_FEED), String(restoredPayload), offline)) {
+                medicalSensorFaultActive = false;
+                medicalNormalPending = true;
+                lastMedicalAlertPublishMs = now;
             }
         }
     }
 
-    // 2. Clinical Alert Evaluation (Independent of Sensor Fault)
-    // Available sensors continue generating alerts (e.g. HR tachycardia, SpO2 hypoxia)
+    // 2. Clinical Vitals Evaluation
     AlertCandidate candidate = evaluateMedicalAlert(snapshot);
 
     if (!candidate.active) {
-        // Clinical vitals are nominal.
-        // Gating: suppress false NORMAL if any mandatory sensor is not yet ready or in fault
-        if (!isMedicalTelemetryFullyValid(snapshot)) {
+        // Suppress false NORMAL if sensor fault is active or system is still initializing
+        if (medicalSensorFaultActive || isInitializing) {
             return;
         }
 

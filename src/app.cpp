@@ -4,9 +4,15 @@
  *
  * Architecture Notes:
  * - IPC Allocation: Allocates all FreeRTOS queues, mutexes, and semaphores before tasks run.
- * - Core Pinning: All 13 application tasks are pinned to Core 1 (xTaskCreatePinnedToCore with coreID=1)
- *   alongside Arduino loopTask. Wi-Fi driver and lwIP TCP/IP stacks run on Core 0, while other system
- *   tasks execute according to configured affinity. Pinning organizes workload without implying exclusive reservation.
+ * - Core Pinning: All 13 application tasks are explicitly pinned to Core 1 (xTaskCreatePinnedToCore
+ *   with coreID=1). In the installed PlatformIO toolchain build configuration (sdkconfig.h), the Wi-Fi
+ *   driver task (CONFIG_ESP_WIFI_TASK_PINNED_TO_CORE_0=1) and lwIP TCP/IP stack (CONFIG_LWIP_TCPIP_TASK_AFFINITY=0x0)
+ *   are configured for Core 0, the FreeRTOS timer service task (CONFIG_FREERTOS_TIMER_SERVICE_TASK_CORE_AFFINITY=0x7FFFFFFF)
+ *   is configured with tskNO_AFFINITY (allowing either core), and Arduino loopTask is configured for Core 1
+ *   (CONFIG_ARDUINO_RUNNING_CORE=1). Dynamic runtime scheduling on physical hardware was not instrumented.
+ *   Pinning application tasks to Core 1 organizes application workload, but does not imply exclusive
+ *   reservation of Core 0, complete network isolation, or immunity from shared bus/cache contention
+ *   and interrupt preemption.
  * - Priority Hierarchy:
  *     Priority 4: watchdogTask (highest application priority to guarantee timely health checks)
  *     Priority 3: vitalTask, ecgTask, medicationTask (high-rate physiological acquisition & safety-critical dosage control)

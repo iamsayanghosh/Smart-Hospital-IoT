@@ -1,25 +1,9 @@
 /**
  * @file sensors.cpp
- * @brief Multi-sensor acquisition and physiological data simulation task
- * implementations (Task 1).
+ * @brief Multi-sensor acquisition and physiological data simulation tasks (Task 1).
  *
- * Responsibilities:
- * 1. Physical Sensing:
- *    - temperatureTask: Acquires Dallas DS18B20 1-Wire temperature from GPIO 4.
- *    - motionTask: Acquires binary motion detection from HC-SR501 PIR sensor on
- * GPIO 27.
- * 2. Physiological Simulation:
- *    - vitalTask: Simulates optical PPG telemetry (Heart Rate in BPM and SpO2
- * in %).
- *    - ecgTask: Synthesizes continuous AD8232 PQRST electrocardiogram waveforms
- * using Gaussian modeling.
- * 3. Concurrency & Adaptive Sampling:
- *    - Both temperatureTask and vitalTask query their active period dynamically
- * via getSamplePeriodMs() [5000 ms to 60000 ms], while executing an inner 500
- * ms delay to ensure prompt watchdog heartbeat reporting without TWDT
- * starvation.
- *    - All sensor readings are packaged into SensorMessage structs and
- * dispatched to sensorQueue.
+ * Implements physical DS18B20 1-Wire temperature (GPIO 4), HC-SR501 PIR motion (GPIO 27),
+ * optical PPG heart rate and SpO2 simulation, and AD8232 ECG waveform synthesis.
  */
 
 #include "sensors.h"

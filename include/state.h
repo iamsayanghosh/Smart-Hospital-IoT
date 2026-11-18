@@ -69,6 +69,10 @@ constexpr float SPO2_CRITICAL_LOW = 88.0f;
 constexpr float BODY_TEMP_CRITICAL_LOW = 34.0f;
 constexpr float BODY_TEMP_CRITICAL_HIGH = 39.5f;
 
+#ifndef DEVICE_DISCONNECTED_C
+#define DEVICE_DISCONNECTED_C -127
+#endif
+
 // Named facility critical threshold constants
 constexpr float ROOM_TEMP_CRITICAL_LOW = 16.0f;
 constexpr float ROOM_TEMP_CRITICAL_HIGH = 30.0f;
@@ -282,18 +286,48 @@ bool sendSensorMessage(const SensorMessage &message, const char *taskName);
 AlertSeverity evaluateClinicalSeverity(const Telemetry &data);
 
 /**
- * @brief Assesses whether all mandatory medical vitals are available for full clinical clearance.
+ * @brief Assesses whether the system is still waiting for initial telemetry from any medical sensor.
  *
- * Requires initial vital signs acquisition, initial ECG acquisition, and an active, valid temperature reading.
- * An unavailable or disconnected sensor precludes asserting a definitive NORMAL status.
+ * Distinguishes startup latency (INITIALIZING) from a confirmed hardware failure (SENSOR FAULT).
  *
  * @param data Patient telemetry snapshot.
- * @return true if all required measurements are valid; false otherwise.
+ * @return true if any required medical sensor has not yet completed its first acquisition attempt.
+ */
+inline bool isMedicalTelemetryInitializing(const Telemetry &data)
+{
+    return !data.initialVitalsProcessed ||
+           !data.initialEcgProcessed ||
+           !data.initialTempProcessed;
+}
+
+/**
+ * @brief Assesses whether a confirmed hardware fault exists for the temperature sensor.
+ *
+ * Returns true only after a measurement attempt has occurred and confirmed a disconnected
+ * or invalid sensor reading (e.g. DEVICE_DISCONNECTED_C or runtime 85°C reset).
+ *
+ * @param data Patient telemetry snapshot.
+ * @return true if temperature acquisition was attempted and failed; false otherwise.
+ */
+inline bool isMedicalTemperatureFault(const Telemetry &data)
+{
+    return data.initialTempProcessed && !data.temperatureValid;
+}
+
+/**
+ * @brief Assesses whether all mandatory medical vitals are available for full clinical clearance (READY).
+ *
+ * Requires that vitals, ECG, and temperature have all completed initialization and that
+ * temperature is currently valid. An unavailable sensor precludes asserting a definitive NORMAL status.
+ *
+ * @param data Patient telemetry snapshot.
+ * @return true if all required measurements are available and valid; false otherwise.
  */
 inline bool isMedicalTelemetryFullyValid(const Telemetry &data)
 {
     return data.initialVitalsProcessed &&
            data.initialEcgProcessed &&
+           data.initialTempProcessed &&
            data.temperatureValid;
 }
 
