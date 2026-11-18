@@ -242,7 +242,8 @@ void test_medical_sensor_fault_state_machine_and_recovery() {
 
     // 3. While faulted, acute vitals abnormalities preserved and detected by production evaluator
     snap.heartRate = 135;
-    AlertCandidate candidate = evaluateMedicalAlert(snap);
+    MedicalThresholdConfig testThresholds;
+    AlertCandidate candidate = evaluateMedicalAlert(snap, testThresholds);
     TEST_ASSERT_TRUE(candidate.active);
     TEST_ASSERT_EQUAL_STRING("heartRate", candidate.parameter);
     TEST_ASSERT_EQUAL(ALERT_SEVERITY_CRITICAL, candidate.severity);

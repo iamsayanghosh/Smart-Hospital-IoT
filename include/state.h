@@ -410,9 +410,11 @@ inline bool updateQueueRetryState(bool sendSuccess, bool &pendingState)
  * 45-49 or 101-120 BPM Warning), and Body Temperature (<34°C or >39.5°C Critical, 34-36°C or 38-39.5°C Warning).
  *
  * @param snapshot Evaluated patient vitals snapshot.
+ * @param thresholds Clinical threshold configuration (defaults to the global medicalThresholds instance).
  * @return AlertCandidate Populated candidate descriptor.
  */
-inline AlertCandidate evaluateMedicalAlert(const Telemetry &snapshot)
+inline AlertCandidate evaluateMedicalAlert(const Telemetry &snapshot,
+                                           const MedicalThresholdConfig &thresholds = medicalThresholds)
 {
     AlertCandidate bestCandidate;
 
@@ -425,8 +427,6 @@ inline AlertCandidate evaluateMedicalAlert(const Telemetry &snapshot)
             bestCandidate.severity = sev;
         }
     };
-
-    MedicalThresholdConfig thresholds;
 
     // 1. SpO2 (Hypoxia / critical airway priority)
     if (snapshot.spo2 < thresholds.spo2.low) {
