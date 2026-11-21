@@ -29,6 +29,9 @@
     <marker id="arrowPurple" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
       <path d="M 0 1 L 10 5 L 0 9 z" fill="#c084fc"/>
     </marker>
+    <marker id="arrowAmber" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#f59e0b"/>
+    </marker>
   </defs>
 
   <!-- Title Banner -->
@@ -47,18 +50,18 @@
     <rect x="0" y="0" width="280" height="65" rx="8" fill="#0f172a" stroke="#10b981" stroke-width="1"/>
     <text x="15" y="24" fill="#f8fafc" font-size="13" font-weight="bold">DS18B20 Temp Sensor</text>
     <text x="15" y="42" fill="#a7f3d0" font-size="11">1-Wire Bus &#8226; GPIO 4 &#8226; 4.7k Pull-up (physical)</text>
-    <text x="15" y="56" fill="#64748b" font-size="10">Non-blocking FSM (&#8805;800 ms millis() gate)</text>
+    <text x="15" y="56" fill="#94a3b8" font-size="10">Non-blocking FSM (&#8805;800 ms millis() gate)</text>
 
     <!-- PIR Motion -->
     <rect x="0" y="75" width="280" height="55" rx="8" fill="#0f172a" stroke="#10b981" stroke-width="1"/>
     <text x="15" y="99" fill="#f8fafc" font-size="13" font-weight="bold">HC-SR501 PIR Sensor</text>
-    <text x="15" y="117" fill="#a7f3d0" font-size="11">Digital Input &#8226; GPIO 27 (Motion Detect)</text>
+    <text x="15" y="117" fill="#a7f3d0" font-size="11">Digital Input &#8226; GPIO 27 (5V supply for LDO)</text>
 
     <!-- Green Button -->
     <rect x="0" y="140" width="280" height="60" rx="8" fill="#0f172a" stroke="#10b981" stroke-width="1"/>
     <text x="15" y="164" fill="#f8fafc" font-size="13" font-weight="bold">Confirmation Push Button</text>
     <text x="15" y="182" fill="#a7f3d0" font-size="11">Active-Low Input &#8226; GPIO 13</text>
-    <text x="15" y="194" fill="#64748b" font-size="10">Task 3 Critical Dose confirm (held at 80 until pressed)</text>
+    <text x="15" y="194" fill="#94a3b8" font-size="10">Task 3 Critical Dose confirm (held at 80 until pressed)</text>
 
     <!-- Status LEDs -->
     <rect x="0" y="210" width="280" height="85" rx="8" fill="#0f172a" stroke="#10b981" stroke-width="1"/>
@@ -71,20 +74,20 @@
     <rect x="0" y="305" width="280" height="65" rx="8" fill="#0f172a" stroke="#10b981" stroke-width="1"/>
     <text x="15" y="329" fill="#f8fafc" font-size="13" font-weight="bold">Piezo Buzzer (1200 Hz Tone)</text>
     <text x="15" y="347" fill="#a7f3d0" font-size="11">PWM Output &#8226; GPIO 14</text>
-    <text x="15" y="361" fill="#64748b" font-size="10">Priority Cadences: Critical / Wi-Fi / MQTT</text>
+    <text x="15" y="361" fill="#94a3b8" font-size="10">Priority Cadences: Critical / Wi-Fi / MQTT</text>
 
     <!-- OLED -->
     <rect x="0" y="380" width="280" height="80" rx="8" fill="#0f172a" stroke="#10b981" stroke-width="1"/>
     <text x="15" y="404" fill="#f8fafc" font-size="13" font-weight="bold">SSD1306 128x64 I2C OLED</text>
     <text x="15" y="422" fill="#a7f3d0" font-size="11">I2C: GPIO 21 (SDA), GPIO 22 (SCL)</text>
-    <text x="15" y="437" fill="#64748b" font-size="10">Medication Live Status (y: 0..44)</text>
-    <text x="15" y="451" fill="#64748b" font-size="10">Task 6 LOGGING OFFLINE Banner (y: 54..63)</text>
+    <text x="15" y="437" fill="#94a3b8" font-size="10">Medication Live Status (y: 0..44)</text>
+    <text x="15" y="451" fill="#94a3b8" font-size="10">Task 6 LOGGING OFFLINE Banner (y: 54..63)</text>
 
     <!-- SG90 Servo -->
     <rect x="0" y="470" width="280" height="65" rx="8" fill="#0f172a" stroke="#10b981" stroke-width="1"/>
     <text x="15" y="494" fill="#f8fafc" font-size="13" font-weight="bold">SG90 Micro-Servo Motor</text>
     <text x="15" y="512" fill="#a7f3d0" font-size="11">PWM Slew Output &#8226; GPIO 18</text>
-    <text x="15" y="526" fill="#64748b" font-size="10">Bed Angles: 10&#176; Rest, 45&#176; Resp, 90&#176; Emer</text>
+    <text x="15" y="526" fill="#94a3b8" font-size="10">Bed Angles: 10&#176; Rest, 45&#176; Resp, 90&#176; Emer</text>
 
     <!-- ESP32 Board Spec -->
     <rect x="0" y="545" width="280" height="135" rx="8" fill="#064e3b" stroke="#059669" stroke-width="1"/>
@@ -99,103 +102,114 @@
   <!-- ESP32 FreeRTOS Core 1: Application Tasks (Center Column) -->
   <rect x="360" y="105" width="650" height="785" rx="12" fill="url(#cardCore1)" stroke="#2563eb" stroke-width="1.5"/>
   <rect x="375" y="120" width="620" height="35" rx="8" fill="#1e40af"/>
-  <text x="390" y="143" fill="#93c5fd" font-size="14" font-weight="bold">CORE 1: FreeRTOS APPLICATION SCHEDULER &amp; IPC PIPELINE</text>
+  <text x="390" y="143" fill="#93c5fd" font-size="14" font-weight="bold">CORE 1: ALL 13 FreeRTOS APPLICATION TASKS &amp; IPC PIPELINE</text>
 
   <!-- Supervisor Tier -->
-  <rect x="375" y="165" width="620" height="55" rx="8" fill="#1e293b" stroke="#e11d48" stroke-width="1.5"/>
-  <text x="390" y="188" fill="#fda4af" font-size="13" font-weight="bold">watchdogTask [Priority 4] (1000 ms audit, 6s silence limit)</text>
-  <text x="390" y="206" fill="#94a3b8" font-size="11">Audits task heartbeats (lastHeartbeatMs) &#8226; Flags SYSTEM_DEGRADED &#8226; ESP-IDF TWDT (8000 ms hardware panic)</text>
+  <rect x="375" y="165" width="620" height="52" rx="8" fill="#1e293b" stroke="#e11d48" stroke-width="1.5"/>
+  <text x="390" y="186" fill="#fda4af" font-size="13" font-weight="bold">watchdogTask [Priority 4] (1000 ms audit, 6s silence limit)</text>
+  <text x="390" y="204" fill="#94a3b8" font-size="11">Audits task heartbeats (lastHeartbeatMs) &#8226; Logs SYSTEM_DEGRADED &#8226; Feeds TWDT (8000 ms panic)</text>
 
   <!-- Alert Tier -->
-  <rect x="375" y="228" width="620" height="48" rx="8" fill="#1e293b" stroke="#f59e0b" stroke-width="1"/>
-  <text x="390" y="250" fill="#fde68a" font-size="13" font-weight="bold">alertTask [Priority 2] (Binary Semaphore Triggered)</text>
-  <text x="390" y="266" fill="#94a3b8" font-size="11">Dispatches clinical/facility rising-edge anomalies to Serial and coordinates alert states</text>
+  <rect x="375" y="224" width="620" height="46" rx="8" fill="#1e293b" stroke="#f59e0b" stroke-width="1"/>
+  <text x="390" y="245" fill="#fde68a" font-size="13" font-weight="bold">alertTask [Priority 2] (Binary Semaphore Triggered)</text>
+  <text x="390" y="261" fill="#94a3b8" font-size="11">Dispatches clinical/facility rising-edge anomalies to Serial and coordinates alert states</text>
 
   <!-- Sensor & Telemetry Tier -->
-  <g transform="translate(375, 284)">
-    <rect x="0" y="0" width="300" height="60" rx="8" fill="#0f172a" stroke="#3b82f6" stroke-width="1"/>
-    <text x="12" y="22" fill="#93c5fd" font-size="12" font-weight="bold">vitalTask [P3]</text>
-    <text x="12" y="38" fill="#60a5fa" font-size="10">PPG Heart Rate &amp; SpO2</text>
-    <text x="12" y="50" fill="#64748b" font-size="9">Adaptive Cadence (5s / 60s)</text>
+  <g transform="translate(375, 278)">
+    <rect x="0" y="0" width="300" height="58" rx="8" fill="#0f172a" stroke="#3b82f6" stroke-width="1"/>
+    <text x="12" y="20" fill="#93c5fd" font-size="12" font-weight="bold">vitalTask [P3]</text>
+    <text x="12" y="35" fill="#60a5fa" font-size="10">PPG Heart Rate &amp; SpO2</text>
+    <text x="12" y="48" fill="#94a3b8" font-size="9">Dynamic Cadence via samplingPeriods (5s / 60s)</text>
 
-    <rect x="320" y="0" width="300" height="60" rx="8" fill="#0f172a" stroke="#3b82f6" stroke-width="1"/>
-    <text x="332" y="22" fill="#93c5fd" font-size="12" font-weight="bold">ecgTask [P3]</text>
-    <text x="332" y="38" fill="#60a5fa" font-size="10">Cardiac Gaussian Model</text>
-    <text x="332" y="50" fill="#64748b" font-size="9">Fixed 5 Hz Cadence (200 ms)</text>
+    <rect x="320" y="0" width="300" height="58" rx="8" fill="#0f172a" stroke="#3b82f6" stroke-width="1"/>
+    <text x="332" y="20" fill="#93c5fd" font-size="12" font-weight="bold">ecgTask [P3]</text>
+    <text x="332" y="35" fill="#60a5fa" font-size="10">Cardiac Gaussian Model</text>
+    <text x="332" y="48" fill="#94a3b8" font-size="9">Fixed 5 Hz Cadence (200 ms)</text>
 
-    <rect x="0" y="68" width="300" height="60" rx="8" fill="#0f172a" stroke="#3b82f6" stroke-width="1"/>
-    <text x="12" y="90" fill="#93c5fd" font-size="12" font-weight="bold">temperatureTask [P2]</text>
-    <text x="12" y="106" fill="#60a5fa" font-size="10">DS18B20 1-Wire FSM</text>
-    <text x="12" y="118" fill="#64748b" font-size="9">IDLE -&gt; CONVERT (&#8805;800 ms millis() gate)</text>
+    <rect x="0" y="65" width="300" height="58" rx="8" fill="#0f172a" stroke="#3b82f6" stroke-width="1"/>
+    <text x="12" y="85" fill="#93c5fd" font-size="12" font-weight="bold">temperatureTask [P2]</text>
+    <text x="12" y="100" fill="#60a5fa" font-size="10">DS18B20 1-Wire FSM</text>
+    <text x="12" y="113" fill="#94a3b8" font-size="9">IDLE -&gt; CONVERT (&#8805;800 ms millis() gate)</text>
 
-    <rect x="320" y="68" width="300" height="60" rx="8" fill="#0f172a" stroke="#3b82f6" stroke-width="1"/>
-    <text x="332" y="90" fill="#93c5fd" font-size="12" font-weight="bold">motionTask [P2]</text>
-    <text x="332" y="106" fill="#60a5fa" font-size="10">PIR Motion Detector</text>
-    <text x="332" y="118" fill="#64748b" font-size="9">Cadence: 1000 ms periodic</text>
+    <rect x="320" y="65" width="300" height="58" rx="8" fill="#0f172a" stroke="#3b82f6" stroke-width="1"/>
+    <text x="332" y="85" fill="#93c5fd" font-size="12" font-weight="bold">motionTask [P2]</text>
+    <text x="332" y="100" fill="#60a5fa" font-size="10">PIR Motion Detector</text>
+    <text x="332" y="113" fill="#94a3b8" font-size="9">Cadence: 1000 ms periodic</text>
 
-    <rect x="0" y="136" width="300" height="60" rx="8" fill="#0f172a" stroke="#3b82f6" stroke-width="1"/>
-    <text x="12" y="158" fill="#93c5fd" font-size="12" font-weight="bold">environmentTask [P2]</text>
-    <text x="12" y="174" fill="#60a5fa" font-size="10">Room Temp, Oxygen %, AQI</text>
-    <text x="12" y="186" fill="#64748b" font-size="9">Simulated + UART CLI override</text>
+    <rect x="0" y="130" width="300" height="58" rx="8" fill="#0f172a" stroke="#3b82f6" stroke-width="1"/>
+    <text x="12" y="150" fill="#93c5fd" font-size="12" font-weight="bold">environmentTask [P2]</text>
+    <text x="12" y="165" fill="#60a5fa" font-size="10">Room Temp, Oxygen %, AQI</text>
+    <text x="12" y="178" fill="#94a3b8" font-size="9">Updates facilityTelemetry directly under telemetryMux</text>
 
-    <rect x="320" y="136" width="300" height="60" rx="8" fill="#0f172a" stroke="#3b82f6" stroke-width="1"/>
-    <text x="332" y="158" fill="#93c5fd" font-size="12" font-weight="bold">samplingTask [P2]</text>
-    <text x="332" y="174" fill="#60a5fa" font-size="10">Adaptive Cadence Manager</text>
-    <text x="332" y="186" fill="#64748b" font-size="9">Normal: 60s | Critical: 5s</text>
+    <rect x="320" y="130" width="300" height="58" rx="8" fill="#0f172a" stroke="#3b82f6" stroke-width="1"/>
+    <text x="332" y="150" fill="#93c5fd" font-size="12" font-weight="bold">samplingTask [P2]</text>
+    <text x="332" y="165" fill="#60a5fa" font-size="10">Adaptive Cadence Manager</text>
+    <text x="332" y="178" fill="#94a3b8" font-size="9">Normal: 60s | Abnormal: 5s (updates samplingPeriods)</text>
   </g>
 
-  <!-- Actuation & Control Tier -->
-  <g transform="translate(375, 490)">
-    <rect x="0" y="0" width="300" height="65" rx="8" fill="#0f172a" stroke="#ec4899" stroke-width="1"/>
-    <text x="12" y="22" fill="#fbcfe8" font-size="12" font-weight="bold">medicationTask [P3] (50 Hz / 20 ms)</text>
-    <text x="12" y="38" fill="#f472b6" font-size="10">Task 3 Safety Slew (+5.0 mg/h/s)</text>
-    <text x="12" y="50" fill="#94a3b8" font-size="9">Interlock: &gt;80 mg/h needs Button Confirm</text>
+  <!-- Actuation, UI & Comm Tier (Including mqttTask on Core 1) -->
+  <g transform="translate(375, 474)">
+    <rect x="0" y="0" width="300" height="60" rx="8" fill="#0f172a" stroke="#ec4899" stroke-width="1"/>
+    <text x="12" y="20" fill="#fbcfe8" font-size="12" font-weight="bold">medicationTask [P3] (50 Hz / 20 ms)</text>
+    <text x="12" y="35" fill="#f472b6" font-size="10">Task 3 Safety Slew (+5.0 mg/h/s)</text>
+    <text x="12" y="48" fill="#94a3b8" font-size="9">Interlock: &gt;80 mg/h needs Button Confirm</text>
 
-    <rect x="320" y="0" width="300" height="65" rx="8" fill="#0f172a" stroke="#06b6d4" stroke-width="1"/>
-    <text x="332" y="22" fill="#cffafe" font-size="12" font-weight="bold">bedTask [P2] (50 Hz / 20 ms)</text>
-    <text x="332" y="38" fill="#22d3ee" font-size="10">Task 4 Smooth Microsecond Slew</text>
-    <text x="332" y="50" fill="#94a3b8" font-size="9">Auto: 1.5&#176;/s, Man: 2&#176;/s, Emer: 5&#176;/s</text>
+    <rect x="320" y="0" width="300" height="60" rx="8" fill="#0f172a" stroke="#06b6d4" stroke-width="1"/>
+    <text x="332" y="20" fill="#cffafe" font-size="12" font-weight="bold">bedTask [P2] (50 Hz / 20 ms)</text>
+    <text x="332" y="35" fill="#22d3ee" font-size="10">Task 4 Smooth Microsecond Slew</text>
+    <text x="332" y="48" fill="#94a3b8" font-size="9">Auto: 1.5&#176;/s, Man: 2&#176;/s, Emer: 5&#176;/s</text>
 
-    <rect x="0" y="73" width="300" height="60" rx="8" fill="#0f172a" stroke="#8b5cf6" stroke-width="1"/>
-    <text x="12" y="95" fill="#ddd6fe" font-size="12" font-weight="bold">displayTask [P1] (100 ms)</text>
-    <text x="12" y="111" fill="#a78bfa" font-size="10">SSD1306 OLED via I2C</text>
-    <text x="12" y="123" fill="#94a3b8" font-size="9">Drains sensorQueue &amp; renders UI</text>
+    <rect x="0" y="68" width="300" height="60" rx="8" fill="#0f172a" stroke="#8b5cf6" stroke-width="1"/>
+    <text x="12" y="88" fill="#ddd6fe" font-size="12" font-weight="bold">displayTask [P1] (100 ms)</text>
+    <text x="12" y="103" fill="#a78bfa" font-size="10">SSD1306 OLED via I2C</text>
+    <text x="12" y="116" fill="#94a3b8" font-size="9">Drains sensorQueue &amp; renders UI / DEGRADED banner</text>
 
-    <rect x="320" y="73" width="300" height="60" rx="8" fill="#0f172a" stroke="#10b981" stroke-width="1"/>
-    <text x="332" y="95" fill="#a7f3d0" font-size="12" font-weight="bold">offlineTask [P2] (Cadence: 50 ms)</text>
-    <text x="332" y="111" fill="#6ee7b7" font-size="10">Task 6 Health Monitor &amp; Buzzer</text>
-    <text x="332" y="123" fill="#94a3b8" font-size="9">Audits Wi-Fi/MQTT/WDT &amp; FIFO RAM Buffer</text>
+    <rect x="320" y="68" width="300" height="60" rx="8" fill="#0f172a" stroke="#10b981" stroke-width="1"/>
+    <text x="332" y="88" fill="#a7f3d0" font-size="12" font-weight="bold">offlineTask [P2] (Cadence: 50 ms)</text>
+    <text x="332" y="103" fill="#6ee7b7" font-size="10">Health Monitor &amp; Buzzer Cadence</text>
+    <text x="332" y="116" fill="#94a3b8" font-size="9">Audits Wi-Fi/MQTT/WDT &amp; controls failure beeps</text>
+
+    <!-- mqttTask on Core 1 -->
+    <rect x="0" y="136" width="620" height="60" rx="8" fill="#1e1b4b" stroke="#6366f1" stroke-width="1.5"/>
+    <text x="12" y="156" fill="#c7d2fe" font-size="12" font-weight="bold">mqttTask [P2] (Core 1 Cloud Bridge: PubSubClient 8192 B stack, 3000 ms cadence)</text>
+    <text x="12" y="172" fill="#a5b4fc" font-size="10">&#8226; Round-Robin Rate Limiting &#8226; Exponential Backoff &#8226; Enqueues/Dequeues offlineBuffer (64 FIFO)</text>
+    <text x="12" y="186" fill="#94a3b8" font-size="9">&#8226; Aggregates 60s summary &#8226; Transmits via lwIP stack on Core 0</text>
   </g>
 
   <!-- Thread-Safe IPC Bus Container -->
-  <rect x="375" y="635" width="620" height="115" rx="8" fill="#0f172a" stroke="#0284c7" stroke-width="1.5"/>
-  <text x="390" y="656" fill="#38bdf8" font-size="12" font-weight="bold">THREAD-SAFE INTER-TASK COMMUNICATION (IPC) PRIMITIVES</text>
+  <rect x="375" y="685" width="620" height="185" rx="8" fill="#0f172a" stroke="#0284c7" stroke-width="1.5"/>
+  <text x="390" y="706" fill="#38bdf8" font-size="12" font-weight="bold">THREAD-SAFE INTER-TASK COMMUNICATION (IPC) PRIMITIVES</text>
   
   <!-- Row 1: Synchronization Primitives -->
-  <rect x="390" y="666" width="145" height="32" rx="6" fill="#1e293b" stroke="#0369a1"/>
-  <text x="398" y="686" fill="#e0f2fe" font-size="10">telemetryMux (Spinlock)</text>
+  <rect x="390" y="718" width="145" height="32" rx="6" fill="#1e293b" stroke="#0369a1"/>
+  <text x="398" y="738" fill="#e0f2fe" font-size="10">telemetryMux (Spinlock)</text>
 
-  <rect x="545" y="666" width="135" height="32" rx="6" fill="#1e293b" stroke="#0369a1"/>
-  <text x="555" y="686" fill="#e0f2fe" font-size="10">displayMutex (Mutex)</text>
+  <rect x="545" y="718" width="135" height="32" rx="6" fill="#1e293b" stroke="#0369a1"/>
+  <text x="555" y="738" fill="#e0f2fe" font-size="10">displayMutex (Mutex)</text>
 
-  <rect x="690" y="666" width="145" height="32" rx="6" fill="#1e293b" stroke="#0369a1"/>
-  <text x="698" y="686" fill="#e0f2fe" font-size="10">heartbeatMutex (Mutex)</text>
+  <rect x="690" y="718" width="145" height="32" rx="6" fill="#1e293b" stroke="#0369a1"/>
+  <text x="698" y="738" fill="#e0f2fe" font-size="10">heartbeatMutex (Mutex)</text>
 
-  <rect x="845" y="666" width="135" height="32" rx="6" fill="#1e293b" stroke="#0369a1"/>
-  <text x="855" y="686" fill="#e0f2fe" font-size="10">alertSemaphore (Binary)</text>
+  <rect x="845" y="718" width="135" height="32" rx="6" fill="#1e293b" stroke="#0369a1"/>
+  <text x="855" y="738" fill="#e0f2fe" font-size="10">alertSemaphore (Binary)</text>
 
   <!-- Row 2: Queues and Buffers -->
-  <rect x="390" y="706" width="145" height="32" rx="6" fill="#1e293b" stroke="#0369a1"/>
-  <text x="400" y="726" fill="#e0f2fe" font-size="10">sensorQueue (16 items)</text>
+  <rect x="390" y="758" width="145" height="32" rx="6" fill="#1e293b" stroke="#0369a1"/>
+  <text x="400" y="778" fill="#e0f2fe" font-size="10">sensorQueue (16 items)</text>
 
-  <rect x="545" y="706" width="135" height="32" rx="6" fill="#1e293b" stroke="#0369a1"/>
-  <text x="555" y="726" fill="#e0f2fe" font-size="10">samplingQueue (Depth 1)</text>
+  <rect x="545" y="758" width="135" height="32" rx="6" fill="#1e293b" stroke="#0369a1"/>
+  <text x="555" y="778" fill="#e0f2fe" font-size="10">samplingQueue (Depth 1)</text>
 
-  <rect x="690" y="706" width="145" height="32" rx="6" fill="#1e293b" stroke="#0369a1"/>
-  <text x="700" y="726" fill="#e0f2fe" font-size="10">bedQueue (Depth 1)</text>
+  <rect x="690" y="758" width="145" height="32" rx="6" fill="#1e293b" stroke="#0369a1"/>
+  <text x="700" y="778" fill="#e0f2fe" font-size="10">bedQueue (Depth 1)</text>
 
-  <rect x="845" y="706" width="135" height="32" rx="6" fill="#1e293b" stroke="#f59e0b"/>
-  <text x="850" y="726" fill="#fef3c7" font-size="10">offlineBuffer (64 RAM FIFO)</text>
+  <rect x="845" y="758" width="135" height="32" rx="6" fill="#1e293b" stroke="#f59e0b"/>
+  <text x="850" y="778" fill="#fef3c7" font-size="10">offlineBuffer (64 RAM FIFO)</text>
+
+  <!-- Connective summary line -->
+  <text x="390" y="812" fill="#94a3b8" font-size="10">&#8226; sensorQueue: TEMP, MOT, VIT, ECG -> displayTask -> shared telemetry (telemetryMux)</text>
+  <text x="390" y="828" fill="#94a3b8" font-size="10">&#8226; samplingQueue / bedQueue: MQTT commands -> samplingTask / bedTask</text>
+  <text x="390" y="844" fill="#94a3b8" font-size="10">&#8226; offlineBuffer: Owned &amp; drained strictly by mqttTask during network drops</text>
 
   <!-- Network / Cloud Layer (Right Column) -->
   <rect x="1030" y="105" width="340" height="785" rx="12" fill="url(#cardCloud)" stroke="#9333ea" stroke-width="1.5"/>
@@ -204,54 +218,47 @@
 
   <!-- Core 0 Stacks -->
   <g transform="translate(1045, 165)">
-    <rect x="0" y="0" width="310" height="75" rx="8" fill="#0f172a" stroke="#a855f7" stroke-width="1"/>
-    <text x="15" y="24" fill="#f3e8ff" font-size="13" font-weight="bold">CORE 0: Network Coprocessor</text>
-    <text x="15" y="44" fill="#d8b4fe" font-size="11">&#8226; Espressif 802.11 b/g/n Wi-Fi MAC/PHY</text>
-    <text x="15" y="60" fill="#d8b4fe" font-size="11">&#8226; lwIP IPv4/TCP Protocol Stack</text>
-
-    <!-- mqttTask (Core 1 bridge) -->
-    <rect x="0" y="85" width="310" height="120" rx="8" fill="#1e1b4b" stroke="#6366f1" stroke-width="1.5"/>
-    <text x="15" y="108" fill="#c7d2fe" font-size="13" font-weight="bold">mqttTask [Core 1 Bridge] (3000 ms)</text>
-    <text x="15" y="126" fill="#a5b4fc" font-size="11">&#8226; PubSubClient MQTT v3.1.1 (P2, 8192 stack)</text>
-    <text x="15" y="142" fill="#a5b4fc" font-size="11">&#8226; Round-Robin Rate Limiting (Adafruit IO)</text>
-    <text x="15" y="158" fill="#a5b4fc" font-size="11">&#8226; Exponential Backoff Reconnect (1s-&gt;30s)</text>
-    <text x="15" y="174" fill="#a5b4fc" font-size="11">&#8226; FIFO Replay Engine from offlineBuffer</text>
-    <text x="15" y="190" fill="#a5b4fc" font-size="11">&#8226; 60-Second Telemetry Aggregator Summary</text>
+    <rect x="0" y="0" width="310" height="90" rx="8" fill="#0f172a" stroke="#a855f7" stroke-width="1.5"/>
+    <text x="15" y="26" fill="#f3e8ff" font-size="13" font-weight="bold">CORE 0: Network Coprocessor</text>
+    <text x="15" y="48" fill="#d8b4fe" font-size="11">&#8226; Espressif 802.11 b/g/n Wi-Fi MAC/PHY</text>
+    <text x="15" y="66" fill="#d8b4fe" font-size="11">&#8226; lwIP IPv4/TCP Protocol Stack</text>
+    <text x="15" y="82" fill="#94a3b8" font-size="9">Dedicated Core 0 networking handles MQTT TCP sockets</text>
 
     <!-- Adafruit IO Feeds -->
-    <rect x="0" y="215" width="310" height="495" rx="8" fill="#0f172a" stroke="#a855f7" stroke-width="1"/>
-    <text x="15" y="238" fill="#e9d5ff" font-size="13" font-weight="bold">Adafruit IO Cloud Feeds (10 Limit)</text>
+    <rect x="0" y="105" width="310" height="605" rx="8" fill="#0f172a" stroke="#a855f7" stroke-width="1"/>
+    <text x="15" y="128" fill="#e9d5ff" font-size="13" font-weight="bold">Adafruit IO Cloud Feeds (10 Limit)</text>
 
     <!-- Medical Feeds -->
-    <rect x="12" y="248" width="286" height="85" rx="6" fill="#1e293b" stroke="#3b82f6"/>
-    <text x="22" y="268" fill="#93c5fd" font-size="11" font-weight="bold">Medical Staff Dashboard Feeds:</text>
-    <text x="22" y="285" fill="#bfdbfe" font-size="10">&#8226; medical-heart-rate (50-100 BPM gauge)</text>
-    <text x="22" y="300" fill="#bfdbfe" font-size="10">&#8226; medical-spo2 (92-100 % gauge)</text>
-    <text x="22" y="315" fill="#bfdbfe" font-size="10">&#8226; medical-body-temperature (36-38 &#176;C gauge)</text>
+    <rect x="12" y="140" width="286" height="85" rx="6" fill="#1e293b" stroke="#3b82f6"/>
+    <text x="22" y="160" fill="#93c5fd" font-size="11" font-weight="bold">Medical Staff Dashboard Feeds:</text>
+    <text x="22" y="177" fill="#bfdbfe" font-size="10">&#8226; medical-heart-rate (50-100 BPM gauge)</text>
+    <text x="22" y="192" fill="#bfdbfe" font-size="10">&#8226; medical-spo2 (92-100 % gauge)</text>
+    <text x="22" y="207" fill="#bfdbfe" font-size="10">&#8226; medical-body-temperature (36-38 &#176;C gauge)</text>
 
     <!-- Facility Feeds -->
-    <rect x="12" y="340" width="286" height="85" rx="6" fill="#1e293b" stroke="#10b981"/>
-    <text x="22" y="360" fill="#6ee7b7" font-size="11" font-weight="bold">Facility Management Dashboard Feeds:</text>
-    <text x="22" y="377" fill="#a7f3d0" font-size="10">&#8226; facility-room-temperature (18-28 &#176;C gauge)</text>
-    <text x="22" y="392" fill="#a7f3d0" font-size="10">&#8226; facility-oxygen (19.5-24 % gauge)</text>
-    <text x="22" y="407" fill="#a7f3d0" font-size="10">&#8226; facility-aqi (0-100 AQI gauge)</text>
+    <rect x="12" y="235" width="286" height="85" rx="6" fill="#1e293b" stroke="#10b981"/>
+    <text x="22" y="255" fill="#6ee7b7" font-size="11" font-weight="bold">Facility Management Dashboard Feeds:</text>
+    <text x="22" y="272" fill="#a7f3d0" font-size="10">&#8226; facility-room-temperature (18-28 &#176;C gauge)</text>
+    <text x="22" y="287" fill="#a7f3d0" font-size="10">&#8226; facility-oxygen (19.5-24 % gauge)</text>
+    <text x="22" y="302" fill="#a7f3d0" font-size="10">&#8226; facility-aqi (0-100 AQI gauge)</text>
 
     <!-- Control Feeds -->
-    <rect x="12" y="432" width="286" height="85" rx="6" fill="#1e293b" stroke="#f59e0b"/>
-    <text x="22" y="452" fill="#fde68a" font-size="11" font-weight="bold">Interactive Control Feeds (Sliders):</text>
-    <text x="22" y="469" fill="#fef08a" font-size="10">&#8226; medication-dosage (0-100 mg/hr control)</text>
-    <text x="22" y="484" fill="#fef08a" font-size="10">&#8226; bed-angle (0-90&#176; bed slider)</text>
-    <text x="22" y="499" fill="#fef08a" font-size="10">&#8226; sampling-rate (5-60 s slider)</text>
+    <rect x="12" y="330" width="286" height="85" rx="6" fill="#1e293b" stroke="#f59e0b"/>
+    <text x="22" y="350" fill="#fde68a" font-size="11" font-weight="bold">Interactive Control Feeds (Sliders):</text>
+    <text x="22" y="367" fill="#fef08a" font-size="10">&#8226; medication-dosage (0-100 mg/hr control)</text>
+    <text x="22" y="382" fill="#fef08a" font-size="10">&#8226; bed-angle (0-90&#176; bed slider)</text>
+    <text x="22" y="397" fill="#fef08a" font-size="10">&#8226; sampling-rate (5-60 s slider)</text>
 
     <!-- Events Feed -->
-    <rect x="12" y="524" width="286" height="175" rx="6" fill="#1e293b" stroke="#ef4444"/>
-    <text x="22" y="544" fill="#fca5a5" font-size="11" font-weight="bold">Multiplexed Event Stream Feed:</text>
-    <text x="22" y="561" fill="#fecaca" font-size="10">&#8226; hospital-events (Stream &amp; Feed View)</text>
-    <text x="22" y="578" fill="#94a3b8" font-size="9">  - Clinical Alarms (Tachycardia, Hypoxia)</text>
-    <text x="22" y="594" fill="#94a3b8" font-size="9">  - Facility Alarms (High Temp, Low O2, High AQI)</text>
-    <text x="22" y="610" fill="#94a3b8" font-size="9">  - Medication Confirmations (&gt;80 mg/hr)</text>
-    <text x="22" y="626" fill="#94a3b8" font-size="9">  - Bed Mode Transitions (Emergency, Support)</text>
-    <text x="22" y="642" fill="#94a3b8" font-size="9">  - Network Failures (Wi-Fi, MQTT loss)</text>
-    <text x="22" y="658" fill="#94a3b8" font-size="9">  - 60-Second Periodic Aggregation Insights</text>
+    <rect x="12" y="425" width="286" height="175" rx="6" fill="#1e293b" stroke="#ef4444"/>
+    <text x="22" y="445" fill="#fca5a5" font-size="11" font-weight="bold">Multiplexed Event Stream Feed:</text>
+    <text x="22" y="462" fill="#fecaca" font-size="10">&#8226; hospital-events (Stream &amp; Feed View)</text>
+    <text x="22" y="480" fill="#94a3b8" font-size="9">  - Clinical Alerts (Tachycardia, Hypoxia, Fever)</text>
+    <text x="22" y="496" fill="#94a3b8" font-size="9">  - Facility Alerts (High Temp, Low O2, High AQI)</text>
+    <text x="22" y="512" fill="#94a3b8" font-size="9">  - Sensor Integrity (SENSOR FAULT / RESTORED)</text>
+    <text x="22" y="528" fill="#94a3b8" font-size="9">  - Normal Clearances (Clinical &amp; Facility)</text>
+    <text x="22" y="544" fill="#94a3b8" font-size="9">  - 60-Second Periodic Aggregation Insights</text>
+    <text x="22" y="565" fill="#6ee7b7" font-size="9">&#8226; Paced by Round-Robin rate limiter (20 msgs/min)</text>
+    <text x="22" y="580" fill="#6ee7b7" font-size="9">&#8226; Reconnect backoff (1s -&gt; 30s) + FIFO replay</text>
   </g>
 </svg>

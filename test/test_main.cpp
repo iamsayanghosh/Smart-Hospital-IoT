@@ -3,6 +3,9 @@
 #include "parser_utils.h"
 #include "medication.h"
 
+void setUp(void) {}
+void tearDown(void) {}
+
 void test_parse_float_strict_valid() {
     float val = 0.0f;
     TEST_ASSERT_TRUE(parseFloatStrict("36.5", 34.0f, 42.0f, val));

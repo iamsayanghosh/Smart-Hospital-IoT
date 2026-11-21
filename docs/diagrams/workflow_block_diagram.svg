@@ -55,7 +55,7 @@
     <!-- PIR -->
     <rect x="0" y="125" width="250" height="70" rx="8" fill="#1e293b" stroke="#10b981" stroke-width="1"/>
     <text x="12" y="147" fill="#a7f3d0" font-size="12" font-weight="bold">HC-SR501 Motion Detection</text>
-    <text x="12" y="165" fill="#e2e8f0" font-size="10">&#8226; Digital GPIO 27 Sampling</text>
+    <text x="12" y="165" fill="#e2e8f0" font-size="10">&#8226; Digital GPIO 27 Sampling (5V supply)</text>
     <text x="12" y="181" fill="#e2e8f0" font-size="10">&#8226; Periodic 1000 ms Heartbeat Check</text>
 
     <!-- Synthetic PPG -->
@@ -80,13 +80,14 @@
     <text x="12" y="470" fill="#e2e8f0" font-size="10">&#8226; Room Temperature (18 - 28 &#176;C)</text>
     <text x="12" y="486" fill="#e2e8f0" font-size="10">&#8226; Oxygen Level (19.5% - 24.0%)</text>
     <text x="12" y="502" fill="#e2e8f0" font-size="10">&#8226; Air Quality Index (0 - 100 AQI)</text>
-    <text x="12" y="516" fill="#64748b" font-size="9">CLI override: SET_ROOM, SET_OXYGEN, SET_AQI</text>
+    <text x="12" y="516" fill="#64748b" font-size="9">Updates facilityTelemetry under telemetryMux</text>
 
     <!-- Push into SensorQueue -->
-    <rect x="0" y="540" width="250" height="60" rx="8" fill="#065f46" stroke="#059669" stroke-width="1.5"/>
-    <text x="12" y="563" fill="#ecfdf5" font-size="12" font-weight="bold">sensorQueue [Capacity: 16]</text>
-    <text x="12" y="581" fill="#a7f3d0" font-size="10">All sensor tasks pack SensorMessage</text>
-    <text x="12" y="593" fill="#a7f3d0" font-size="9">and push asynchronously into FIFO queue</text>
+    <rect x="0" y="540" width="250" height="75" rx="8" fill="#065f46" stroke="#059669" stroke-width="1.5"/>
+    <text x="12" y="561" fill="#ecfdf5" font-size="12" font-weight="bold">sensorQueue [Capacity: 16]</text>
+    <text x="12" y="577" fill="#a7f3d0" font-size="10">&#8226; TEMP, MOT, VIT, ECG push SensorMessage</text>
+    <text x="12" y="591" fill="#a7f3d0" font-size="10">&#8226; Asynchronous FIFO delivery to displayTask</text>
+    <text x="12" y="605" fill="#6ee7b7" font-size="9">(Facility updates shared state directly)</text>
   </g>
 
   <!-- STAGE 2: Processing & State Management (Middle-Left Column) -->
@@ -97,41 +98,45 @@
   <!-- Stage 2 Items -->
   <g transform="translate(345, 165)">
     <!-- Central Telemetry Drain -->
-    <rect x="0" y="0" width="280" height="95" rx="8" fill="#1e293b" stroke="#3b82f6" stroke-width="1"/>
+    <rect x="0" y="0" width="280" height="85" rx="8" fill="#1e293b" stroke="#3b82f6" stroke-width="1"/>
     <text x="12" y="22" fill="#93c5fd" font-size="12" font-weight="bold">Central Telemetry Aggregator</text>
     <text x="12" y="40" fill="#e2e8f0" font-size="10">&#8226; Drains sensorQueue inside displayTask</text>
     <text x="12" y="56" fill="#e2e8f0" font-size="10">&#8226; Spinlock protected: telemetryMux</text>
-    <text x="12" y="72" fill="#e2e8f0" font-size="10">&#8226; Updates atomic SystemState record</text>
-    <text x="12" y="88" fill="#64748b" font-size="9">Protects against concurrent race conditions</text>
+    <text x="12" y="72" fill="#e2e8f0" font-size="10">&#8226; Commits atomic SystemState record</text>
 
-    <!-- 3-Tier Threshold Engine -->
-    <rect x="0" y="110" width="280" height="150" rx="8" fill="#1e293b" stroke="#3b82f6" stroke-width="1"/>
-    <text x="12" y="132" fill="#93c5fd" font-size="12" font-weight="bold">3-Tier Clinical &amp; Facility Thresholds</text>
-    <text x="12" y="150" fill="#22c55e" font-size="10">&#8226; NORMAL: HR/ECG 50-100, SpO2 &gt;=92%, Temp 36-38</text>
-    <text x="12" y="166" fill="#eab308" font-size="10">&#8226; WARNING: HR/ECG 45-49 / 101-120, SpO2 88-91%</text>
-    <text x="12" y="182" fill="#ef4444" font-size="10">&#8226; CRITICAL: HR/ECG &lt;45 or &gt;120, SpO2 &lt;88%, Temp &lt;34/&gt;39.5</text>
-    <text x="12" y="200" fill="#6ee7b7" font-size="10">&#8226; FACILITY NORMAL: Room 18-28&#176;C, O2 19.5-24%, AQI &lt;100</text>
-    <text x="12" y="216" fill="#fde68a" font-size="10">&#8226; FACILITY WARNING: Room 16-18 / 28-30&#176;C, AQI 101-150</text>
-    <text x="12" y="232" fill="#fca5a5" font-size="10">&#8226; FACILITY CRITICAL: Room &lt;16/&gt;30&#176;C, O2 &lt;18/&gt;24.5%, AQI &gt;150</text>
-    <text x="12" y="250" fill="#64748b" font-size="9">Rising edge transition gives alertSemaphore</text>
+    <!-- 3-Tier Threshold Engine (Wrapped cleanly to prevent clipping) -->
+    <rect x="0" y="98" width="280" height="175" rx="8" fill="#1e293b" stroke="#3b82f6" stroke-width="1"/>
+    <text x="12" y="118" fill="#93c5fd" font-size="12" font-weight="bold">3-Tier Clinical &amp; Facility Thresholds</text>
+    
+    <text x="12" y="136" fill="#22c55e" font-size="10">&#8226; CLINICAL NORMAL: HR 50-100, SpO2 &#8805;92%</text>
+    <text x="24" y="150" fill="#22c55e" font-size="10">Temp 36.1-37.5 &#176;C</text>
+    <text x="12" y="166" fill="#eab308" font-size="10">&#8226; CLINICAL WARN: HR 45-49/101-120, SpO2 88-91%</text>
+    <text x="12" y="182" fill="#ef4444" font-size="10">&#8226; CLINICAL CRIT: HR &lt;45/&gt;120, SpO2 &lt;88%</text>
+    <text x="24" y="196" fill="#ef4444" font-size="10">Temp &lt;34/&gt;39.5 &#176;C</text>
 
-    <!-- Dynamic Rate Adjustment Logic (Placed directly below Thresholds) -->
-    <rect x="0" y="275" width="280" height="110" rx="8" fill="#1e293b" stroke="#3b82f6" stroke-width="1"/>
-    <text x="12" y="297" fill="#93c5fd" font-size="12" font-weight="bold">Task 5: Adaptive Sampling Manager</text>
-    <text x="12" y="315" fill="#e2e8f0" font-size="10">&#8226; Monitors vitalState (Normal vs Abnormal)</text>
-    <text x="12" y="331" fill="#e2e8f0" font-size="10">&#8226; Abnormal: Auto-switch to 5s high-frequency</text>
-    <text x="12" y="347" fill="#e2e8f0" font-size="10">&#8226; Stable: Auto-relax to 60s battery saving</text>
-    <text x="12" y="363" fill="#e2e8f0" font-size="10">&#8226; Doctor manual slider: 5s to 60s</text>
-    <text x="12" y="377" fill="#64748b" font-size="9">Dispatches rate via samplingQueue (depth 1)</text>
+    <text x="12" y="214" fill="#6ee7b7" font-size="10">&#8226; FACILITY NORMAL: Room 18-28&#176;C, O2 19.5-24%</text>
+    <text x="24" y="228" fill="#6ee7b7" font-size="10">AQI &#8804;100 (Clean Air)</text>
+    <text x="12" y="244" fill="#fde68a" font-size="10">&#8226; FACILITY WARN: Room 16-18/28-30&#176;C, AQI 101-150</text>
+    <text x="12" y="260" fill="#fca5a5" font-size="10">&#8226; FACILITY CRIT: Room &lt;16/&gt;30&#176;C, O2 &lt;18/&gt;24.5%</text>
+    <text x="24" y="269" fill="#fca5a5" font-size="9">AQI &gt;150 &#8226; Gives alertSemaphore</text>
+
+    <!-- Dynamic Rate Adjustment Logic -->
+    <rect x="0" y="285" width="280" height="110" rx="8" fill="#1e293b" stroke="#3b82f6" stroke-width="1"/>
+    <text x="12" y="307" fill="#93c5fd" font-size="12" font-weight="bold">Task 5: Adaptive Sampling Manager</text>
+    <text x="12" y="325" fill="#e2e8f0" font-size="10">&#8226; Evaluates clinical severity (Normal vs Abnormal)</text>
+    <text x="12" y="341" fill="#e2e8f0" font-size="10">&#8226; Abnormal (Warn/Crit): Auto-switch to 5s</text>
+    <text x="12" y="357" fill="#e2e8f0" font-size="10">&#8226; Stable: Auto-relax to 60s battery saving</text>
+    <text x="12" y="373" fill="#e2e8f0" font-size="10">&#8226; Doctor slider (5s-60s) via samplingQueue</text>
+    <text x="12" y="387" fill="#64748b" font-size="9">Updates samplingPeriods under telemetryMux</text>
 
     <!-- Watchdog & Health Monitor -->
-    <rect x="0" y="400" width="280" height="110" rx="8" fill="#1e293b" stroke="#e11d48" stroke-width="1"/>
-    <text x="12" y="422" fill="#fda4af" font-size="12" font-weight="bold">Dual-Tier Watchdog Supervisor</text>
-    <text x="12" y="440" fill="#e2e8f0" font-size="10">&#8226; Hardware: ESP-IDF TWDT (8000 ms panic)</text>
-    <text x="12" y="456" fill="#e2e8f0" font-size="10">&#8226; Software: watchdogTask audits heartbeats</text>
-    <text x="12" y="472" fill="#e2e8f0" font-size="10">&#8226; Cadence: 1000 ms audit (6000 ms silence limit)</text>
-    <text x="12" y="488" fill="#fca5a5" font-size="10">&#8226; Stalled task triggers SYSTEM_DEGRADED</text>
-    <text x="12" y="502" fill="#64748b" font-size="9">Fail-safe reboot ~2s later if unresponsive</text>
+    <rect x="0" y="408" width="280" height="110" rx="8" fill="#1e293b" stroke="#e11d48" stroke-width="1"/>
+    <text x="12" y="430" fill="#fda4af" font-size="12" font-weight="bold">Dual-Tier Watchdog Supervisor</text>
+    <text x="12" y="448" fill="#e2e8f0" font-size="10">&#8226; Hardware: ESP-IDF TWDT (8000 ms panic)</text>
+    <text x="12" y="464" fill="#e2e8f0" font-size="10">&#8226; Software: watchdogTask audits heartbeats</text>
+    <text x="12" y="480" fill="#e2e8f0" font-size="10">&#8226; Cadence: 1000 ms audit (6000 ms silence limit)</text>
+    <text x="12" y="496" fill="#fca5a5" font-size="10">&#8226; Stalled task logs SYSTEM_DEGRADED</text>
+    <text x="12" y="510" fill="#64748b" font-size="9">OLED shows DEGRADED banner; TWDT panic if hung</text>
   </g>
 
   <!-- STAGE 3: Local Safety & Actuation (Middle-Right Column) -->
@@ -171,9 +176,9 @@
     <text x="12" y="414" fill="#c4b5fd" font-size="11">&#8226; Rows y: 0 .. 44 (Medication Live State):</text>
     <text x="24" y="430" fill="#e2e8f0" font-size="10">Dose: xx.x mg/hr | Status: NORMAL/WARN/CRIT</text>
     <text x="24" y="444" fill="#e2e8f0" font-size="10">If Pending: Req / Now / PRESS BUTTON</text>
-    <text x="12" y="464" fill="#f59e0b" font-size="11">&#8226; Rows y: 54 .. 63 (Task 6 Inverted Banner):</text>
-    <text x="24" y="480" fill="#fde68a" font-size="10">Draws white bar: &quot;LOGGING OFFLINE&quot;</text>
-    <text x="12" y="496" fill="#64748b" font-size="9">Dual-zone layout: Offline alert never clobbers dose UI</text>
+    <text x="12" y="464" fill="#f59e0b" font-size="11">&#8226; Rows y: 54 .. 63 (Inverted Banner):</text>
+    <text x="24" y="480" fill="#fde68a" font-size="10">Draws white bar: &quot;LOGGING OFFLINE&quot; / &quot;DEGRADED&quot;</text>
+    <text x="12" y="496" fill="#64748b" font-size="9">Dual-zone layout: Offline/health alert never clobbers dose UI</text>
   </g>
 
   <!-- STAGE 4: Cloud & Fault-Tolerant Replay (Right Column) -->
@@ -189,7 +194,7 @@
     <text x="12" y="44" fill="#22c55e" font-size="11">&#8226; ONLINE: Wi-Fi connected &amp; MQTT active</text>
     <text x="12" y="60" fill="#eab308" font-size="11">&#8226; DEGRADED: Transport OK, Task Heartbeat stall</text>
     <text x="12" y="76" fill="#ef4444" font-size="11">&#8226; OFFLINE: Wi-Fi lost or MQTT disconnected</text>
-    <text x="12" y="96" fill="#fca5a5" font-size="10">Triggers distinct failure tones &amp; local buffer</text>
+    <text x="12" y="96" fill="#fca5a5" font-size="10">OFFLINE triggers buzzer failure tones &amp; local buffer</text>
 
     <!-- Failure-Specific Buzzer Cadences -->
     <rect x="0" y="125" width="310" height="110" rx="8" fill="#1e293b" stroke="#f59e0b" stroke-width="1"/>
@@ -200,20 +205,20 @@
     <text x="24" y="219" fill="#94a3b8" font-size="10">0-500 ms ON, 500-1000 ms OFF per 1000 ms</text>
     <text x="12" y="233" fill="#64748b" font-size="9">Medication alarm overrides network beeps</text>
 
-    <!-- Local RAM FIFO Buffer -->
+    <!-- Local RAM FIFO Buffer (Managed by mqttTask) -->
     <rect x="0" y="250" width="310" height="120" rx="8" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5"/>
-    <text x="12" y="274" fill="#fde68a" font-size="13" font-weight="bold">Local RAM FIFO Buffer (offlineBuffer)</text>
+    <text x="12" y="274" fill="#fde68a" font-size="13" font-weight="bold">Local RAM FIFO Buffer (Managed by mqttTask)</text>
     <text x="12" y="294" fill="#e2e8f0" font-size="11">&#8226; Capacity: 64 Telemetry Records (~36.8 KB)</text>
     <text x="12" y="310" fill="#e2e8f0" font-size="11">&#8226; Policy: Drops newest entries when saturated</text>
     <text x="12" y="326" fill="#e2e8f0" font-size="11">&#8226; Structure: topic[64] + payload[512]</text>
-    <text x="12" y="344" fill="#cbd5e1" font-size="10">&#8226; Volatile: SRAM-based (broker stamps on receipt)</text>
+    <text x="12" y="344" fill="#cbd5e1" font-size="10">&#8226; Exclusively enqueued &amp; drained by mqttTask</text>
     <text x="12" y="358" fill="#64748b" font-size="9">CLI test: SIM_OFFLINE WIFI / MQTT</text>
 
     <!-- Exponential Backoff & Replay -->
     <rect x="0" y="385" width="310" height="130" rx="8" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
     <text x="12" y="409" fill="#a7f3d0" font-size="13" font-weight="bold">Exponential Backoff &amp; Replay Engine</text>
     <text x="12" y="429" fill="#e2e8f0" font-size="11">&#8226; Reconnection Retry: 1s -&gt; 2s -&gt; 4s ... -&gt; 30s max</text>
-    <text x="12" y="445" fill="#e2e8f0" font-size="11">&#8226; On Connect: Drains offlineBuffer in FIFO order</text>
+    <text x="12" y="445" fill="#e2e8f0" font-size="11">&#8226; On Connect: mqttTask drains offlineBuffer FIFO</text>
     <text x="12" y="461" fill="#e2e8f0" font-size="11">&#8226; Rate-Limited: Paced to obey Adafruit IO quotas</text>
     <text x="12" y="479" fill="#6ee7b7" font-size="10">&#8226; Reconnection preserves data integrity</text>
     <text x="12" y="495" fill="#64748b" font-size="9">CLI test: SIM_ONLINE flushes buffer to cloud</text>
@@ -233,21 +238,21 @@
 
   <!-- Connective Arrows between Stages -->
   <!-- 1. Sensor Queue push to Central Aggregator -->
-  <path d="M 295 735 C 325 735, 315 212, 345 212" stroke="#10b981" stroke-width="2" fill="none" marker-end="url(#wfArrowGreen)"/>
-  <rect x="295" y="465" width="45" height="18" rx="3" fill="#065f46" opacity="0.9"/>
-  <text x="298" y="478" fill="#a7f3d0" font-size="9" font-weight="bold">FIFO</text>
+  <path d="M 295 735 C 325 735, 315 208, 345 208" stroke="#10b981" stroke-width="2" fill="none" marker-end="url(#wfArrowGreen)"/>
+  <rect x="290" y="465" width="45" height="18" rx="3" fill="#065f46" opacity="0.9"/>
+  <text x="293" y="478" fill="#a7f3d0" font-size="9" font-weight="bold">FIFO</text>
 
   <!-- 2. Inside Stage 2: Aggregator -> Thresholds -->
-  <path d="M 485 260 L 485 273" stroke="#38bdf8" stroke-width="2" fill="none" marker-end="url(#wfArrowBlue)"/>
+  <path d="M 485 250 L 485 263" stroke="#38bdf8" stroke-width="2" fill="none" marker-end="url(#wfArrowBlue)"/>
 
   <!-- 3. Inside Stage 2: Thresholds -> Adaptive Sampling -->
-  <path d="M 485 425 L 485 438" stroke="#38bdf8" stroke-width="2" fill="none" marker-end="url(#wfArrowBlue)"/>
+  <path d="M 485 440 L 485 450" stroke="#38bdf8" stroke-width="2" fill="none" marker-end="url(#wfArrowBlue)"/>
 
   <!-- 4. Clinical Thresholds -> Autonomous Bed Elevation (Stage 2 -> Stage 3) -->
-  <path d="M 625 350 C 650 350, 650 442, 675 442" stroke="#06b6d4" stroke-width="2.5" fill="none" marker-end="url(#wfArrowCyan)"/>
-  <rect x="625" y="385" width="50" height="26" rx="4" fill="#083344" stroke="#06b6d4" stroke-width="0.8"/>
-  <text x="628" y="397" fill="#67e8f9" font-size="8" font-weight="bold">Vitals &#8594;</text>
-  <text x="628" y="407" fill="#67e8f9" font-size="8">Bed Angle</text>
+  <path d="M 625 350 C 645 350, 650 442, 675 442" stroke="#06b6d4" stroke-width="2.5" fill="none" marker-end="url(#wfArrowCyan)"/>
+  <rect x="618" y="380" width="54" height="28" rx="4" fill="#083344" stroke="#06b6d4" stroke-width="0.8"/>
+  <text x="621" y="393" fill="#67e8f9" font-size="8" font-weight="bold">Vitals &#8594;</text>
+  <text x="621" y="403" fill="#67e8f9" font-size="8">Bed Angle</text>
 
   <!-- 5. Stage 4 Pipeline: Replay Engine -> Adafruit IO Dashboards (Outbound Stream) -->
   <path d="M 1200 680 L 1200 693" stroke="#10b981" stroke-width="2.5" fill="none" marker-end="url(#wfArrowGreen)"/>

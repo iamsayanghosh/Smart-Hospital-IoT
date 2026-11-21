@@ -35,6 +35,7 @@
 #include "medication.h"
 #include "bed.h"
 #include "offline.h"
+#include "outputs.h"
 
 static const uint32_t TWDT_TIMEOUT_MS = 8000;
 
@@ -129,10 +130,7 @@ void failSetup(const char *message)
     bedDetachServo();
 
     // Force discrete outputs to safe unpowered state
-    pinMode(25, OUTPUT); digitalWrite(25, LOW);
-    pinMode(26, OUTPUT); digitalWrite(26, LOW);
-    pinMode(33, OUTPUT); digitalWrite(33, LOW);
-    pinMode(14, OUTPUT); digitalWrite(14, LOW);
+    outputsInit();
     while (true) {
         vTaskDelay(pdMS_TO_TICKS(1000));
     }

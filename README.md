@@ -27,41 +27,49 @@ All 13 application worker tasks are pinned to **Core 1**, alongside Arduino `loo
 ### FreeRTOS Subsystem & Data Pipeline
 ```mermaid
 graph TD
-    subgraph "Core 0: Network Stacks"
-        WIFI_STACK["Espressif Wi-Fi MAC / PHY"]
-        LWIP["lwIP TCP/IP Stack"]
-        WIFI_STACK <--> LWIP
-    end
-
-    subgraph "Core 1: FreeRTOS Application Tasks"
-        P4["P4: watchdogTask (Auditor 1000 ms)"]
-        P3_1["P3: medicationTask (50 Hz / 20 ms)"]
-        P3_2["P3: vitalTask (PPG 5s-60s)"]
-        P3_3["P3: ecgTask (Fixed 5 Hz / 200 ms)"]
-        P2_1["P2: temperatureTask (DS18B20 5s-60s)"]
-        P2_2["P2: motionTask (PIR 1000 ms)"]
-        P2_3["P2: environmentTask (Facility 1000 ms)"]
-        P2_4["P2: bedTask (Servo 50 Hz / 20 ms)"]
-        P2_5["P2: mqttTask (Adafruit IO 3000 ms)"]
-        P2_6["P2: samplingTask (Adaptive 1000 ms)"]
-        P2_7["P2: alertTask (Binary Semaphore)"]
-        P2_8["P2: offlineTask (Health & Cadence 50 ms)"]
-        P1["P1: displayTask (SSD1306 OLED 100 ms)"]
-    end
-
-    subgraph "Hardware & Peripherals"
-        HW_OLED["SSD1306 OLED (I2C: 21, 22)"]
+    subgraph HW["Hardware & Peripherals"]
         HW_SENS["DS18B20 (4), PIR (27), Button (13)"]
+        HW_OLED["SSD1306 OLED (I2C 21, 22)"]
         HW_ACT["Servo (18), Buzzer (14), LEDs (25, 26, 33)"]
     end
-
-    %% Hardware Input / Output Flows
-    HW_SENS --> P2_1 & P2_2 & P3_1
-    P1 --> HW_OLED
-    P2_4 & P3_1 & P2_8 --> HW_ACT
-
-    %% Inter-Core Network Flow
-    P2_5 <--> LWIP
+    subgraph C1["Core 1: FreeRTOS Application Tasks"]
+        TEMP["temperatureTask P2"]
+        MOT["motionTask P2"]
+        VIT["vitalTask P3"]
+        ECG["ecgTask P3"]
+        ENV["environmentTask P2"]
+        DISP["displayTask P1"]
+        TEL[("Shared telemetry (telemetryMux)")]
+        SAMP["samplingTask P2"]
+        ALERT["alertTask P2"]
+        BED["bedTask P2"]
+        MED["medicationTask P3"]
+        MQTT["mqttTask P2"]
+        BUF[("offlineBuffer 64 x 576 B")]
+        OFF["offlineTask P2"]
+        WDT["watchdogTask P4 (audits the other 12 tasks)"]
+    end
+    subgraph C0["Core 0: Network Stacks"]
+        NET["Wi-Fi MAC/PHY + lwIP"]
+    end
+    CLOUD["Adafruit IO (10 feeds)"]
+    HW_SENS --> TEMP & MOT & MED
+    TEMP & MOT & VIT & ECG -->|sensorQueue| DISP
+    DISP --> TEL
+    ENV -->|telemetryMux| TEL
+    DISP & ENV -->|alertSemaphore| ALERT
+    DISP --> HW_OLED
+    TEL --> BED & SAMP & MQTT
+    SAMP -->|samplingPeriods| TEMP & VIT
+    MQTT -->|samplingQueue| SAMP
+    MQTT -->|bedQueue| BED
+    MQTT -->|"dosage cmd (shared state)"| MED
+    MQTT <--> BUF
+    MQTT -->|link-state flag| OFF
+    OFF -->|offline banner flag| DISP
+    BED & MED & OFF --> HW_ACT
+    MQTT <--> NET
+    NET <--> CLOUD
 ```
 
 ---

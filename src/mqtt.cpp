@@ -563,16 +563,14 @@ void publishMedicalAlertIfNeeded(const Telemetry &snapshot, bool offline)
             medicalNormalPending = true;
         }
 
-        if (!medicalAlertStateKnown || medicalNormalPending) {
-            if (!medicalAlertStateKnown || medicalNormalPending || now - lastMedicalAlertPublishMs >= ALERT_PUBLISH_INTERVAL_MS) {
-                const char *normalPayload = "MEDICAL STATUS: NORMAL\nNo active medical alerts.";
-                if (safePublish(getAioFeedTopic(HOSPITAL_EVENTS_FEED), String(normalPayload), offline)) {
-                    lastMedicalAlertPublishMs = now;
-                    medicalAlertStateKnown = true;
-                    medicalNormalPending = false;
-                    lastMedicalAlertParameter = "";
-                    lastMedicalAlertSeverity = ALERT_SEVERITY_NORMAL;
-                }
+        if (!medicalAlertStateKnown || medicalNormalPending || now - lastMedicalAlertPublishMs >= ALERT_PUBLISH_INTERVAL_MS) {
+            const char *normalPayload = "MEDICAL STATUS: NORMAL\nNo active medical alerts.";
+            if (safePublish(getAioFeedTopic(HOSPITAL_EVENTS_FEED), String(normalPayload), offline)) {
+                lastMedicalAlertPublishMs = now;
+                medicalAlertStateKnown = true;
+                medicalNormalPending = false;
+                lastMedicalAlertParameter = "";
+                lastMedicalAlertSeverity = ALERT_SEVERITY_NORMAL;
             }
         }
         return;
@@ -624,16 +622,14 @@ void publishFacilityAlertIfNeeded(const FacilityTelemetry &snapshot, bool offlin
             facilityNormalPending = true;
         }
 
-        if (!facilityAlertStateKnown || facilityNormalPending) {
-            if (!facilityAlertStateKnown || now - lastFacilityAlertPublishMs >= ALERT_PUBLISH_INTERVAL_MS) {
-                const char *normalPayload = "FACILITY STATUS: NORMAL\nNo active facility alerts.";
-                if (safePublish(getAioFeedTopic(HOSPITAL_EVENTS_FEED), String(normalPayload), offline)) {
-                    lastFacilityAlertPublishMs = now;
-                    facilityAlertStateKnown = true;
-                    facilityNormalPending = false;
-                    lastFacilityAlertParameter = "";
-                    lastFacilityAlertSeverity = ALERT_SEVERITY_NORMAL;
-                }
+        if (!facilityAlertStateKnown || facilityNormalPending || now - lastFacilityAlertPublishMs >= ALERT_PUBLISH_INTERVAL_MS) {
+            const char *normalPayload = "FACILITY STATUS: NORMAL\nNo active facility alerts.";
+            if (safePublish(getAioFeedTopic(HOSPITAL_EVENTS_FEED), String(normalPayload), offline)) {
+                lastFacilityAlertPublishMs = now;
+                facilityAlertStateKnown = true;
+                facilityNormalPending = false;
+                lastFacilityAlertParameter = "";
+                lastFacilityAlertSeverity = ALERT_SEVERITY_NORMAL;
             }
         }
         return;
