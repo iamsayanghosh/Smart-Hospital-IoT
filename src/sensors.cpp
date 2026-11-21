@@ -144,9 +144,11 @@ void temperatureTask(void *parameter) {
       retryMsg.type = TEMP_DATA;
       retryMsg.temperature = DEVICE_DISCONNECTED_C;
       bool sent = sendSensorMessage(retryMsg, "TEMP TASK");
-      updateQueueRetryState(sent, pendingTempDisconnectMessage);
-      if (sent) {
-        temperatureFaultReported = true;
+      if (!retryTemperatureDisconnect(sent, pendingTempDisconnectMessage, temperatureFaultReported)) {
+        // Queue still saturated; yield and retry next tick, preserving pending fault
+        reportTaskHeartbeat(TASK_TEMP);
+        vTaskDelay(pdMS_TO_TICKS(100));
+        continue;
       }
     }
 
@@ -162,14 +164,14 @@ void temperatureTask(void *parameter) {
       lastSampleMs = now;
       float overrideTemp = simOverrideTemperature.load();
       if (overrideTemp > -100.0f) {
-        consecutiveScratchpadCount = 0;
-        hasReadValidTemperature = true;
-        pendingTempDisconnectMessage = false;
-        temperatureFaultReported = false;
         SensorMessage message = {};
         message.type = TEMP_DATA;
         message.temperature = overrideTemp;
-        sendSensorMessage(message, "TEMP TASK");
+        bool sent = sendSensorMessage(message, "TEMP TASK");
+        if (updateTemperatureFaultReportState(false, sent, pendingTempDisconnectMessage, temperatureFaultReported)) {
+          consecutiveScratchpadCount = 0;
+          hasReadValidTemperature = true;
+        }
 
         Serial.print("[TEMP TASK] Temperature (override): ");
         Serial.print(message.temperature, 1);
@@ -197,28 +199,26 @@ void temperatureTask(void *parameter) {
             Serial.println("/3");
           } else {
             hasReadValidTemperature = false;
-            if (!temperatureFaultReported) {
+            if (!temperatureFaultReported && !pendingTempDisconnectMessage) {
               Serial.println("[TEMP TASK] Warning: Persistent 85.0 C scratchpad detected; marking sensor unavailable");
               SensorMessage message = {};
               message.type = TEMP_DATA;
               message.temperature = DEVICE_DISCONNECTED_C;
               bool sent = sendSensorMessage(message, "TEMP TASK");
-              updateQueueRetryState(sent, pendingTempDisconnectMessage);
-              if (sent) temperatureFaultReported = true; // latch until valid reading clears fault
+              updateTemperatureFaultReportState(true, sent, pendingTempDisconnectMessage, temperatureFaultReported);
             } else {
               Serial.println("[TEMP TASK] Persistent 85.0 C scratchpad; fault already reported, retrying");
             }
           }
         } else {
           hasReadValidTemperature = false;
-          if (!temperatureFaultReported) {
+          if (!temperatureFaultReported && !pendingTempDisconnectMessage) {
             Serial.println("[TEMP TASK] Warning: DS18B20 reset during operation (85.0 C scratchpad); marking unavailable");
             SensorMessage message = {};
             message.type = TEMP_DATA;
             message.temperature = DEVICE_DISCONNECTED_C;
             bool sent = sendSensorMessage(message, "TEMP TASK");
-            updateQueueRetryState(sent, pendingTempDisconnectMessage);
-            if (sent) temperatureFaultReported = true;
+            updateTemperatureFaultReportState(true, sent, pendingTempDisconnectMessage, temperatureFaultReported);
           } else {
             Serial.println("[TEMP TASK] DS18B20 85.0 C runtime reset; fault already reported, retrying");
           }
@@ -227,26 +227,25 @@ void temperatureTask(void *parameter) {
                  rawTemp > 125.0f) {
         consecutiveScratchpadCount = 0;
         hasReadValidTemperature = false;
-        if (!temperatureFaultReported) {
+        if (!temperatureFaultReported && !pendingTempDisconnectMessage) {
           Serial.println("[TEMP TASK] Warning: DS18B20 disconnected");
           SensorMessage message = {};
           message.type = TEMP_DATA;
           message.temperature = DEVICE_DISCONNECTED_C;
           bool sent = sendSensorMessage(message, "TEMP TASK");
-          updateQueueRetryState(sent, pendingTempDisconnectMessage);
-          if (sent) temperatureFaultReported = true;
+          updateTemperatureFaultReportState(true, sent, pendingTempDisconnectMessage, temperatureFaultReported);
         } else {
           Serial.println("[TEMP TASK] DS18B20 disconnected; fault already reported, retrying");
         }
       } else {
         consecutiveScratchpadCount = 0;
-        hasReadValidTemperature = true;
-        pendingTempDisconnectMessage = false;
-        temperatureFaultReported = false; // clear latch — sensor has recovered
         SensorMessage message = {};
         message.type = TEMP_DATA;
         message.temperature = rawTemp;
-        sendSensorMessage(message, "TEMP TASK");
+        bool sent = sendSensorMessage(message, "TEMP TASK");
+        if (updateTemperatureFaultReportState(false, sent, pendingTempDisconnectMessage, temperatureFaultReported)) {
+          hasReadValidTemperature = true;
+        }
 
         Serial.print("[TEMP TASK] Temperature: ");
         Serial.print(message.temperature, 1);

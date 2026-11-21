@@ -286,27 +286,61 @@ void test_medical_sensor_fault_state_machine_and_recovery() {
 
 void test_temperature_sensor_disconnect_queue_retry() {
     bool pendingTempDisconnectMessage = false;
+    bool temperatureFaultReported = false;
 
-    // Unit test of queue-retry bookkeeping helper (updateQueueRetryState);
+    // Unit test of queue-retry and one-notification fault latch bookkeeping helpers
+    // (updateQueueRetryState, updateTemperatureFaultReportState, retryTemperatureDisconnect);
     // does not exercise FreeRTOS queue saturation or IPC primitives.
 
-    // 1. Initial state: no retry pending
+    // 1. Initial state: no retry pending, no fault reported
     TEST_ASSERT_FALSE(pendingTempDisconnectMessage);
+    TEST_ASSERT_FALSE(temperatureFaultReported);
 
-    // 2. Queue full on initial disconnect dispatch (sendSuccess = false)
-    bool changed = updateQueueRetryState(false, pendingTempDisconnectMessage);
+    // 2. Queue full on initial disconnect dispatch (sendSuccess = false):
+    //    Sets pending flag, does NOT latch faultReported
+    bool changed = updateTemperatureFaultReportState(true, false, pendingTempDisconnectMessage, temperatureFaultReported);
     TEST_ASSERT_TRUE(changed);
     TEST_ASSERT_TRUE(pendingTempDisconnectMessage);
+    TEST_ASSERT_FALSE(temperatureFaultReported);
 
-    // 3. Subsequent cycle with queue still full (sendSuccess = false) retains pending flag
-    changed = updateQueueRetryState(false, pendingTempDisconnectMessage);
-    TEST_ASSERT_FALSE(changed);
+    // 3. Queue full fault -> sensor recovery before queue space becomes available:
+    //    Recovery attempt while pendingTempDisconnectMessage is true must NOT cancel pending fault
+    bool recovered = updateTemperatureFaultReportState(false, true, pendingTempDisconnectMessage, temperatureFaultReported);
+    TEST_ASSERT_FALSE(recovered);
+    TEST_ASSERT_TRUE(pendingTempDisconnectMessage); // pending fault strictly preserved
+    TEST_ASSERT_FALSE(temperatureFaultReported);
+
+    // 4. Subsequent retry cycle with queue still full (sendSuccess = false) retains pending flag
+    bool retried = retryTemperatureDisconnect(false, pendingTempDisconnectMessage, temperatureFaultReported);
+    TEST_ASSERT_FALSE(retried);
     TEST_ASSERT_TRUE(pendingTempDisconnectMessage);
+    TEST_ASSERT_FALSE(temperatureFaultReported);
 
-    // 4. Queue drains: successful dispatch (sendSuccess = true) clears pending flag
-    changed = updateQueueRetryState(true, pendingTempDisconnectMessage);
-    TEST_ASSERT_TRUE(changed);
+    // 5. Queue drains: successful dispatch of pending disconnect (sendSuccess = true)
+    //    Clears pending flag and latches faultReported
+    retried = retryTemperatureDisconnect(true, pendingTempDisconnectMessage, temperatureFaultReported);
+    TEST_ASSERT_TRUE(retried);
     TEST_ASSERT_FALSE(pendingTempDisconnectMessage);
+    TEST_ASSERT_TRUE(temperatureFaultReported);
+
+    // 6. Duplicate suppression: subsequent fault while faultReported is true does NOT dispatch duplicate
+    bool duplicate = updateTemperatureFaultReportState(true, true, pendingTempDisconnectMessage, temperatureFaultReported);
+    TEST_ASSERT_FALSE(duplicate);
+    TEST_ASSERT_TRUE(temperatureFaultReported);
+
+    // 7. Sensor recovery with space in queue (sendSuccess = true):
+    //    Clears faultReported latch
+    recovered = updateTemperatureFaultReportState(false, true, pendingTempDisconnectMessage, temperatureFaultReported);
+    TEST_ASSERT_TRUE(recovered);
+    TEST_ASSERT_FALSE(temperatureFaultReported);
+    TEST_ASSERT_FALSE(pendingTempDisconnectMessage);
+
+    // 8. Legacy updateQueueRetryState helper verification
+    bool legacyPending = false;
+    TEST_ASSERT_TRUE(updateQueueRetryState(false, legacyPending));
+    TEST_ASSERT_TRUE(legacyPending);
+    TEST_ASSERT_TRUE(updateQueueRetryState(true, legacyPending));
+    TEST_ASSERT_FALSE(legacyPending);
 }
 
 void test_evaluate_medical_alert_default_thresholds_override() {

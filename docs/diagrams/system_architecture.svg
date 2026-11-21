@@ -219,7 +219,7 @@
   <!-- Core 0 Stacks -->
   <g transform="translate(1045, 165)">
     <rect x="0" y="0" width="310" height="90" rx="8" fill="#0f172a" stroke="#a855f7" stroke-width="1.5"/>
-    <text x="15" y="26" fill="#f3e8ff" font-size="13" font-weight="bold">CORE 0: Network Coprocessor</text>
+    <text x="15" y="26" fill="#f3e8ff" font-size="11" font-weight="bold">CORE 0: Wi-Fi &amp; lwIP Networking Task Affinity</text>
     <text x="15" y="48" fill="#d8b4fe" font-size="11">&#8226; Espressif 802.11 b/g/n Wi-Fi MAC/PHY</text>
     <text x="15" y="66" fill="#d8b4fe" font-size="11">&#8226; lwIP IPv4/TCP Protocol Stack</text>
     <text x="15" y="82" fill="#94a3b8" font-size="9">Dedicated Core 0 networking handles MQTT TCP sockets</text>

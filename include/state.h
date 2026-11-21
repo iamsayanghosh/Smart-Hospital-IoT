@@ -403,6 +403,75 @@ inline bool updateQueueRetryState(bool sendSuccess, bool &pendingState)
 }
 
 /**
+ * @brief Retries dispatch of a pending temperature disconnect message.
+ *
+ * If send succeeds, clears pendingDisconnect and latches faultReported=true.
+ * If send fails, preserves pendingDisconnect=true.
+ *
+ * @param sendSuccess True if queue send operation succeeded.
+ * @param pendingDisconnect In/out reference to pending disconnect flag.
+ * @param faultReported In/out reference to one-shot fault reported latch.
+ * @return true if retry was pending and successfully cleared; false otherwise.
+ */
+inline bool retryTemperatureDisconnect(bool sendSuccess, bool &pendingDisconnect, bool &faultReported)
+{
+    if (!pendingDisconnect) {
+        return false;
+    }
+    if (sendSuccess) {
+        pendingDisconnect = false;
+        faultReported = true;
+        return true;
+    }
+    return false;
+}
+
+/**
+ * @brief Manages one-shot fault notification latch and recovery transitions for sensor outages.
+ *
+ * Ensures:
+ * 1. Exactly one fault notification is published per outage.
+ * 2. If a fault fails to enqueue (queue full), pendingDisconnect is set and preserved.
+ * 3. Recovery with a valid reading while pendingDisconnect is true NEVER silently drops the pending fault.
+ * 4. faultReported latch is cleared ONLY after a recovered valid reading is successfully accepted into the queue.
+ *
+ * @param isFault True if evaluating a fault condition (persistent 85C or disconnect); false for valid reading recovery.
+ * @param sendSuccess True if queue send operation succeeded.
+ * @param pendingDisconnect In/out reference to pending disconnect flag.
+ * @param faultReported In/out reference to one-shot fault reported latch.
+ * @return true if state transitioned; false if duplicate or suppressed.
+ */
+inline bool updateTemperatureFaultReportState(bool isFault, bool sendSuccess,
+                                              bool &pendingDisconnect, bool &faultReported)
+{
+    if (isFault) {
+        if (faultReported || pendingDisconnect) {
+            return false; // Duplicate suppressed: already reported or already pending retry
+        }
+        if (sendSuccess) {
+            faultReported = true;
+            pendingDisconnect = false;
+        } else {
+            faultReported = false;
+            pendingDisconnect = true;
+        }
+        return true;
+    } else {
+        // Recovery / valid temperature reading
+        if (pendingDisconnect) {
+            // Cannot clear fault state or deliver recovery while disconnect notification is still pending
+            return false;
+        }
+        if (sendSuccess) {
+            bool wasReported = faultReported;
+            faultReported = false; // Latch cleared only after successful queue acceptance of valid reading
+            return wasReported;
+        }
+        return false;
+    }
+}
+
+/**
  * @brief Analyzes patient telemetry and constructs an alert candidate if a threshold is violated.
  *
  * Evaluates physiological parameters in priority order: Heart Rate (<45 or >120 BPM Critical,

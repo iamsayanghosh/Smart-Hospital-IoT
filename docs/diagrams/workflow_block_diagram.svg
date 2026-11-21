@@ -106,19 +106,21 @@
 
     <!-- 3-Tier Threshold Engine (Wrapped cleanly to prevent clipping) -->
     <rect x="0" y="98" width="280" height="175" rx="8" fill="#1e293b" stroke="#3b82f6" stroke-width="1"/>
-    <text x="12" y="118" fill="#93c5fd" font-size="12" font-weight="bold">3-Tier Clinical &amp; Facility Thresholds</text>
+    <text x="12" y="115" fill="#93c5fd" font-size="11" font-weight="bold">3-Tier Clinical &amp; Facility Thresholds</text>
     
-    <text x="12" y="136" fill="#22c55e" font-size="10">&#8226; CLINICAL NORMAL: HR 50-100, SpO2 &#8805;92%</text>
-    <text x="24" y="150" fill="#22c55e" font-size="10">Temp 36.0-38.0 &#176;C</text>
-    <text x="12" y="166" fill="#eab308" font-size="10">&#8226; CLINICAL WARN: HR 45-49/101-120, SpO2 88-91%</text>
-    <text x="12" y="182" fill="#ef4444" font-size="10">&#8226; CLINICAL CRIT: HR &lt;45/&gt;120, SpO2 &lt;88%</text>
-    <text x="24" y="196" fill="#ef4444" font-size="10">Temp &lt;34/&gt;39.5 &#176;C</text>
+    <text x="12" y="130" fill="#22c55e" font-size="9">&#8226; CLINICAL NORMAL: HR/ECG 50-100, SpO2 &#8805;92%</text>
+    <text x="24" y="142" fill="#22c55e" font-size="9">Temp 36.0-38.0 &#176;C</text>
+    <text x="12" y="156" fill="#eab308" font-size="9">&#8226; CLINICAL WARN: HR/ECG 45-49/101-120, SpO2 88-91%</text>
+    <text x="24" y="168" fill="#eab308" font-size="9">Temp 34-36 / 38-39.5 &#176;C</text>
+    <text x="12" y="182" fill="#ef4444" font-size="9">&#8226; CLINICAL CRIT: HR/ECG &lt;45/&gt;120, SpO2 &lt;88%</text>
+    <text x="24" y="194" fill="#ef4444" font-size="9">Temp &lt;34 / &gt;39.5 &#176;C</text>
 
-    <text x="12" y="214" fill="#6ee7b7" font-size="10">&#8226; FACILITY NORMAL: Room 18-28&#176;C, O2 19.5-24%</text>
-    <text x="24" y="228" fill="#6ee7b7" font-size="10">AQI &#8804;100 (Clean Air)</text>
-    <text x="12" y="244" fill="#fde68a" font-size="10">&#8226; FACILITY WARN: Room 16-18/28-30&#176;C, AQI 101-150</text>
-    <text x="12" y="260" fill="#fca5a5" font-size="10">&#8226; FACILITY CRIT: Room &lt;16/&gt;30&#176;C, O2 &lt;18/&gt;24.5%</text>
-    <text x="24" y="269" fill="#fca5a5" font-size="9">AQI &gt;150 &#8226; Gives alertSemaphore</text>
+    <text x="12" y="210" fill="#6ee7b7" font-size="9">&#8226; FACILITY NORMAL: Room 18-28&#176;C, O2 19.5-24%</text>
+    <text x="24" y="222" fill="#6ee7b7" font-size="9">AQI &#8804;100 (Clean Air)</text>
+    <text x="12" y="236" fill="#fde68a" font-size="9">&#8226; FACILITY WARN: Room 16-18/28-30&#176;C, AQI 101-150</text>
+    <text x="24" y="248" fill="#fde68a" font-size="9">O2 18-19.5 / 24-24.5%</text>
+    <text x="12" y="260" fill="#fca5a5" font-size="9">&#8226; FACILITY CRIT: Room &lt;16/&gt;30&#176;C, O2 &lt;18/&gt;24.5%</text>
+    <text x="24" y="269" fill="#fca5a5" font-size="8.5">AQI &gt;150 &#8226; Gives alertSemaphore</text>
 
     <!-- Dynamic Rate Adjustment Logic -->
     <rect x="0" y="285" width="280" height="110" rx="8" fill="#1e293b" stroke="#3b82f6" stroke-width="1"/>
