@@ -517,8 +517,9 @@ static bool medicalSensorFaultActive = false;
  * @brief Publishes medical alert or normal-status events when state changes.
  *
  * Both abnormal and normal-status messages use the shared hospital-events
- * feed. Repeated states are suppressed and messages are rate-limited by
- * ALERT_PUBLISH_INTERVAL_MS.
+ * feed. Duplicate states are suppressed. Abnormal alert re-publishes are
+ * rate-limited by ALERT_PUBLISH_INTERVAL_MS; NORMAL is only published on
+ * first ready state or on alert clearance transitions.
  */
 void publishMedicalAlertIfNeeded(const Telemetry &snapshot, bool offline)
 {
@@ -563,7 +564,7 @@ void publishMedicalAlertIfNeeded(const Telemetry &snapshot, bool offline)
             medicalNormalPending = true;
         }
 
-        if (!medicalAlertStateKnown || medicalNormalPending || now - lastMedicalAlertPublishMs >= ALERT_PUBLISH_INTERVAL_MS) {
+        if (!medicalAlertStateKnown || medicalNormalPending) {
             const char *normalPayload = "MEDICAL STATUS: NORMAL\nNo active medical alerts.";
             if (safePublish(getAioFeedTopic(HOSPITAL_EVENTS_FEED), String(normalPayload), offline)) {
                 lastMedicalAlertPublishMs = now;
@@ -610,8 +611,9 @@ void publishMedicalAlertIfNeeded(const Telemetry &snapshot, bool offline)
  * @brief Publishes facility alert or normal-status events when state changes.
  *
  * Both abnormal and normal-status messages use the shared hospital-events
- * feed. Repeated states are suppressed and messages are rate-limited by
- * ALERT_PUBLISH_INTERVAL_MS.
+ * feed. Duplicate states are suppressed. Abnormal alert re-publishes are
+ * rate-limited by ALERT_PUBLISH_INTERVAL_MS; NORMAL is only published on
+ * first ready state or on alert clearance transitions.
  */
 void publishFacilityAlertIfNeeded(const FacilityTelemetry &snapshot, bool offline)
 {
@@ -626,7 +628,7 @@ void publishFacilityAlertIfNeeded(const FacilityTelemetry &snapshot, bool offlin
             facilityNormalPending = true;
         }
 
-        if (!facilityAlertStateKnown || facilityNormalPending || now - lastFacilityAlertPublishMs >= ALERT_PUBLISH_INTERVAL_MS) {
+        if (!facilityAlertStateKnown || facilityNormalPending) {
             const char *normalPayload = "FACILITY STATUS: NORMAL\nNo active facility alerts.";
             if (safePublish(getAioFeedTopic(HOSPITAL_EVENTS_FEED), String(normalPayload), offline)) {
                 lastFacilityAlertPublishMs = now;
