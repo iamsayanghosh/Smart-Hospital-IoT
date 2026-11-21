@@ -42,6 +42,7 @@ void alertTask(void *parameter)
     if (wdtResult != ESP_OK) {
         Serial.print("[WATCHDOG] ALERT registration failed: ");
         Serial.println(esp_err_to_name(wdtResult));
+        vTaskDelete(NULL);
         return;
     }
     Serial.println("[WATCHDOG] ALERT task registered with TWDT");

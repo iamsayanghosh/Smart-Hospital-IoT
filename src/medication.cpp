@@ -178,6 +178,7 @@ void medicationTask(void *parameter)
     if (wdtResult != ESP_OK) {
         Serial.print("[WATCHDOG] MEDICATION registration failed: ");
         Serial.println(esp_err_to_name(wdtResult));
+        vTaskDelete(NULL);
         return;
     }
     Serial.println("[WATCHDOG] MEDICATION task registered with TWDT");

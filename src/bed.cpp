@@ -30,15 +30,6 @@ static const int BED_SERVO_MIN_PULSE = 500;   ///< Minimum pulse width in micros
 static const int BED_SERVO_MAX_PULSE = 2400;  ///< Maximum pulse width in microseconds (corresponds to 180°)
 static const float BED_SERVO_MAX_ANGLE = 180.0f; ///< Physical servo full travel scale in degrees
 
-/**
- * @brief Discrete operational modes for hospital bed elevation control.
- */
-enum BedMode {
-    BED_MODE_SLEEPING,          ///< Rest angle (10°) during stable condition
-    BED_MODE_BREATHING_SUPPORT, ///< Elevated angle (45°) for respiratory support (SpO2 88-91%)
-    BED_MODE_EMERGENCY,         ///< Upright angle (90°) during acute physiological crises
-};
-
 static Servo bedServo;
 
 /**
@@ -65,6 +56,7 @@ void bedTask(void *parameter)
     if (wdtResult != ESP_OK) {
         Serial.print("[WATCHDOG] BED registration failed: ");
         Serial.println(esp_err_to_name(wdtResult));
+        vTaskDelete(NULL);
         return;
     }
     Serial.println("[WATCHDOG] BED task registered with TWDT");
@@ -82,6 +74,7 @@ void bedTask(void *parameter)
 
     // Force an initial update to evaluate telemetry and move from 0°
     bool initialEval = true;
+    static bool tempTriggeredEmergency = false;
 
     while (true) {
         Telemetry data = getTelemetrySnapshot();
@@ -106,27 +99,8 @@ void bedTask(void *parameter)
             Serial.println(targetAngle);
         }
 
-        // 2. Automatic condition logic
-        BedMode currentAutoMode = BED_MODE_SLEEPING;
-
-        // CRITICAL CONDITION -> EMERGENCY (90°)
-        // Critical conditions: Severe bradycardia (<45) or severe tachycardia (>120), severe hypoxia (<88%), or extreme temp (<34 or >39.5)
-        if (data.heartRate < medicalThresholds.heartRate.criticalLow || data.heartRate > medicalThresholds.heartRate.criticalHigh ||
-            data.spo2 < medicalThresholds.spo2.criticalLow ||
-            data.ecgRate < medicalThresholds.ecgRate.criticalLow || data.ecgRate > medicalThresholds.ecgRate.criticalHigh ||
-            (data.temperatureValid && (data.temperature < medicalThresholds.bodyTemperature.criticalLow || data.temperature > medicalThresholds.bodyTemperature.criticalHigh))) {
-            currentAutoMode = BED_MODE_EMERGENCY;
-        } 
-        // BREATHING ISSUE -> BREATHING_SUPPORT (45°)
-        else if (data.spo2 < medicalThresholds.spo2.low) { // default 92, meaning 88 to 91 inclusive
-            currentAutoMode = BED_MODE_BREATHING_SUPPORT;
-        }
-        // OTHER NON-CRITICAL ABNORMALITIES or PATIENT OK / STABLE -> SLEEPING (10°)
-        // The assignment does not define a separate bed response for every possible abnormal vital.
-        // Therefore, we use SLEEPING as the safest existing/default bed behavior for any other abnormalities (e.g. Temperature = 38.5).
-        else {
-            currentAutoMode = BED_MODE_SLEEPING;
-        }
+        // 2. Automatic condition logic with sensor-fault emergency latching
+        BedMode currentAutoMode = evaluateBedMode(data, tempTriggeredEmergency, medicalThresholds);
 
         // Apply if the auto mode changed OR if it's the very first evaluation.
         // This implicitly breaks out of manual override if the patient's condition changes.

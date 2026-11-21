@@ -579,6 +579,7 @@ void publishMedicalAlertIfNeeded(const Telemetry &snapshot, bool offline)
     // Cancel pending normal if an acute abnormality emerges
     medicalNormalPending = false;
 
+    const bool isNewMedicalAlertTransition = !medicalAlertPublished;
     const bool isMedicalEscalation = (candidate.severity == ALERT_SEVERITY_CRITICAL &&
                                       (!medicalAlertPublished || lastMedicalAlertSeverity != ALERT_SEVERITY_CRITICAL));
 
@@ -586,9 +587,9 @@ void publishMedicalAlertIfNeeded(const Telemetry &snapshot, bool offline)
         return;
     }
     if (medicalAlertStateKnown) {
-        if (isMedicalEscalation) {
+        if (isNewMedicalAlertTransition || isMedicalEscalation) {
             if (now - lastMedicalAlertPublishMs < ALERT_ESCALATION_COOLDOWN_MS) {
-                return; // rate limit on escalation bursts
+                return; // rate limit rapid transitions or escalation bursts
             }
         } else if (now - lastMedicalAlertPublishMs < ALERT_PUBLISH_INTERVAL_MS) {
             return;
@@ -614,6 +615,9 @@ void publishMedicalAlertIfNeeded(const Telemetry &snapshot, bool offline)
  */
 void publishFacilityAlertIfNeeded(const FacilityTelemetry &snapshot, bool offline)
 {
+    if (!snapshot.initialFacilityProcessed) {
+        return;
+    }
     AlertCandidate candidate = evaluateFacilityAlert(snapshot);
     const uint32_t now = millis();
     if (!candidate.active) {
@@ -638,6 +642,7 @@ void publishFacilityAlertIfNeeded(const FacilityTelemetry &snapshot, bool offlin
     // Cancel pending normal if a facility anomaly emerges
     facilityNormalPending = false;
 
+    const bool isNewFacilityAlertTransition = !facilityAlertPublished;
     const bool isFacilityEscalation = (candidate.severity == ALERT_SEVERITY_CRITICAL &&
                                        (!facilityAlertPublished || lastFacilityAlertSeverity != ALERT_SEVERITY_CRITICAL));
 
@@ -645,9 +650,9 @@ void publishFacilityAlertIfNeeded(const FacilityTelemetry &snapshot, bool offlin
         return;
     }
     if (facilityAlertStateKnown) {
-        if (isFacilityEscalation) {
+        if (isNewFacilityAlertTransition || isFacilityEscalation) {
             if (now - lastFacilityAlertPublishMs < ALERT_ESCALATION_COOLDOWN_MS) {
-                return; // rate limit on escalation bursts
+                return; // rate limit rapid transitions or escalation bursts
             }
         } else if (now - lastFacilityAlertPublishMs < ALERT_PUBLISH_INTERVAL_MS) {
             return;
@@ -790,6 +795,7 @@ void mqttTask(void *parameter)
     if (wdtResult != ESP_OK) {
         Serial.print("[WATCHDOG] MQTT registration failed: ");
         Serial.println(esp_err_to_name(wdtResult));
+        vTaskDelete(NULL);
         return;
     }
     Serial.println("[WATCHDOG] MQTT task registered with TWDT");
@@ -880,8 +886,18 @@ void mqttTask(void *parameter)
             }
 
             static bool syncTurn = false;
+            static bool wasReplaying = false;
+            size_t bufferedCount = getBufferedTelemetryCount();
+            if (bufferedCount > 0) {
+                wasReplaying = true;
+            } else if (wasReplaying) {
+                // Replay queue drained completely; resynchronize live feed states
+                resetLiveFeedPublishState();
+                wasReplaying = false;
+                Serial.println("[MQTT TASK] Offline replay drained; live feeds resynchronized");
+            }
             
-            if (!offline && getBufferedTelemetryCount() > 0 && syncTurn) {
+            if (!offline && bufferedCount > 0 && syncTurn) {
                 BufferedTelemetryMessage msg;
                 if (peekBufferedTelemetry(&msg)) {
                     if (mqttClient.publish(msg.topic, msg.payload)) {

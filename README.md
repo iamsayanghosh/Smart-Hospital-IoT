@@ -185,7 +185,7 @@ Smart-Hospital-IoT/
 │       ├── workflow_block_diagram.svg # End-to-End Workflow & Dataflow
 │       └── workflow_block_diagram.png # High-DPI Workflow Diagram
 ├── test/                             # Automated Unit Tests
-│   └── test_main.cpp                 # 24 Unity test cases
+│   └── test_main.cpp                 # 26 Unity test cases
 ├── diagram.json                      # Wokwi circuit schematic wiring
 ├── libraries.txt                     # Wokwi library manifest
 ├── platformio.ini                    # PlatformIO project configuration
@@ -262,7 +262,7 @@ pio run --target upload
   ```bash
   pio test -e esp32dev --without-uploading --without-testing
   ```
-  Unit tests are implemented under `test/test_main.cpp` covering 24 test cases for strict numeric string parsers (NaN, Inf, float integers, negative boundary handling), medication dosage safety clamping, slew-rate timing mechanics, telemetry validity guards, sensor fault state transitions, and queue retry bookkeeping.
+  Unit tests are implemented under `test/test_main.cpp` covering 26 test cases for strict numeric string parsers (NaN, Inf, float integers, negative boundary handling), medication dosage safety clamping, slew-rate timing mechanics, telemetry validity guards, sensor fault state transitions, queue retry bookkeeping, default threshold evaluation overrides, and bed elevation emergency retention on sensor disconnect.
 
 ---
 

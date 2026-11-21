@@ -42,6 +42,7 @@ void environmentTask(void *parameter)
     if (wdtResult != ESP_OK) {
         Serial.print("[WATCHDOG] ENVIRONMENT registration failed: ");
         Serial.println(esp_err_to_name(wdtResult));
+        vTaskDelete(NULL);
         return;
     }
     Serial.println("[WATCHDOG] ENVIRONMENT task registered with TWDT");

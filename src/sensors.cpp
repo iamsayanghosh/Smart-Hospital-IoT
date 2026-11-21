@@ -121,6 +121,7 @@ void temperatureTask(void *parameter) {
   if (wdtResult != ESP_OK) {
     Serial.print("[WATCHDOG] TEMP registration failed: ");
     Serial.println(esp_err_to_name(wdtResult));
+    vTaskDelete(NULL);
     return;
   }
   Serial.println("[WATCHDOG] TEMP task registered with TWDT");
@@ -131,6 +132,7 @@ void temperatureTask(void *parameter) {
   uint32_t requestStartMs = 0;
   bool hasReadValidTemperature = false;
   bool pendingTempDisconnectMessage = false;
+  uint8_t consecutiveScratchpadCount = 0;
 
   while (true) {
     uint32_t now = millis();
@@ -182,8 +184,20 @@ void temperatureTask(void *parameter) {
       // Distinguish initial cold-boot scratchpad (+85.0 C) from runtime sensor reset
       if (abs(rawTemp - 85.0f) <= 0.05f) {
         if (!hasReadValidTemperature && !pendingTempDisconnectMessage) {
-          Serial.println("[TEMP TASK] Ignored initial DS18B20 power-on reset scratchpad "
-                         "reading (85.0 C)");
+          consecutiveScratchpadCount++;
+          if (consecutiveScratchpadCount < 3) {
+            Serial.print("[TEMP TASK] Ignored initial DS18B20 power-on reset scratchpad reading (85.0 C), attempt ");
+            Serial.print(consecutiveScratchpadCount);
+            Serial.println("/3");
+          } else {
+            Serial.println("[TEMP TASK] Warning: Persistent 85.0 C scratchpad detected; marking sensor unavailable");
+            hasReadValidTemperature = false;
+            SensorMessage message = {};
+            message.type = TEMP_DATA;
+            message.temperature = DEVICE_DISCONNECTED_C;
+            bool sent = sendSensorMessage(message, "TEMP TASK");
+            updateQueueRetryState(sent, pendingTempDisconnectMessage);
+          }
         } else {
           Serial.println("[TEMP TASK] Warning: DS18B20 reset during operation (85.0 C scratchpad); marking unavailable");
           hasReadValidTemperature = false;
@@ -195,6 +209,7 @@ void temperatureTask(void *parameter) {
         }
       } else if (rawTemp == DEVICE_DISCONNECTED_C || rawTemp <= -55.0f ||
                  rawTemp > 125.0f) {
+        consecutiveScratchpadCount = 0;
         Serial.println("[TEMP TASK] Warning: DS18B20 disconnected");
         hasReadValidTemperature = false;
         SensorMessage message = {};
@@ -203,6 +218,7 @@ void temperatureTask(void *parameter) {
         bool sent = sendSensorMessage(message, "TEMP TASK");
         updateQueueRetryState(sent, pendingTempDisconnectMessage);
       } else {
+        consecutiveScratchpadCount = 0;
         hasReadValidTemperature = true;
         pendingTempDisconnectMessage = false;
         SensorMessage message = {};
@@ -236,6 +252,7 @@ void motionTask(void *parameter) {
   if (wdtResult != ESP_OK) {
     Serial.print("[WATCHDOG] MOTION registration failed: ");
     Serial.println(esp_err_to_name(wdtResult));
+    vTaskDelete(NULL);
     return;
   }
   Serial.println("[WATCHDOG] MOTION task registered with TWDT");
@@ -274,6 +291,7 @@ void vitalTask(void *parameter) {
   if (wdtResult != ESP_OK) {
     Serial.print("[WATCHDOG] VITAL registration failed: ");
     Serial.println(esp_err_to_name(wdtResult));
+    vTaskDelete(NULL);
     return;
   }
   Serial.println("[WATCHDOG] VITAL task registered with TWDT");
@@ -341,6 +359,7 @@ void ecgTask(void *parameter) {
   if (wdtResult != ESP_OK) {
     Serial.print("[WATCHDOG] ECG registration failed: ");
     Serial.println(esp_err_to_name(wdtResult));
+    vTaskDelete(NULL);
     return;
   }
   Serial.println("[WATCHDOG] ECG task registered with TWDT");

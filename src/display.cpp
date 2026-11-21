@@ -166,6 +166,7 @@ void displayTask(void *parameter)
     if (wdtResult != ESP_OK) {
         Serial.print("[WATCHDOG] DISPLAY registration failed: ");
         Serial.println(esp_err_to_name(wdtResult));
+        vTaskDelete(NULL);
         return;
     }
     Serial.println("[WATCHDOG] DISPLAY task registered with TWDT");

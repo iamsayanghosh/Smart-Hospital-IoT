@@ -2,6 +2,10 @@
 #include <unity.h>
 #include "parser_utils.h"
 #include "medication.h"
+#include "bed.h"
+
+// Define global medicalThresholds instance for unit testing environment
+MedicalThresholdConfig medicalThresholds;
 
 void setUp(void) {}
 void tearDown(void) {}
@@ -305,6 +309,65 @@ void test_temperature_sensor_disconnect_queue_retry() {
     TEST_ASSERT_FALSE(pendingTempDisconnectMessage);
 }
 
+void test_evaluate_medical_alert_default_thresholds_override() {
+    Telemetry snap = {};
+    snap.spo2 = 98;
+    snap.heartRate = 75;
+    snap.ecgRate = 75;
+    snap.temperature = 37.0f;
+    snap.temperatureValid = true;
+
+    // Normal baseline: no alert
+    AlertCandidate cand = evaluateMedicalAlert(snap);
+    TEST_ASSERT_FALSE(cand.active);
+
+    // Modify global medicalThresholds temporarily
+    float oldHrHigh = medicalThresholds.heartRate.high;
+    medicalThresholds.heartRate.high = 70.0f; // Lower high threshold below current 75 BPM
+
+    cand = evaluateMedicalAlert(snap); // Call without passing explicit threshold argument
+    TEST_ASSERT_TRUE(cand.active);
+    TEST_ASSERT_EQUAL_STRING("heartRate", cand.parameter);
+    TEST_ASSERT_EQUAL(ALERT_SEVERITY_WARNING, cand.severity);
+
+    // Restore threshold
+    medicalThresholds.heartRate.high = oldHrHigh;
+}
+
+void test_bed_emergency_retention_on_sensor_disconnect() {
+    Telemetry snap = {};
+    snap.heartRate = 75;
+    snap.spo2 = 98;
+    snap.ecgRate = 75;
+    snap.temperatureValid = true;
+    snap.temperature = 39.8f; // Critical high fever (>39.5 C)
+
+    bool tempTriggeredEmergency = false;
+
+    // 1. Critical fever triggers EMERGENCY mode and sets latch
+    BedMode mode = evaluateBedMode(snap, tempTriggeredEmergency);
+    TEST_ASSERT_EQUAL(BED_MODE_EMERGENCY, mode);
+    TEST_ASSERT_TRUE(tempTriggeredEmergency);
+
+    // 2. Sensor disconnects (temperature becomes invalid)
+    snap.temperatureValid = false;
+    snap.temperature = DEVICE_DISCONNECTED_C;
+
+    // 3. Posture MUST retain EMERGENCY (90 deg) and not drop to SLEEPING (10 deg)
+    mode = evaluateBedMode(snap, tempTriggeredEmergency);
+    TEST_ASSERT_EQUAL(BED_MODE_EMERGENCY, mode);
+    TEST_ASSERT_TRUE(tempTriggeredEmergency);
+
+    // 4. Valid temperature recovers at normal stable 36.8 C
+    snap.temperatureValid = true;
+    snap.temperature = 36.8f;
+
+    // 5. Posture cleanly demotes to SLEEPING and clears latch
+    mode = evaluateBedMode(snap, tempTriggeredEmergency);
+    TEST_ASSERT_EQUAL(BED_MODE_SLEEPING, mode);
+    TEST_ASSERT_FALSE(tempTriggeredEmergency);
+}
+
 void setup() {
     UNITY_BEGIN();
     RUN_TEST(test_parse_float_strict_valid);
@@ -331,6 +394,8 @@ void setup() {
     RUN_TEST(test_medical_telemetry_validity_distinguishes_normal_from_fault);
     RUN_TEST(test_medical_sensor_fault_state_machine_and_recovery);
     RUN_TEST(test_temperature_sensor_disconnect_queue_retry);
+    RUN_TEST(test_evaluate_medical_alert_default_thresholds_override);
+    RUN_TEST(test_bed_emergency_retention_on_sensor_disconnect);
     UNITY_END();
 }
 

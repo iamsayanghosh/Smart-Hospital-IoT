@@ -60,6 +60,7 @@ void samplingTask(void *parameter)
     if (wdtResult != ESP_OK) {
         Serial.print("[WATCHDOG] SAMPLING registration failed: ");
         Serial.println(esp_err_to_name(wdtResult));
+        vTaskDelete(NULL);
         return;
     }
     Serial.println("[WATCHDOG] SAMPLING task registered with TWDT");
@@ -95,7 +96,7 @@ void samplingTask(void *parameter)
                 effectiveIntervalMs = STARTUP_CONSERVATIVE_INTERVAL_MS;
             }
             portENTER_CRITICAL(&telemetryMux);
-            samplingPeriods.temperatureMs = effectiveIntervalMs;
+            samplingPeriods.temperatureMs = (!snapshot.temperatureValid) ? AUTO_INTERVAL_ABNORMAL_MS : effectiveIntervalMs;
             samplingPeriods.vitalMs = effectiveIntervalMs;
             portEXIT_CRITICAL(&telemetryMux);
 
@@ -156,7 +157,12 @@ void samplingTask(void *parameter)
 
         // 5. Propagate effective interval to shared state under critical section
         portENTER_CRITICAL(&telemetryMux);
-        samplingPeriods.temperatureMs = effectiveIntervalMs;
+        if (!snapshot.temperatureValid) {
+            // Temperature sensor faulted/disconnected: retry at fast 5s cadence to recover promptly
+            samplingPeriods.temperatureMs = AUTO_INTERVAL_ABNORMAL_MS;
+        } else {
+            samplingPeriods.temperatureMs = effectiveIntervalMs;
+        }
         samplingPeriods.vitalMs = effectiveIntervalMs;
         portEXIT_CRITICAL(&telemetryMux);
 
