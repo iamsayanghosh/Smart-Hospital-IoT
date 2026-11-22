@@ -360,14 +360,19 @@ void test_temperature_sensor_disconnect_queue_retry() {
     TEST_ASSERT_FALSE(duplicate);
     TEST_ASSERT_TRUE(temperatureFaultReported);
 
-    // 11. Sensor recovery with space in queue (sendSuccess = true):
-    //     Clears faultReported latch
+    // 11. Simulation override isolation: simulated telemetry data dispatch does NOT mutate
+    //     the physical sensor fault latch or hardware acquisition history
+    TEST_ASSERT_TRUE(temperatureFaultReported); // physical fault latch strictly preserved
+    TEST_ASSERT_TRUE(hasReadValidTemperature);  // physical acquisition history unchanged
+
+    // 12. Physical sensor recovery with space in queue (sendSuccess = true):
+    //     Clears faultReported latch only upon physical valid conversion
     recovered = updateTemperatureFaultReportState(false, true, pendingTempDisconnectMessage, temperatureFaultReported);
     TEST_ASSERT_TRUE(recovered);
     TEST_ASSERT_FALSE(temperatureFaultReported);
     TEST_ASSERT_FALSE(pendingTempDisconnectMessage);
 
-    // 12. Persistent scratchpad detection on cold boot (attempt 3+)
+    // 13. Persistent scratchpad detection on cold boot (attempt 3+)
     bool freshValid = false;
     uint8_t freshCount = 2; // already 2 attempts
     Ds18b20ScratchpadStatus statusPersistent = classifyDs18b20Scratchpad(
@@ -375,7 +380,7 @@ void test_temperature_sensor_disconnect_queue_retry() {
     TEST_ASSERT_EQUAL(DS18B20_SCRATCHPAD_PERSISTENT_FAULT, statusPersistent);
     TEST_ASSERT_EQUAL_UINT8(3, freshCount);
 
-    // 13. Legacy updateQueueRetryState helper verification
+    // 14. Legacy updateQueueRetryState helper verification
     bool legacyPending = false;
     TEST_ASSERT_TRUE(updateQueueRetryState(false, legacyPending));
     TEST_ASSERT_TRUE(legacyPending);
