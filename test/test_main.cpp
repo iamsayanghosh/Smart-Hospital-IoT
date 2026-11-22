@@ -285,57 +285,101 @@ void test_medical_sensor_fault_state_machine_and_recovery() {
 }
 
 void test_temperature_sensor_disconnect_queue_retry() {
+    // -------------------------------------------------------------------------
+    // Phase A: Physical DS18B20 Acquisition History & Scratchpad Classification
+    // (classifyDs18b20Reading helper)
+    // -------------------------------------------------------------------------
+    bool hasReadValidPhysicalTemperature = false;
+    uint8_t scratchpadCount = 0;
+
+    // 1. Initial state: no valid physical conversion recorded
+    TEST_ASSERT_FALSE(hasReadValidPhysicalTemperature);
+    TEST_ASSERT_EQUAL_UINT8(0, scratchpadCount);
+
+    // 2. Cold-boot attempt 1 (85.0 C): suppressed as power-on reset scratchpad
+    TemperatureScratchpadType type1 =
+        classifyDs18b20Reading(85.0f, hasReadValidPhysicalTemperature, scratchpadCount);
+    TEST_ASSERT_EQUAL(TEMP_READING_COLD_BOOT_SCRATCHPAD, type1);
+    TEST_ASSERT_EQUAL_UINT8(1, scratchpadCount);
+    TEST_ASSERT_FALSE(hasReadValidPhysicalTemperature);
+
+    // 3. Cold-boot attempt 2 (85.0 C): suppressed as power-on reset scratchpad
+    TemperatureScratchpadType type2 =
+        classifyDs18b20Reading(85.0f, hasReadValidPhysicalTemperature, scratchpadCount);
+    TEST_ASSERT_EQUAL(TEMP_READING_COLD_BOOT_SCRATCHPAD, type2);
+    TEST_ASSERT_EQUAL_UINT8(2, scratchpadCount);
+
+    // 4. Cold-boot attempt 3 (85.0 C): confirmed persistent scratchpad fault
+    TemperatureScratchpadType type3 =
+        classifyDs18b20Reading(85.0f, hasReadValidPhysicalTemperature, scratchpadCount);
+    TEST_ASSERT_EQUAL(TEMP_READING_PERSISTENT_SCRATCHPAD, type3);
+    TEST_ASSERT_EQUAL_UINT8(3, scratchpadCount);
+
+    // 5. First valid physical conversion acquired (36.8 C):
+    //    Classified as valid, resets scratchpad count, updates physical history
+    TemperatureScratchpadType typeValid =
+        classifyDs18b20Reading(36.8f, hasReadValidPhysicalTemperature, scratchpadCount);
+    TEST_ASSERT_EQUAL(TEMP_READING_VALID, typeValid);
+    TEST_ASSERT_EQUAL_UINT8(0, scratchpadCount);
+    hasReadValidPhysicalTemperature = true; // Physical sensor history recorded
+
+    // 6. Queue send failure on valid reading does NOT erase physical acquisition history
+    bool queueSendSuccess = false;
+    TEST_ASSERT_FALSE(queueSendSuccess);
+    TEST_ASSERT_TRUE(hasReadValidPhysicalTemperature); // History strictly preserved
+
+    // 7. Subsequent 85.0 C reading: immediately classified as runtime reset (attempt 1)
+    TemperatureScratchpadType typeReset =
+        classifyDs18b20Reading(85.0f, hasReadValidPhysicalTemperature, scratchpadCount);
+    TEST_ASSERT_EQUAL(TEMP_READING_RUNTIME_RESET, typeReset);
+
+    // -------------------------------------------------------------------------
+    // Phase B: Queue-Retry Bookkeeping & One-Notification Fault Latching
+    // (updateTemperatureFaultReportState & retryTemperatureDisconnect helpers)
+    // -------------------------------------------------------------------------
     bool pendingTempDisconnectMessage = false;
     bool temperatureFaultReported = false;
 
-    // Unit test of queue-retry and one-notification fault latch bookkeeping helpers
-    // (updateQueueRetryState, updateTemperatureFaultReportState, retryTemperatureDisconnect);
-    // does not exercise FreeRTOS queue saturation or IPC primitives.
-
-    // 1. Initial state: no retry pending, no fault reported
-    TEST_ASSERT_FALSE(pendingTempDisconnectMessage);
-    TEST_ASSERT_FALSE(temperatureFaultReported);
-
-    // 2. Queue full on initial disconnect dispatch (sendSuccess = false):
+    // 8. Queue full on initial disconnect dispatch (sendSuccess = false):
     //    Sets pending flag, does NOT latch faultReported
     bool changed = updateTemperatureFaultReportState(true, false, pendingTempDisconnectMessage, temperatureFaultReported);
     TEST_ASSERT_TRUE(changed);
     TEST_ASSERT_TRUE(pendingTempDisconnectMessage);
     TEST_ASSERT_FALSE(temperatureFaultReported);
 
-    // 3. Queue full fault -> sensor recovery before queue space becomes available:
+    // 9. Queue full fault -> sensor recovery before queue space becomes available:
     //    Recovery attempt while pendingTempDisconnectMessage is true must NOT cancel pending fault
     bool recovered = updateTemperatureFaultReportState(false, true, pendingTempDisconnectMessage, temperatureFaultReported);
     TEST_ASSERT_FALSE(recovered);
     TEST_ASSERT_TRUE(pendingTempDisconnectMessage); // pending fault strictly preserved
     TEST_ASSERT_FALSE(temperatureFaultReported);
 
-    // 4. Subsequent retry cycle with queue still full (sendSuccess = false) retains pending flag
+    // 10. Subsequent retry cycle with queue still full (sendSuccess = false) retains pending flag
     bool retried = retryTemperatureDisconnect(false, pendingTempDisconnectMessage, temperatureFaultReported);
     TEST_ASSERT_FALSE(retried);
     TEST_ASSERT_TRUE(pendingTempDisconnectMessage);
     TEST_ASSERT_FALSE(temperatureFaultReported);
 
-    // 5. Queue drains: successful dispatch of pending disconnect (sendSuccess = true)
-    //    Clears pending flag and latches faultReported
+    // 11. Queue drains: successful dispatch of pending disconnect (sendSuccess = true)
+    //     Clears pending flag and latches faultReported
     retried = retryTemperatureDisconnect(true, pendingTempDisconnectMessage, temperatureFaultReported);
     TEST_ASSERT_TRUE(retried);
     TEST_ASSERT_FALSE(pendingTempDisconnectMessage);
     TEST_ASSERT_TRUE(temperatureFaultReported);
 
-    // 6. Duplicate suppression: subsequent fault while faultReported is true does NOT dispatch duplicate
+    // 12. Duplicate suppression: subsequent fault while faultReported is true does NOT dispatch duplicate
     bool duplicate = updateTemperatureFaultReportState(true, true, pendingTempDisconnectMessage, temperatureFaultReported);
     TEST_ASSERT_FALSE(duplicate);
     TEST_ASSERT_TRUE(temperatureFaultReported);
 
-    // 7. Sensor recovery with space in queue (sendSuccess = true):
-    //    Clears faultReported latch
+    // 13. Sensor recovery with space in queue (sendSuccess = true):
+    //     Clears faultReported latch
     recovered = updateTemperatureFaultReportState(false, true, pendingTempDisconnectMessage, temperatureFaultReported);
     TEST_ASSERT_TRUE(recovered);
     TEST_ASSERT_FALSE(temperatureFaultReported);
     TEST_ASSERT_FALSE(pendingTempDisconnectMessage);
 
-    // 8. Legacy updateQueueRetryState helper verification
+    // 14. Legacy updateQueueRetryState helper verification
     bool legacyPending = false;
     TEST_ASSERT_TRUE(updateQueueRetryState(false, legacyPending));
     TEST_ASSERT_TRUE(legacyPending);

@@ -402,6 +402,46 @@ inline bool updateQueueRetryState(bool sendSuccess, bool &pendingState)
     return prevState != pendingState;
 }
 
+enum TemperatureScratchpadType {
+    TEMP_READING_VALID,
+    TEMP_READING_DISCONNECTED,
+    TEMP_READING_COLD_BOOT_SCRATCHPAD,
+    TEMP_READING_PERSISTENT_SCRATCHPAD,
+    TEMP_READING_RUNTIME_RESET
+};
+
+/**
+ * @brief Classifies a DS18B20 raw temperature reading to distinguish
+ * cold-boot power-on scratchpad (+85.0 C), persistent failure, and runtime reset.
+ *
+ * @param rawTemp Raw reading from DallasTemperature.
+ * @param hasReadValidPhysicalTemperature True if physical sensor previously produced a valid conversion.
+ * @param consecutiveScratchpadCount In/out counter for consecutive 85C readings.
+ * @return TemperatureScratchpadType Classification result.
+ */
+inline TemperatureScratchpadType classifyDs18b20Reading(float rawTemp,
+                                                        bool hasReadValidPhysicalTemperature,
+                                                        uint8_t &consecutiveScratchpadCount)
+{
+    if (rawTemp == DEVICE_DISCONNECTED_C || rawTemp <= -55.0f || rawTemp > 125.0f) {
+        consecutiveScratchpadCount = 0;
+        return TEMP_READING_DISCONNECTED;
+    }
+    if (abs(rawTemp - 85.0f) <= 0.05f) {
+        if (!hasReadValidPhysicalTemperature) {
+            consecutiveScratchpadCount++;
+            if (consecutiveScratchpadCount < 3) {
+                return TEMP_READING_COLD_BOOT_SCRATCHPAD;
+            }
+            return TEMP_READING_PERSISTENT_SCRATCHPAD;
+        }
+        return TEMP_READING_RUNTIME_RESET;
+    }
+    // Valid physical reading
+    consecutiveScratchpadCount = 0;
+    return TEMP_READING_VALID;
+}
+
 /**
  * @brief Retries dispatch of a pending temperature disconnect message.
  *
