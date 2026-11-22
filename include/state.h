@@ -402,44 +402,58 @@ inline bool updateQueueRetryState(bool sendSuccess, bool &pendingState)
     return prevState != pendingState;
 }
 
-enum TemperatureScratchpadType {
-    TEMP_READING_VALID,
-    TEMP_READING_DISCONNECTED,
-    TEMP_READING_COLD_BOOT_SCRATCHPAD,
-    TEMP_READING_PERSISTENT_SCRATCHPAD,
-    TEMP_READING_RUNTIME_RESET
+/**
+ * @brief Classification of DS18B20 +85.0 C power-on reset scratchpad readings.
+ */
+enum Ds18b20ScratchpadStatus {
+    DS18B20_SCRATCHPAD_IGNORE_INITIAL,    ///< Cold-boot initial reading (<3 attempts), ignore
+    DS18B20_SCRATCHPAD_PERSISTENT_FAULT,  ///< Persistent cold-boot failure (>=3 attempts), trigger fault
+    DS18B20_SCRATCHPAD_RUNTIME_RESET      ///< Runtime reset after physical conversion, immediate fault
 };
 
 /**
- * @brief Classifies a DS18B20 raw temperature reading to distinguish
- * cold-boot power-on scratchpad (+85.0 C), persistent failure, and runtime reset.
+ * @brief Classifies a DS18B20 +85.0 C scratchpad reading.
  *
- * @param rawTemp Raw reading from DallasTemperature.
- * @param hasReadValidPhysicalTemperature True if physical sensor previously produced a valid conversion.
- * @param consecutiveScratchpadCount In/out counter for consecutive 85C readings.
- * @return TemperatureScratchpadType Classification result.
+ * Distinguishes initial cold-boot power-on reset scratchpad readings from runtime sensor resets:
+ * - If physical sensor has previously produced a valid conversion or a disconnect is pending:
+ *   immediately classified as DS18B20_SCRATCHPAD_RUNTIME_RESET.
+ * - Otherwise (cold boot without previous valid conversion): increments consecutiveCount.
+ *   Returns DS18B20_SCRATCHPAD_IGNORE_INITIAL for attempts 1 and 2 (< 3).
+ *   Returns DS18B20_SCRATCHPAD_PERSISTENT_FAULT on attempt 3 or greater.
+ *
+ * @param hasReadValidTemperature True if physical sensor has previously produced a valid conversion.
+ * @param pendingDisconnect True if a disconnect notification is currently pending queue dispatch.
+ * @param consecutiveCount In/out reference to consecutive scratchpad counter.
+ * @return Ds18b20ScratchpadStatus Classification result.
  */
-inline TemperatureScratchpadType classifyDs18b20Reading(float rawTemp,
-                                                        bool hasReadValidPhysicalTemperature,
-                                                        uint8_t &consecutiveScratchpadCount)
+inline Ds18b20ScratchpadStatus classifyDs18b20Scratchpad(bool hasReadValidTemperature,
+                                                        bool pendingDisconnect,
+                                                        uint8_t &consecutiveCount)
 {
-    if (rawTemp == DEVICE_DISCONNECTED_C || rawTemp <= -55.0f || rawTemp > 125.0f) {
-        consecutiveScratchpadCount = 0;
-        return TEMP_READING_DISCONNECTED;
+    if (hasReadValidTemperature || pendingDisconnect) {
+        return DS18B20_SCRATCHPAD_RUNTIME_RESET;
     }
-    if (abs(rawTemp - 85.0f) <= 0.05f) {
-        if (!hasReadValidPhysicalTemperature) {
-            consecutiveScratchpadCount++;
-            if (consecutiveScratchpadCount < 3) {
-                return TEMP_READING_COLD_BOOT_SCRATCHPAD;
-            }
-            return TEMP_READING_PERSISTENT_SCRATCHPAD;
-        }
-        return TEMP_READING_RUNTIME_RESET;
+    consecutiveCount++;
+    if (consecutiveCount < 3) {
+        return DS18B20_SCRATCHPAD_IGNORE_INITIAL;
     }
-    // Valid physical reading
-    consecutiveScratchpadCount = 0;
-    return TEMP_READING_VALID;
+    return DS18B20_SCRATCHPAD_PERSISTENT_FAULT;
+}
+
+/**
+ * @brief Records successful physical DS18B20 conversion history.
+ *
+ * Marks that the physical sensor has produced a valid conversion, independent
+ * of downstream queue acceptance. Resets the cold-boot scratchpad counter.
+ *
+ * @param hasReadValidTemperature In/out reference to physical sensor acquisition flag.
+ * @param consecutiveCount In/out reference to consecutive scratchpad counter.
+ */
+inline void recordPhysicalTemperatureAcquisition(bool &hasReadValidTemperature,
+                                                 uint8_t &consecutiveCount)
+{
+    consecutiveCount = 0;
+    hasReadValidTemperature = true;
 }
 
 /**
