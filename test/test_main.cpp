@@ -360,10 +360,61 @@ void test_temperature_sensor_disconnect_queue_retry() {
     TEST_ASSERT_FALSE(duplicate);
     TEST_ASSERT_TRUE(temperatureFaultReported);
 
-    // 11. Simulation override isolation: simulated telemetry data dispatch does NOT mutate
-    //     the physical sensor fault latch or hardware acquisition history
-    TEST_ASSERT_TRUE(temperatureFaultReported); // physical fault latch strictly preserved
-    TEST_ASSERT_TRUE(hasReadValidTemperature);  // physical acquisition history unchanged
+    // 11. Source-aware telemetry isolation via production helper applyTemperatureTelemetryUpdate:
+    // a. Physical disconnect updates telemetry and sets physicalTempFault
+    Telemetry testTelem = {};
+    testTelem.initialVitalsProcessed = true;
+    testTelem.initialEcgProcessed = true;
+    applyTemperatureTelemetryUpdate(DEVICE_DISCONNECTED_C, false, testTelem);
+    TEST_ASSERT_FALSE(testTelem.temperatureValid);
+    TEST_ASSERT_TRUE(testTelem.physicalTempFault);
+    TEST_ASSERT_TRUE(isMedicalTemperatureFault(testTelem));
+    TEST_ASSERT_FALSE(isMedicalTelemetryFullyValid(testTelem));
+
+    bool faultActive = false;
+    SensorFaultTransition transFault = evaluateSensorFaultTransition(
+        isMedicalTemperatureFault(testTelem),
+        isMedicalTelemetryFullyValid(testTelem),
+        faultActive);
+    TEST_ASSERT_EQUAL(SensorFaultTransition::TRIGGER_FAULT, transFault);
+    faultActive = true; // fault state committed
+
+    // b. Simulated temperature override: provides measurement availability for vitals/OLED
+    //    without clearing physicalTempFault or triggering false hardware SENSOR RESTORED
+    applyTemperatureTelemetryUpdate(37.0f, true, testTelem);
+    TEST_ASSERT_TRUE(testTelem.temperatureValid); // measurement available for clinical monitoring
+    TEST_ASSERT_TRUE(testTelem.physicalTempFault); // physical hardware fault strictly preserved!
+    TEST_ASSERT_TRUE(isMedicalTemperatureFault(testTelem)); // fault status remains active
+    TEST_ASSERT_FALSE(isMedicalTelemetryFullyValid(testTelem)); // full clinical clearance suppressed!
+
+    SensorFaultTransition transSim = evaluateSensorFaultTransition(
+        isMedicalTemperatureFault(testTelem),
+        isMedicalTelemetryFullyValid(testTelem),
+        faultActive);
+    TEST_ASSERT_EQUAL(SensorFaultTransition::NONE, transSim); // false SENSOR RESTORED prevented!
+
+    // c. Simulated telemetry dispatch leaves physical task latches and scratchpad counter untouched
+    TEST_ASSERT_TRUE(temperatureFaultReported); // physical task fault latch preserved
+    TEST_ASSERT_TRUE(hasReadValidTemperature);  // physical acquisition history preserved
+
+    // d. Physical sensor recovery: valid physical reading clears physicalTempFault and enables SENSOR RESTORED
+    applyTemperatureTelemetryUpdate(36.8f, false, testTelem);
+    TEST_ASSERT_TRUE(testTelem.temperatureValid);
+    TEST_ASSERT_FALSE(testTelem.physicalTempFault); // physical hardware fault cleared
+    TEST_ASSERT_FALSE(isMedicalTemperatureFault(testTelem));
+    TEST_ASSERT_TRUE(isMedicalTelemetryFullyValid(testTelem));
+
+    SensorFaultTransition transRecover = evaluateSensorFaultTransition(
+        isMedicalTemperatureFault(testTelem),
+        isMedicalTelemetryFullyValid(testTelem),
+        faultActive);
+    TEST_ASSERT_EQUAL(SensorFaultTransition::TRIGGER_RECOVERY, transRecover);
+    faultActive = false; // recovery committed
+
+    // e. Post-simulation disconnect: properly marks telemetry invalid
+    applyTemperatureTelemetryUpdate(DEVICE_DISCONNECTED_C, false, testTelem);
+    TEST_ASSERT_FALSE(testTelem.temperatureValid);
+    TEST_ASSERT_TRUE(testTelem.physicalTempFault);
 
     // 12. Physical sensor recovery with space in queue (sendSuccess = true):
     //     Clears faultReported latch only upon physical valid conversion

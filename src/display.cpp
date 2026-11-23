@@ -128,10 +128,7 @@ void updateTelemetry(const SensorMessage &message)
 {
     portENTER_CRITICAL(&telemetryMux);
     if (message.type == TEMP_DATA) {
-        telemetry.temperature = message.temperature;
-        telemetry.temperatureValid = isfinite(message.temperature) &&
-                                     message.temperature != DEVICE_DISCONNECTED_C;
-        telemetry.initialTempProcessed = true;
+        applyTemperatureTelemetryUpdate(message.temperature, message.isSimulated, telemetry);
     } else if (message.type == MOTION_DATA) {
         telemetry.motion = message.motion;
     } else if (message.type == VITAL_DATA) {

@@ -134,6 +134,7 @@ void temperatureTask(void *parameter) {
   bool pendingTempDisconnectMessage = false;
   uint8_t consecutiveScratchpadCount = 0;
   bool temperatureFaultReported = false; // latch: suppress duplicate fault notifications per outage
+  bool wasSimulating = false; // tracks simulation mode to update displayTask upon return to physical sensor
 
   while (true) {
     uint32_t now = millis();
@@ -143,6 +144,7 @@ void temperatureTask(void *parameter) {
       SensorMessage retryMsg = {};
       retryMsg.type = TEMP_DATA;
       retryMsg.temperature = DEVICE_DISCONNECTED_C;
+      retryMsg.isSimulated = false;
       bool sent = sendSensorMessage(retryMsg, "TEMP TASK");
       if (!retryTemperatureDisconnect(sent, pendingTempDisconnectMessage, temperatureFaultReported)) {
         // Queue still saturated; yield and retry next tick, preserving pending fault
@@ -166,11 +168,12 @@ void temperatureTask(void *parameter) {
       if (overrideTemp > -100.0f) {
         // Simulation override: provides synthetic telemetry for testing without
         // altering physical sensor hardware history or clearing physical fault latches
-        consecutiveScratchpadCount = 0;
+        wasSimulating = true;
 
         SensorMessage message = {};
         message.type = TEMP_DATA;
         message.temperature = overrideTemp;
+        message.isSimulated = true;
         sendSensorMessage(message, "TEMP TASK");
 
         Serial.print("[TEMP TASK] Temperature (override): ");
@@ -188,17 +191,25 @@ void temperatureTask(void *parameter) {
       if (overrideTemp > -100.0f) {
         // Simulation override arrived during in-flight conversion: dispatch as override
         // without altering physical hardware history or clearing physical fault latches
-        consecutiveScratchpadCount = 0;
+        wasSimulating = true;
 
         SensorMessage message = {};
         message.type = TEMP_DATA;
         message.temperature = overrideTemp;
+        message.isSimulated = true;
         sendSensorMessage(message, "TEMP TASK");
 
         Serial.print("[TEMP TASK] Temperature (override): ");
         Serial.print(message.temperature, 1);
         Serial.println(" C");
       } else {
+        if (wasSimulating) {
+          // Returning to physical sensor from simulation: reset fault reported latch
+          // so displayTask is updated if physical sensor is disconnected
+          wasSimulating = false;
+          temperatureFaultReported = false;
+        }
+
         // Physical DS18B20 conversion completed: process through hardware state machine
         float rawTemp = temperatureSensor.getTempCByIndex(0);
 
@@ -218,6 +229,7 @@ void temperatureTask(void *parameter) {
               SensorMessage message = {};
               message.type = TEMP_DATA;
               message.temperature = DEVICE_DISCONNECTED_C;
+              message.isSimulated = false;
               bool sent = sendSensorMessage(message, "TEMP TASK");
               updateTemperatureFaultReportState(true, sent, pendingTempDisconnectMessage, temperatureFaultReported);
             } else {
@@ -230,6 +242,7 @@ void temperatureTask(void *parameter) {
               SensorMessage message = {};
               message.type = TEMP_DATA;
               message.temperature = DEVICE_DISCONNECTED_C;
+              message.isSimulated = false;
               bool sent = sendSensorMessage(message, "TEMP TASK");
               updateTemperatureFaultReportState(true, sent, pendingTempDisconnectMessage, temperatureFaultReported);
             } else {
@@ -245,6 +258,7 @@ void temperatureTask(void *parameter) {
             SensorMessage message = {};
             message.type = TEMP_DATA;
             message.temperature = DEVICE_DISCONNECTED_C;
+            message.isSimulated = false;
             bool sent = sendSensorMessage(message, "TEMP TASK");
             updateTemperatureFaultReportState(true, sent, pendingTempDisconnectMessage, temperatureFaultReported);
           } else {
@@ -257,6 +271,7 @@ void temperatureTask(void *parameter) {
           SensorMessage message = {};
           message.type = TEMP_DATA;
           message.temperature = rawTemp;
+          message.isSimulated = false;
           bool sent = sendSensorMessage(message, "TEMP TASK");
 
           // Downstream queue delivery & fault latch clearance

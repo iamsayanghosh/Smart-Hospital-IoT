@@ -128,11 +128,13 @@ struct SensorMessage {
     int spo2;
     int ecgRate;
     float ecgSample;
+    bool isSimulated = false;
 };
 
 struct Telemetry {
     float temperature = 0.0;
     bool temperatureValid = false;
+    bool physicalTempFault = false;
     int motion = 0;
     int heartRate = 75;
     int spo2 = 97;
@@ -309,16 +311,48 @@ inline bool isMedicalTelemetryInitializing(const Telemetry &data)
  * @param data Patient telemetry snapshot.
  * @return true if temperature acquisition was attempted and failed; false otherwise.
  */
+/**
+ * @brief Ingests temperature telemetry updates with source provenance awareness.
+ *
+ * Separates telemetry measurement availability (validity for OLED and clinical alerts)
+ * from physical DS18B20 hardware health:
+ * - Physical readings (!isSimulated): update physicalTempFault directly based on validity.
+ * - Simulated overrides (isSimulated): update measurement availability without altering
+ *   physicalTempFault, preventing synthetic readings from causing false hardware recovery.
+ *
+ * @param tempValue Temperature reading in deg C (or DEVICE_DISCONNECTED_C).
+ * @param isSimulated True if sample originated from CLI simulation override.
+ * @param telemetry In/out reference to global telemetry state.
+ */
+inline void applyTemperatureTelemetryUpdate(float tempValue, bool isSimulated, Telemetry &telemetry)
+{
+    telemetry.temperature = tempValue;
+    telemetry.temperatureValid = isfinite(tempValue) && tempValue != DEVICE_DISCONNECTED_C;
+    telemetry.initialTempProcessed = true;
+    if (!isSimulated) {
+        telemetry.physicalTempFault = !telemetry.temperatureValid;
+    }
+}
+
+/**
+ * @brief Evaluates whether a confirmed medical temperature sensor fault is present.
+ *
+ * Returns true if temperature acquisition has completed initialization and either the physical
+ * sensor is faulted or telemetry is invalid.
+ *
+ * @param data Patient telemetry snapshot.
+ * @return true if temperature acquisition was attempted and failed; false otherwise.
+ */
 inline bool isMedicalTemperatureFault(const Telemetry &data)
 {
-    return data.initialTempProcessed && !data.temperatureValid;
+    return data.initialTempProcessed && (data.physicalTempFault || !data.temperatureValid);
 }
 
 /**
  * @brief Assesses whether all mandatory medical vitals are available for full clinical clearance (READY).
  *
- * Requires that vitals, ECG, and temperature have all completed initialization and that
- * temperature is currently valid. An unavailable sensor precludes asserting a definitive NORMAL status.
+ * Requires that vitals, ECG, and temperature have all completed initialization, that
+ * temperature is currently valid, and that the physical sensor is not in fault.
  *
  * @param data Patient telemetry snapshot.
  * @return true if all required measurements are available and valid; false otherwise.
@@ -328,7 +362,8 @@ inline bool isMedicalTelemetryFullyValid(const Telemetry &data)
     return data.initialVitalsProcessed &&
            data.initialEcgProcessed &&
            data.initialTempProcessed &&
-           data.temperatureValid;
+           data.temperatureValid &&
+           !data.physicalTempFault;
 }
 
 enum class SensorFaultTransition {
