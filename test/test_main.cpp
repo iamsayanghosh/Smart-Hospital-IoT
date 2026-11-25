@@ -174,6 +174,7 @@ void test_medical_telemetry_validity_distinguishes_normal_from_fault() {
     // 2. Confirmed temperature fault during boot before vitals/ECG arrive
     snap.initialTempProcessed = true;
     snap.temperatureValid = false;
+    snap.physicalTempHealth = PHYSICAL_SENSOR_FAULT;
     snap.temperature = DEVICE_DISCONNECTED_C;
     TEST_ASSERT_TRUE(isMedicalTelemetryInitializing(snap));
     TEST_ASSERT_TRUE(isMedicalTemperatureFault(snap));
@@ -193,6 +194,7 @@ void test_medical_telemetry_validity_distinguishes_normal_from_fault() {
 
     // 5. All valid: READY for clinical clearance
     snap.temperatureValid = true;
+    snap.physicalTempHealth = PHYSICAL_SENSOR_HEALTHY;
     snap.temperature = 36.8f;
     TEST_ASSERT_FALSE(isMedicalTelemetryInitializing(snap));
     TEST_ASSERT_FALSE(isMedicalTemperatureFault(snap));
@@ -200,6 +202,7 @@ void test_medical_telemetry_validity_distinguishes_normal_from_fault() {
 
     // 6. Runtime disconnect: revoked
     snap.temperatureValid = false;
+    snap.physicalTempHealth = PHYSICAL_SENSOR_FAULT;
     snap.temperature = DEVICE_DISCONNECTED_C;
     TEST_ASSERT_FALSE(isMedicalTelemetryInitializing(snap));
     TEST_ASSERT_TRUE(isMedicalTemperatureFault(snap));
@@ -226,6 +229,7 @@ void test_medical_sensor_fault_state_machine_and_recovery() {
     // 2. Confirmed temp failure during boot triggers FAULT
     snap.initialTempProcessed = true;
     snap.temperatureValid = false;
+    snap.physicalTempHealth = PHYSICAL_SENSOR_FAULT;
     snap.temperature = DEVICE_DISCONNECTED_C;
     trans = evaluateSensorFaultTransition(
         isMedicalTemperatureFault(snap),
@@ -264,6 +268,7 @@ void test_medical_sensor_fault_state_machine_and_recovery() {
     snap.initialVitalsProcessed = true;
     snap.initialEcgProcessed = true;
     snap.temperatureValid = true;
+    snap.physicalTempHealth = PHYSICAL_SENSOR_HEALTHY;
     snap.temperature = 36.8f;
     TEST_ASSERT_TRUE(isMedicalTelemetryFullyValid(snap));
 

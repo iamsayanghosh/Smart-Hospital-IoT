@@ -329,15 +329,15 @@ inline bool isMedicalTelemetryInitializing(const Telemetry &data)
  *
  * @param tempValue Temperature reading in deg C (or DEVICE_DISCONNECTED_C).
  * @param isSimulated True if sample originated from CLI simulation override.
- * @param telemetry In/out reference to global telemetry state.
+ * @param target In/out reference to global telemetry state.
  */
-inline void applyTemperatureTelemetryUpdate(float tempValue, bool isSimulated, Telemetry &telemetry)
+inline void applyTemperatureTelemetryUpdate(float tempValue, bool isSimulated, Telemetry &target)
 {
-    telemetry.temperature = tempValue;
-    telemetry.temperatureValid = isfinite(tempValue) && tempValue != DEVICE_DISCONNECTED_C;
-    telemetry.initialTempProcessed = true;
+    target.temperature = tempValue;
+    target.temperatureValid = isfinite(tempValue) && tempValue != DEVICE_DISCONNECTED_C;
+    target.initialTempProcessed = true;
     if (!isSimulated) {
-        telemetry.physicalTempHealth = telemetry.temperatureValid ? PHYSICAL_SENSOR_HEALTHY : PHYSICAL_SENSOR_FAULT;
+        target.physicalTempHealth = target.temperatureValid ? PHYSICAL_SENSOR_HEALTHY : PHYSICAL_SENSOR_FAULT;
     }
 }
 
