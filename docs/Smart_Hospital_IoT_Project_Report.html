@@ -340,7 +340,7 @@
     <strong>Key Project Accomplishments:</strong>
     <ul>
       <li><strong>Unified Single-Project Integration:</strong> All 6 assigned internship tasks run simultaneously in one firmware image with zero Arduino <code>delay()</code> calls (FreeRTOS tasks use cooperative <code>vTaskDelay()</code> yielding).</li>
-      <li><strong>Resource Efficiency:</strong> Static RAM utilization measured at <strong>15.1%</strong> (49,536 B of 327,680 B data SRAM budget; 520 KB physical on-chip SRAM) and Flash at <strong>80.3%</strong> (1,052,174 B of 1,310,720 B), leaving healthy runtime dynamic heap for FreeRTOS queues.</li>
+      <li><strong>Resource Efficiency:</strong> Static RAM utilization measured at <strong>15.1%</strong> (49,536 B of 327,680 B data SRAM budget; 520 KB physical on-chip SRAM) and Flash at <strong>80.3%</strong> (1,052,350 B of 1,310,720 B), leaving healthy runtime dynamic heap for FreeRTOS queues.</li>
       <li><strong>Automated Test Suite:</strong> 26 Unity test cases are included, covering strict numeric parsers, medication safety, slew-rate mechanics, telemetry validity, sensor-fault transitions, queue-retry bookkeeping, default threshold overrides, and bed emergency posture latching. The ESP32 test runner has been build-verified.</li>
       <li><strong>Open Source &amp; Credentials Safety:</strong> Released under the MIT License with complete credential isolation (private keys never committed to Git).</li>
     </ul>
@@ -396,7 +396,7 @@
         <td>Digital Output</td>
         <td><code>GPIO 25</code></td>
         <td>220&Omega; current-limiting resistor</td>
-        <td>Task 3: Critical dosage warning (rapid 3.3 Hz blink)</td>
+        <td>Task 3: Critical dosage alert (3.3 Hz blink; solid when confirmed)</td>
       </tr>
       <tr>
         <td><strong>Yellow Indicator LED</strong></td>
@@ -509,7 +509,7 @@
       <tr>
         <td><code>samplingTask</code></td>
         <td><strong>Priority 2</strong></td>
-        <td>1000 ms periodic</td>
+        <td>1000 ms (200 ms boot)</td>
         <td>4096 Bytes</td>
         <td>Monitors vital health state; commands 5s abnormal vs 60s stable acquisition rate.</td>
       </tr>
@@ -657,7 +657,7 @@
     <text x="15" y="404" fill="#f8fafc" font-size="13" font-weight="bold">SSD1306 128x64 I2C OLED</text>
     <text x="15" y="422" fill="#a7f3d0" font-size="11">I2C: GPIO 21 (SDA), GPIO 22 (SCL)</text>
     <text x="15" y="437" fill="#94a3b8" font-size="10">Medication Live Status (y: 0..44)</text>
-    <text x="15" y="451" fill="#94a3b8" font-size="10">Task 6 LOGGING OFFLINE Banner (y: 54..63)</text>
+    <text x="15" y="451" fill="#94a3b8" font-size="9.5">Task 6 OFFLINE / SYSTEM DEGRADED Banner (y: 54..63)</text>
 
     <!-- SG90 Servo -->
     <rect x="0" y="470" width="280" height="65" rx="8" fill="#0f172a" stroke="#10b981" stroke-width="1"/>
@@ -683,7 +683,7 @@
   <!-- Supervisor Tier -->
   <rect x="375" y="165" width="620" height="52" rx="8" fill="#1e293b" stroke="#e11d48" stroke-width="1.5"/>
   <text x="390" y="186" fill="#fda4af" font-size="13" font-weight="bold">watchdogTask [Priority 4] (1000 ms audit, 6s silence limit)</text>
-  <text x="390" y="204" fill="#94a3b8" font-size="11">Audits task heartbeats (lastHeartbeatMs) &#8226; Logs SYSTEM_DEGRADED &#8226; Feeds TWDT (8000 ms panic)</text>
+  <text x="390" y="204" fill="#94a3b8" font-size="11">Audits task heartbeats (lastHeartbeatMs) &#8226; Flags SYSTEM_DEGRADED &#8226; Feeds TWDT (8000 ms panic)</text>
 
   <!-- Alert Tier -->
   <rect x="375" y="224" width="620" height="46" rx="8" fill="#1e293b" stroke="#f59e0b" stroke-width="1"/>
@@ -738,7 +738,7 @@
     <rect x="0" y="68" width="300" height="60" rx="8" fill="#0f172a" stroke="#8b5cf6" stroke-width="1"/>
     <text x="12" y="88" fill="#ddd6fe" font-size="12" font-weight="bold">displayTask [P1] (100 ms)</text>
     <text x="12" y="103" fill="#a78bfa" font-size="10">SSD1306 OLED via I2C</text>
-    <text x="12" y="116" fill="#94a3b8" font-size="9">Drains sensorQueue &amp; renders UI / DEGRADED banner</text>
+    <text x="12" y="116" fill="#94a3b8" font-size="9">Drains sensorQueue; draws SYSTEM DEGRADED / OFFLINE</text>
 
     <rect x="320" y="68" width="300" height="60" rx="8" fill="#0f172a" stroke="#10b981" stroke-width="1"/>
     <text x="332" y="88" fill="#a7f3d0" font-size="12" font-weight="bold">offlineTask [P2] (Cadence: 50 ms)</text>
@@ -990,7 +990,7 @@
     <text x="12" y="448" fill="#e2e8f0" font-size="10">&#8226; Hardware: ESP-IDF TWDT (8000 ms panic)</text>
     <text x="12" y="464" fill="#e2e8f0" font-size="10">&#8226; Software: watchdogTask audits heartbeats</text>
     <text x="12" y="480" fill="#e2e8f0" font-size="10">&#8226; Cadence: 1000 ms audit (6000 ms silence limit)</text>
-    <text x="12" y="496" fill="#fca5a5" font-size="10">&#8226; Stalled task logs SYSTEM_DEGRADED</text>
+    <text x="12" y="496" fill="#fca5a5" font-size="10">&#8226; Stalled task triggers SYSTEM_DEGRADED</text>
     <text x="12" y="510" fill="#64748b" font-size="9">OLED shows SYSTEM DEGRADED banner; TWDT panic if hung</text>
   </g>
 
@@ -1142,7 +1142,7 @@
     The system concurrently manages physical and simulated parameters. Physical core temperature is sampled via a 
     Dallas DS18B20 1-Wire sensor on <code>GPIO 4</code> using a non-blocking two-state machine (<code>TEMP_IDLE</code> &rarr; 
     <code>TEMP_CONVERTING</code>). This ensures the &ge;800 ms 12-bit conversion delay (checked via non-blocking <code>millis()</code> gate in <code>sensors.cpp</code>) never stalls 
-    the FreeRTOS scheduler. Optical Photoplethysmogram (PPG) vitals (Heart Rate 50-100 BPM, SpO2 92-100%) and a 5 Hz Gaussian 
+    the FreeRTOS scheduler. Optical Photoplethysmogram (PPG) vitals (68-80 BPM, 95-98% SpO2 resting; thresholds 50-100 BPM, 92-100%) and a 5 Hz Gaussian 
     ECG waveform model are synthesized concurrently with independent tiered threshold monitoring across all vital modalities (Heart Rate, ECG Rate, SpO2, and Body Temperature). Dual-tier watchdog protection couples the hardware ESP-IDF TWDT (8000 ms hardware panic) 
     with a software heartbeat monitor (<code>watchdogTask</code>) auditing the 12 FreeRTOS worker tasks every 1000 ms against a 6000 ms silence limit while servicing its own hardware TWDT registration.
   </p>
@@ -1182,7 +1182,7 @@
   <ul>
     <li><strong>Sleeping Mode (10&deg;, 1.5&deg;/s):</strong> Nominal resting position when vitals are stable.</li>
     <li><strong>Breathing Support Mode (45&deg;, 1.5&deg;/s):</strong> Automatically triggered when SpO2 drops into the warning band (88% - 91%) to alleviate pulmonary pressure.</li>
-    <li><strong>Emergency Mode (90&deg;, 5.0&deg;/s):</strong> Automatically triggered immediately upon any Critical vital sign (cardiac arrest, extreme hypothermia). If an emergency was triggered by an acute vital (e.g. extreme body temperature) and that measurement subsequently becomes invalid/disconnected, the emergency posture is latched and retained until valid non-critical data is restored.</li>
+    <li><strong>Emergency Mode (90&deg;, 5.0&deg;/s):</strong> Triggered immediately on any Critical vital (SpO2 &lt;88%, HR/ECG &lt;45 or &gt;120 BPM, Temp &lt;34 or &gt;39.5&deg;C; servo boots at 0&deg;). If an emergency was triggered by an acute vital (e.g. extreme body temperature) and that measurement subsequently becomes invalid/disconnected, the emergency posture is latched and retained until valid non-critical data is restored.</li>
     <li><strong>Clinician-in-the-Loop Override Primacy (0&deg;-90&deg;, 2.0&deg;/s):</strong> Remote slider allows attending physicians to command any posture with full clinical authority (e.g. flattening the bed to 0&deg; supine for CPR chest compressions or surgical access during a cardiac arrest). Any subsequent transition in the patient's bed posture category (<code>SLEEPING</code> &harr; <code>BREATHING_SUPPORT</code> &harr; <code>EMERGENCY</code>) automatically cancels manual override and re-evaluates posture.</li>
   </ul>
 
@@ -1201,7 +1201,7 @@
     The firmware continuously monitors Wi-Fi and MQTT connectivity to maintain a tri-state health machine (<code>ONLINE</code>, <code>DEGRADED</code>, <code>OFFLINE</code>):
   </p>
   <ul>
-    <li><strong>OLED Notification:</strong> Inverted status bar on bottom rows (y: 54..63) displays <strong><code>LOGGING OFFLINE</code></strong> without obstructing medication data.</li>
+    <li><strong>OLED Notification:</strong> Inverted status bar on bottom rows (y: 54..63) displays <strong><code>LOGGING OFFLINE</code></strong> or <strong><code>SYSTEM DEGRADED</code></strong> without obstructing medication data.</li>
     <li><strong>Acoustic Discrimination:</strong> Wi-Fi failure triggers a rapid double-pip tone (0-100 ms, 200-300 ms ON), while MQTT failure triggers a slow single beep (0-500 ms ON).</li>
     <li><strong>FIFO Offline Buffer:</strong> An in-memory queue stores up to 64 telemetry records (~36.8 KB SRAM) providing best-effort local data retention during transport outages under QoS 0 at-most-once delivery. Timestamps are assigned upon broker receipt during replay.</li>
     <li><strong>Exponential Backoff &amp; Replay:</strong> Reconnection retry delay doubles from 1s up to 30s (1s &rarr; 2s &rarr; 4s ... &rarr; 30s max). Upon reconnection, <code>mqttTask</code> drains buffered records in FIFO order, sharing the 3000 ms round-robin slot (20 msgs/min baseline); event bursts and 60 s summaries contribute toward Adafruit IO's 30 data points/minute quota.</li>
@@ -1233,7 +1233,7 @@
       </tr>
       <tr>
         <td><strong>Flash Memory</strong></td>
-        <td>1,052,174 Bytes</td>
+        <td>1,052,350 Bytes</td>
         <td>1,310,720 Bytes</td>
         <td><strong>80.3%</strong></td>
         <td>Fits comfortably within default 1.31 MB application partition (app0).</td>

@@ -15,8 +15,9 @@
  *     1. Task 3 Medication Dosage Safety: current applied dosage, safety status label,
  *        "CRITICAL REQUEST" interlock prompts, and "PRESS BUTTON" confirmation cues.
  *        The medication UI is permanently visible regardless of network connectivity.
- *     2. Task 6 Offline Logging State: displays a debounced, inverted "LOGGING OFFLINE" banner
- *        on the bottom row (y=54..63) when connectivity is lost, without obscuring dosage.
+ *     2. Task 6 Health & Offline Banner: displays a debounced, inverted "LOGGING OFFLINE" banner
+ *        when connectivity is lost, or "SYSTEM DEGRADED" when a monitored worker task stalls,
+ *        on the bottom row (y=54..63) without obscuring dosage.
  */
 
 /**

@@ -14,7 +14,7 @@
  * - Fixed Tasks: ecgTask (fixed 200 ms cadence for clinical waveform continuity) and
  *   motionTask (fixed 1000 ms cadence for occupancy detection) are excluded from adaptive scaling.
  * - Automatic-First Priority: Automatic clinical assessment overrides manual doctor settings
- *   upon any transition in the patient's condition.
+ *   upon any transition in the patient's clinical condition; active CRITICAL states cap overrides to 5 s.
  */
 
 /**

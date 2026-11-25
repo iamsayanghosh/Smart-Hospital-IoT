@@ -272,7 +272,7 @@ pio run --target upload
 | Metric | Measured Value | Budget / Limit | Utilization |
 | :--- | :--- | :--- | :--- |
 | **Static RAM (SRAM)** | 49,536 Bytes | 327,680 Bytes | **15.1%** |
-| **Flash Memory** | 1,052,174 Bytes | 1,310,720 Bytes | **80.3%** |
+| **Flash Memory** | 1,052,350 Bytes | 1,310,720 Bytes | **80.3%** |
 | **FreeRTOS Application Tasks** | 13 tasks (all Core 1) | Dual Core Xtensa | Pinned to Core 1 (with loopTask) |
 | **Watchdog Timeout** | 8000 ms (Hardware TWDT) | 6000 ms (Heartbeat) | 100% monitored |
 | **Task Scheduling Delays** | 0 ms (Zero Arduino `delay()`) | Cooperative yielding | FreeRTOS `vTaskDelay` (peripheral I/O remains synchronous) |

@@ -570,9 +570,11 @@ inline bool updateTemperatureFaultReportState(bool isFault, bool sendSuccess,
 /**
  * @brief Analyzes patient telemetry and constructs an alert candidate if a threshold is violated.
  *
- * Evaluates physiological parameters in priority order: Heart Rate (<45 or >120 BPM Critical,
- * 45-49 or 101-120 BPM Warning), SpO2 (<88% Critical, 88-91% Warning), ECG Rate (<45 or >120 BPM Critical,
- * 45-49 or 101-120 BPM Warning), and Body Temperature (<34°C or >39.5°C Critical, 34-36°C or 38-39.5°C Warning).
+ * Evaluates physiological parameters in priority order (highest severity wins):
+ * SpO2 (<88% Critical, 88-91% Warning), Heart Rate (<45 or >120 BPM Critical,
+ * 45-49 or 101-120 BPM Warning), ECG Rate (<45 or >120 BPM Critical,
+ * 45-49 or 101-120 BPM Warning), and Body Temperature (<34°C or >39.5°C Critical,
+ * 34-36°C or 38-39.5°C Warning).
  *
  * @param snapshot Evaluated patient vitals snapshot.
  * @param thresholds Clinical threshold configuration (defaults to the global medicalThresholds instance).
@@ -632,7 +634,7 @@ inline AlertCandidate evaluateMedicalAlert(const Telemetry &snapshot,
 /**
  * @brief Analyzes room telemetry and constructs an alert candidate if environmental limits fail.
  *
- * Evaluates AQI (>100), Room Oxygen (<19.5 or >24 %), and Room Temperature (<18 or >28 °C).
+ * Evaluates Room Oxygen (<19.5 or >24 %), Room Temperature (<18 or >28 °C), and AQI (>100); highest severity wins.
  *
  * @param snapshot Evaluated facility telemetry snapshot.
  * @return AlertCandidate Populated candidate descriptor.
