@@ -73,7 +73,7 @@ void updateOfflineBuzzer(OfflineBuzzerMode mode) {
     if (!shouldBuzz) {
         if (mode == BUZZER_MODE_WIFI_FAIL) {
             uint32_t ms = millis() % 1000;
-            shouldBuzz = (ms < 100) || (ms > 200 && ms < 300);
+            shouldBuzz = (ms < 100) || (ms >= 200 && ms < 300);
         } else if (mode == BUZZER_MODE_MQTT_FAIL) {
             uint32_t ms = millis() % 1000;
             shouldBuzz = (ms < 500);

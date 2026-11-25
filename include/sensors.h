@@ -31,8 +31,8 @@ void sensorsInit();
 /**
  * @brief FreeRTOS task acquiring physical patient temperature via DS18B20.
  *
- * Operates on adaptive schedule (5 s - 60 s) while executing a 500 ms watchdog
- * heartbeat loop to prevent TWDT starvation during extended 60 s idle periods.
+ * Operates on adaptive schedule (5 s - 60 s) while executing a 100 ms polling
+ * and watchdog heartbeat loop to prevent TWDT starvation during extended 60 s idle periods.
  *
  * @param parameter Unused FreeRTOS task parameter pointer (NULL).
  */

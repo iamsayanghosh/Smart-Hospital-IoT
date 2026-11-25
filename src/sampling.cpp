@@ -142,14 +142,9 @@ void samplingTask(void *parameter)
                 Serial.println(" s)");
             }
         } else {
-            // Clinical state unchanged: retain active manual override if present, else auto target
+            // Clinical state unchanged: retain active manual override (already <= 5 s if CRITICAL), else auto target
             if (isManualOverride) {
-                // If patient is in an active critical condition, cap manual interval to 5 s
-                if (currentSeverity == ALERT_SEVERITY_CRITICAL && manualIntervalMs > AUTO_INTERVAL_ABNORMAL_MS) {
-                    effectiveIntervalMs = AUTO_INTERVAL_ABNORMAL_MS;
-                } else {
-                    effectiveIntervalMs = manualIntervalMs;
-                }
+                effectiveIntervalMs = manualIntervalMs;
             } else {
                 effectiveIntervalMs = (currentAutoMode == SAMPLING_MODE_ABNORMAL) ? AUTO_INTERVAL_ABNORMAL_MS : AUTO_INTERVAL_STABLE_MS;
             }
