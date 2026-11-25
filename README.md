@@ -78,9 +78,9 @@ graph TD
 ## 2. Assignment Task Implementation
 
 ### Task 1: Multi-Sensor Expansion Using FreeRTOS
-* **Physical Temperature:** Dallas DS18B20 on 1-Wire bus (`GPIO 4`). Non-blocking state machine (`TEMP_IDLE` $\rightarrow$ `TEMP_CONVERTING`) with an 800–900 ms completion window (800 ms conversion gate plus 100 ms polling cadence) ensures thermal conversion never blocks the scheduler. Filters power-on scratchpad reading (+85.0°C) and invalidates telemetry if sensor resets mid-operation.
+* **Physical Temperature:** Dallas DS18B20 on 1-Wire bus (`GPIO 4`). Non-blocking state machine (`TEMP_IDLE` $\rightarrow$ `TEMP_CONVERTING`) with an 800–900 ms completion window (800 ms conversion gate plus 100 ms polling cadence) ensures thermal conversion never blocks the scheduler. Filters power-on scratchpad reading (+85.0°C) and invalidates telemetry if sensor resets mid-operation. Maintains a 3-state hardware health model (`UNKNOWN`, `HEALTHY`, `FAULT`); CLI simulated values provide measurement availability for testing without clearing active physical hardware faults.
 * **Physical Motion:** HC-SR501 PIR sensor on `GPIO 27`, powered from 5V (`esp:5V`) in circuit diagram to ensure reliable operation of the module's onboard 3.3V LDO regulator on physical hardware.
-* **Simulated Photoplethysmogram (PPG):** Optical Heart Rate (`50 - 100 BPM`) and $\text{SpO}_2$ (`92 - 100 %`).
+* **Simulated Photoplethysmogram (PPG):** Optical Heart Rate and $\text{SpO}_2$ autonomous synthesis (nominal baseline 68–80 BPM, 95–98% $\text{SpO}_2$) evaluated against clinical safety thresholds (`50 - 100 BPM` and `92 - 100 %`), with UART overrides (`SET_HR 40-140`, `SET_SPO2 80-100`) for anomalous scenarios.
 * **Simulated Electrocardiogram (ECG):** Illustrative real-time Gaussian superposition model synthesizing coarse cardiac cycle morphology at 5 Hz (200 ms cadence) for IoT demonstration (clinical diagnostic ECG requires $\ge 250\text{ Hz}$).
 * **Supervision:** Dual-tier watchdog coupling ESP-IDF Task Watchdog Timer (TWDT, 8000 ms) with an application heartbeat auditor (`watchdogTask`, 6000 ms).
 
@@ -95,30 +95,30 @@ graph TD
 * **Safety Tiers:**
   * **Normal (0.0 - 79.9 mg/hr):** Solid Green LED (`GPIO 33`).
   * **Warning (80.0 mg/hr):** Solid Yellow LED (`GPIO 26`).
-  * **Critical (> 80.0 mg/hr):** Red LED (`GPIO 25`) and Piezo Buzzer (`GPIO 14`) rapidly blink/beep at ~3.3 Hz (300 ms period: 150 ms ON / 150 ms OFF). Dosage is clamped at 80.0 mg/hr until physically confirmed.
+  * **Critical (> 80.0 mg/hr):** Red LED (`GPIO 25`) and Piezo Buzzer (`GPIO 14`) rapidly blink/beep at ~3.3 Hz (300 ms period: 150 ms ON / 150 ms OFF) while unconfirmed. Dosage is clamped at 80.0 mg/hr until physically confirmed; once confirmed, the Red LED remains solid ON and the buzzer is silenced.
 * **Dual-Channel Physical Bedside Interlock:** Clinician must physically press the button on `GPIO 13` to unlock dosages above 80 mg/hr. *Range Authorization Policy:* Once confirmed at bedside for a critical rate, adjustments within the critical band (>80.0 mg/hr) remain authorized without re-prompting; dropping dosage back to $\le 80.0\text{ mg/hr}$ automatically clears confirmation and re-arms the interlock.
 * **Asymmetric Slew Limiter:** Increases are smoothly capped to $+5\text{ mg/hr/s}$ across 50 Hz task cycles (with first-step jump elimination and long task interruption recovery) to prevent bolus shock; reductions apply instantaneously.
 * **Permanent OLED Display:** The 128x64 OLED display permanently shows current dosage, status, and confirmation cues online and offline.
 
 ### Task 4: Intelligent Remote Bed Elevation
-* **Actuation:** SG90 Servo on `GPIO 18` with kinematic ramp smoothing (1.5°/s, 2.0°/s, 5.0°/s). During boot failure rollback (`failSetup()`), the servo PWM timer is explicitly detached.
+* **Actuation:** SG90 Servo on `GPIO 18` with kinematic ramp smoothing (1.5°/s, 2.0°/s, 5.0°/s). Starts at 0° supine on boot until initial vitals are processed. During boot failure rollback (`failSetup()`), the servo PWM timer is explicitly detached.
 * **Predefined Clinical Modes:**
   * **Sleeping Rest (10°):** Normal baseline physiological status.
   * **Breathing Support (45°):** Semi-Fowler's positioning automatically triggered by hypoxia ($\text{SpO}_2 \in [88\%, 91\%]$).
-  * **Emergency (90°):** Resuscitation positioning triggered by critical vitals ($\text{SpO}_2 < 88\%$, $\text{HR} < 45$ or $> 120\text{ BPM}$, extreme body temperature $<34.0^\circ\text{C}$ or $>39.5^\circ\text{C}$).
-* **Clinician-in-the-Loop Override Primacy:** Clinicians can command angles ($0 - 90^\circ$) via `bed-angle` with full medical override authority (e.g. flattening the bed to $0^\circ$ supine for emergency CPR chest compressions during a cardiac arrest). Any subsequent transition in the patient's bed posture category (`SLEEPING` ↔ `BREATHING_SUPPORT` ↔ `EMERGENCY`) automatically cancels manual override and re-evaluates posture.
+  * **Emergency (90°):** Resuscitation positioning triggered by critical vitals ($\text{SpO}_2 < 88\%$, $\text{HR} < 45$ or $> 120\text{ BPM}$, $\text{ECG} < 45$ or $> 120\text{ BPM}$, extreme body temperature $<34.0^\circ\text{C}$ or $>39.5^\circ\text{C}$). Latched across temperature sensor disconnects.
+* **Clinician-in-the-Loop Override Primacy:** Clinicians can command angles ($0 - 90^\circ$) via `bed-angle` with full medical override authority—including commanding $0^\circ$ flat supine during an active cardiac arrest for CPR chest compressions. Any subsequent transition in the patient's bed posture category (`SLEEPING` ↔ `BREATHING_SUPPORT` ↔ `EMERGENCY`) automatically cancels manual override and re-evaluates posture.
 
 ### Task 5: Smart Dynamic Sampling Rate (Adaptive Monitoring)
-* **Energy-Efficient Stable Mode:** Sets vital and temperature acquisition to **60 seconds** when all physiological markers are normal. Discrete sampling introduces a sample-and-hold detection latency (up to 60 seconds) before an acute deterioration is acquired.
+* **Energy-Efficient Stable Mode:** Sets vital and temperature acquisition to **60 seconds** when all physiological markers are normal. Discrete sampling introduces a sample-and-hold detection latency (up to 60 seconds) before an acute deterioration is acquired. Starts in a conservative 5-second interval during power-on until initial baseline vitals converge.
 * **Acute Crisis Mode:** Once an abnormal vital sign is acquired, sampling automatically accelerates to **5 seconds**.
-* **Manual Slider Override:** Doctor can adjust sampling interval (5 s to 60 s) via `sampling-rate`. Clinical severity transitions take precedence: an acute escalation to `CRITICAL` severity immediately cancels any slower manual override and enforces rapid 5-second monitoring.
+* **Clinician Rate Adjustment & Safety Floor:** Clinicians can adjust the acquisition interval (5 s to 60 s) via `sampling-rate`. The manual setting is maintained during stable monitoring. However, to prevent a slow manual rate from blinding clinicians during life-threatening crises, an acute escalation to `CRITICAL` severity immediately cancels slower overrides and enforces rapid 5-second monitoring as an autonomous safety floor (rates $> 5\text{ s}$ are clamped during active critical crises).
 
 ### Task 6: Fault-Tolerant Offline Detection & Buffering
 * **Three Health States:** `SYSTEM_ONLINE`, `SYSTEM_DEGRADED` (detected when transport is online but a worker task misses its watchdog heartbeat), and `SYSTEM_OFFLINE` (Wi-Fi or MQTT disconnected).
 * **Unified Quiet Bootup & Debounce:** An `OfflineBannerGate` suppresses the offline banner and buzzer during the first 10 seconds of power-up and ignores transient network hiccups under 5 seconds.
-* **Non-Clobbering OLED Banner:** When offline, an inverted ticker bar (`LOGGING OFFLINE`) renders on the bottom row (`y = 54..63`) while medication dosage remains visible.
+* **Non-Clobbering OLED Banner:** Inverted ticker bar on bottom rows (`y = 54..63`) displays `LOGGING OFFLINE` during network drops or `SYSTEM DEGRADED` during task stalls, while medication dosage remains permanently visible.
 * **Acoustic Cadences:** Distinct failure cadences for Wi-Fi failure (rapid double-pip) vs. MQTT broker failure (slow beep). Medication critical alarms take absolute priority over network beeps.
-* **Offline SRAM Buffer:** Outgoing telemetry packets are diverted to a 64-item **bounded FIFO queue** (sized up to 512 bytes per packet). Provides best-effort local data retention during outages under QoS 0 at-most-once delivery. If network disconnection persists beyond 64 messages, the queue safely preserves earlier historical data.
+* **Offline SRAM Buffer:** Outgoing telemetry packets are diverted to a 64-item **bounded FIFO queue** storing 576-byte records (64-byte topic + 512-byte payload, ~36.8 KB SRAM total). Provides best-effort local data retention during outages under QoS 0 at-most-once delivery. If network disconnection persists beyond 64 messages, the queue safely preserves earlier historical data.
 * **Reconnection Replay:** Replays missed records in strict FIFO order, sharing the 3000 ms round-robin slot (20 msgs/min baseline). Normal telemetry runs at 20 msgs/min; event notifications and 60 s summaries contribute toward Adafruit IO's 30 data points/minute free account quota. Pending `STATUS: NORMAL` clear events are retained until successfully delivered or buffered.
 
 ---
