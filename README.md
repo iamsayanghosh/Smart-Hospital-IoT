@@ -66,6 +66,7 @@ graph TD
     MQTT -->|"dosage cmd (shared state)"| MED
     MQTT <--> BUF
     MQTT -->|link-state flag| OFF
+    WDT -->|isSystemHealthy| OFF
     OFF -->|offline banner flag| DISP
     BED & MED & OFF --> HW_ACT
     MQTT <--> NET
