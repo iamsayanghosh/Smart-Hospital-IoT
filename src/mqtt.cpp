@@ -145,9 +145,14 @@ String buildAlertPayload(const char *role, const char *parameter, float value, A
 String buildHospitalSummaryPayload(const char *averageHeartRateStr, const char *minimumSpo2Str, const char *maxBodyTempStr,
                                   uint32_t medicalSampleCount, uint32_t medicalAbnormalCount, uint32_t medicalCriticalCount,
                                   const char *averageRoomTempStr, const char *averageOxygenStr, const char *averageAqiStr,
-                                  uint32_t facilitySampleCount, uint32_t facilityAbnormalCount, uint32_t facilityCriticalCount)
+                                  uint32_t facilitySampleCount, uint32_t facilityAbnormalCount, uint32_t facilityCriticalCount,
+                                  const char *medicalStatusOverride = nullptr)
 {
-    const char *medicalStatus = (medicalSampleCount == 0 && medicalCriticalCount == 0 && medicalAbnormalCount == 0) ? "N/A" : ((medicalCriticalCount > 0) ? "CRITICAL" : (medicalAbnormalCount > 0 ? "WARNING" : "NORMAL"));
+    const char *medicalStatus = (medicalStatusOverride != nullptr)
+                                    ? medicalStatusOverride
+                                    : ((medicalSampleCount == 0 && medicalCriticalCount == 0 && medicalAbnormalCount == 0)
+                                           ? "N/A"
+                                           : ((medicalCriticalCount > 0) ? "CRITICAL" : (medicalAbnormalCount > 0 ? "WARNING" : "NORMAL")));
     const char *facilityStatus = (facilitySampleCount == 0 && facilityCriticalCount == 0 && facilityAbnormalCount == 0) ? "N/A" : ((facilityCriticalCount > 0) ? "CRITICAL" : (facilityAbnormalCount > 0 ? "WARNING" : "NORMAL"));
 
     char payload[620];
@@ -167,9 +172,12 @@ String buildHospitalSummaryPayload(const char *averageHeartRateStr, const char *
  */
 String buildCompactHospitalSummaryPayload(const char *averageHeartRateStr, const char *minimumSpo2Str, const char *maxBodyTempStr,
                                          uint32_t medicalAbnormalCount, uint32_t medicalCriticalCount,
-                                         const char *averageOxygenStr, uint32_t facilityAbnormalCount, uint32_t facilityCriticalCount)
+                                         const char *averageOxygenStr, uint32_t facilityAbnormalCount, uint32_t facilityCriticalCount,
+                                         const char *medicalStatusOverride = nullptr)
 {
-    const char *medStat = (medicalCriticalCount > 0) ? "CRIT" : (medicalAbnormalCount > 0 ? "WARN" : "NORM");
+    const char *medStat = (medicalStatusOverride != nullptr)
+                              ? medicalStatusOverride
+                              : ((medicalCriticalCount > 0) ? "CRIT" : (medicalAbnormalCount > 0 ? "WARN" : "NORM"));
     const char *facStat = (facilityCriticalCount > 0) ? "CRIT" : (facilityAbnormalCount > 0 ? "WARN" : "NORM");
 
     char payload[220];
@@ -512,6 +520,49 @@ void resetLiveFeedPublishState()
 }
 
 static bool medicalSensorFaultActive = false;
+static String lastMedicalAlertMessage = "";
+static String lastFacilityAlertMessage = "";
+
+/**
+ * @brief Determines whether an active clinical or facility alert publish should be suppressed.
+ *
+ * Allows prompt publication on new transitions, severity escalations, and same-parameter
+ * polarity flips (after ALERT_ESCALATION_COOLDOWN_MS) while suppressing identical active alerts
+ * and throttling non-escalating parameter switches under ALERT_PUBLISH_INTERVAL_MS.
+ */
+static bool shouldSuppressAlertPublish(const AlertCandidate &candidate,
+                                       bool alertPublished,
+                                       bool alertStateKnown,
+                                       const String &lastParameter,
+                                       const String &lastMessage,
+                                       AlertSeverity lastSeverity,
+                                       uint32_t lastPublishMs,
+                                       uint32_t now)
+{
+    const char *candidateMsg = (candidate.message != nullptr) ? candidate.message : "";
+    if (alertPublished &&
+        lastParameter == candidate.parameter &&
+        lastSeverity == candidate.severity &&
+        lastMessage == candidateMsg) {
+        return true;
+    }
+
+    if (!alertStateKnown) {
+        return false;
+    }
+
+    const bool isNewTransition = !alertPublished;
+    const bool isEscalation = (candidate.severity == ALERT_SEVERITY_CRITICAL &&
+                               (!alertPublished || lastSeverity != ALERT_SEVERITY_CRITICAL));
+    const bool isPolarityFlip = (alertPublished &&
+                                 lastParameter == candidate.parameter &&
+                                 lastMessage != candidateMsg);
+
+    const uint32_t cooldownMs = (isNewTransition || isEscalation || isPolarityFlip)
+                                    ? ALERT_ESCALATION_COOLDOWN_MS
+                                    : ALERT_PUBLISH_INTERVAL_MS;
+    return (now - lastPublishMs) < cooldownMs;
+}
 
 /**
  * @brief Publishes medical alert or normal-status events when state changes.
@@ -571,6 +622,7 @@ void publishMedicalAlertIfNeeded(const Telemetry &snapshot, bool offline)
                 medicalAlertStateKnown = true;
                 medicalNormalPending = false;
                 lastMedicalAlertParameter = "";
+                lastMedicalAlertMessage = "";
                 lastMedicalAlertSeverity = ALERT_SEVERITY_NORMAL;
             }
         }
@@ -580,27 +632,22 @@ void publishMedicalAlertIfNeeded(const Telemetry &snapshot, bool offline)
     // Cancel pending normal if an acute abnormality emerges
     medicalNormalPending = false;
 
-    const bool isNewMedicalAlertTransition = !medicalAlertPublished;
-    const bool isMedicalEscalation = (candidate.severity == ALERT_SEVERITY_CRITICAL &&
-                                      (!medicalAlertPublished || lastMedicalAlertSeverity != ALERT_SEVERITY_CRITICAL));
-
-    if (medicalAlertPublished && lastMedicalAlertParameter == candidate.parameter && lastMedicalAlertSeverity == candidate.severity) {
+    if (shouldSuppressAlertPublish(candidate,
+                                   medicalAlertPublished,
+                                   medicalAlertStateKnown,
+                                   lastMedicalAlertParameter,
+                                   lastMedicalAlertMessage,
+                                   lastMedicalAlertSeverity,
+                                   lastMedicalAlertPublishMs,
+                                   now)) {
         return;
-    }
-    if (medicalAlertStateKnown) {
-        if (isNewMedicalAlertTransition || isMedicalEscalation) {
-            if (now - lastMedicalAlertPublishMs < ALERT_ESCALATION_COOLDOWN_MS) {
-                return; // rate limit rapid transitions or escalation bursts
-            }
-        } else if (now - lastMedicalAlertPublishMs < ALERT_PUBLISH_INTERVAL_MS) {
-            return;
-        }
     }
 
     String alertPayload = buildAlertPayload("MEDICAL", candidate.parameter, candidate.value, candidate.severity, candidate.message);
     if (safePublish(getAioFeedTopic(HOSPITAL_EVENTS_FEED), alertPayload, offline)) {
         medicalAlertPublished = true;
         lastMedicalAlertParameter = candidate.parameter;
+        lastMedicalAlertMessage = (candidate.message != nullptr) ? candidate.message : "";
         lastMedicalAlertSeverity = candidate.severity;
         lastMedicalAlertPublishMs = now;
         medicalAlertStateKnown = true;
@@ -635,6 +682,7 @@ void publishFacilityAlertIfNeeded(const FacilityTelemetry &snapshot, bool offlin
                 facilityAlertStateKnown = true;
                 facilityNormalPending = false;
                 lastFacilityAlertParameter = "";
+                lastFacilityAlertMessage = "";
                 lastFacilityAlertSeverity = ALERT_SEVERITY_NORMAL;
             }
         }
@@ -644,27 +692,22 @@ void publishFacilityAlertIfNeeded(const FacilityTelemetry &snapshot, bool offlin
     // Cancel pending normal if a facility anomaly emerges
     facilityNormalPending = false;
 
-    const bool isNewFacilityAlertTransition = !facilityAlertPublished;
-    const bool isFacilityEscalation = (candidate.severity == ALERT_SEVERITY_CRITICAL &&
-                                       (!facilityAlertPublished || lastFacilityAlertSeverity != ALERT_SEVERITY_CRITICAL));
-
-    if (facilityAlertPublished && lastFacilityAlertParameter == candidate.parameter && lastFacilityAlertSeverity == candidate.severity) {
+    if (shouldSuppressAlertPublish(candidate,
+                                   facilityAlertPublished,
+                                   facilityAlertStateKnown,
+                                   lastFacilityAlertParameter,
+                                   lastFacilityAlertMessage,
+                                   lastFacilityAlertSeverity,
+                                   lastFacilityAlertPublishMs,
+                                   now)) {
         return;
-    }
-    if (facilityAlertStateKnown) {
-        if (isNewFacilityAlertTransition || isFacilityEscalation) {
-            if (now - lastFacilityAlertPublishMs < ALERT_ESCALATION_COOLDOWN_MS) {
-                return; // rate limit rapid transitions or escalation bursts
-            }
-        } else if (now - lastFacilityAlertPublishMs < ALERT_PUBLISH_INTERVAL_MS) {
-            return;
-        }
     }
 
     String alertPayload = buildAlertPayload("FACILITY", candidate.parameter, candidate.value, candidate.severity, candidate.message);
     if (safePublish(getAioFeedTopic(HOSPITAL_EVENTS_FEED), alertPayload, offline)) {
         facilityAlertPublished = true;
         lastFacilityAlertParameter = candidate.parameter;
+        lastFacilityAlertMessage = (candidate.message != nullptr) ? candidate.message : "";
         lastFacilityAlertSeverity = candidate.severity;
         lastFacilityAlertPublishMs = now;
         facilityAlertStateKnown = true;
@@ -733,6 +776,41 @@ void publishSummaryData(bool offline)
         snprintf(aqiBuf, sizeof(aqiBuf), "N/A");
     }
 
+    const char *fallbackFullMedicalStatus = nullptr;
+    const char *fallbackCompactMedicalStatus = nullptr;
+    if (medicalSummaryStats.sampleCount == 0 &&
+        medicalSummaryStats.abnormalCount == 0 &&
+        medicalSummaryStats.criticalCount == 0) {
+        if (snapshot.initialVitalsProcessed) {
+            AlertCandidate fallbackAlert = evaluateMedicalAlert(snapshot);
+            if (!fallbackAlert.active) {
+                fallbackFullMedicalStatus = "NORMAL";
+                fallbackCompactMedicalStatus = "NORM";
+            } else if (fallbackAlert.severity == ALERT_SEVERITY_CRITICAL) {
+                fallbackFullMedicalStatus = "CRITICAL";
+                fallbackCompactMedicalStatus = "CRIT";
+            } else {
+                fallbackFullMedicalStatus = "WARNING";
+                fallbackCompactMedicalStatus = "WARN";
+            }
+        } else {
+            fallbackCompactMedicalStatus = "N/A";
+        }
+    }
+
+    auto buildCompactPayload = [&]() {
+        return buildCompactHospitalSummaryPayload(
+            hrBuf,
+            minSpo2Buf,
+            maxTempBuf,
+            medicalSummaryStats.abnormalCount,
+            medicalSummaryStats.criticalCount,
+            oxygenBuf,
+            facilitySummaryStats.abnormalCount,
+            facilitySummaryStats.criticalCount,
+            fallbackCompactMedicalStatus);
+    };
+
     String hospitalSummaryPayload;
     if (mqttClient.getBufferSize() >= 400) {
         hospitalSummaryPayload = buildHospitalSummaryPayload(
@@ -747,17 +825,14 @@ void publishSummaryData(bool offline)
             aqiBuf,
             facilitySummaryStats.sampleCount,
             facilitySummaryStats.abnormalCount,
-            facilitySummaryStats.criticalCount);
+            facilitySummaryStats.criticalCount,
+            fallbackFullMedicalStatus);
+        if (offline && hospitalSummaryPayload.length() >= sizeof(BufferedTelemetryMessage::payload)) {
+            Serial.println("[MQTT] Offline summary exceeds FIFO payload slot; switching to compact payload");
+            hospitalSummaryPayload = buildCompactPayload();
+        }
     } else {
-        hospitalSummaryPayload = buildCompactHospitalSummaryPayload(
-            hrBuf,
-            minSpo2Buf,
-            maxTempBuf,
-            medicalSummaryStats.abnormalCount,
-            medicalSummaryStats.criticalCount,
-            oxygenBuf,
-            facilitySummaryStats.abnormalCount,
-            facilitySummaryStats.criticalCount);
+        hospitalSummaryPayload = buildCompactPayload();
     }
 
     Serial.print("[MQTT] Hospital summary payload length: ");
@@ -849,10 +924,10 @@ void mqttTask(void *parameter)
             
             if (!mqttClient.connected()) {
                 if ((int32_t)(now - nextMqttRetryMs) >= 0) {
+                    reportTaskHeartbeat(TASK_MQTT);
                     if (connectMqtt()) {
                         resetLiveFeedPublishState();
                         lastPublishMs = now - MQTT_TASK_INTERVAL_MS;
-                        lastSummaryPublishMs = now;
                         mqttRetryDelayMs = MQTT_INITIAL_RETRY_DELAY_MS;
                         nextMqttRetryMs = now;
                     } else {

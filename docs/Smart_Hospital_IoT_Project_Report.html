@@ -340,7 +340,7 @@
     <strong>Key Project Accomplishments:</strong>
     <ul>
       <li><strong>Unified Single-Project Integration:</strong> All 6 assigned internship tasks run simultaneously in one firmware image with zero Arduino <code>delay()</code> calls (FreeRTOS tasks use cooperative <code>vTaskDelay()</code> yielding).</li>
-      <li><strong>Resource Efficiency:</strong> Static RAM utilization measured at <strong>15.1%</strong> (49,536 B of 327,680 B data SRAM budget; 520 KB physical on-chip SRAM) and Flash at <strong>80.3%</strong> (1,052,350 B of 1,310,720 B), leaving healthy runtime dynamic heap for FreeRTOS queues.</li>
+      <li><strong>Resource Efficiency:</strong> Static RAM utilization measured at <strong>15.1%</strong> (49,568 B of 327,680 B data SRAM budget; 520 KB physical on-chip SRAM) and Flash at <strong>80.3%</strong> (1,052,526 B of 1,310,720 B), leaving healthy runtime dynamic heap for FreeRTOS queues.</li>
       <li><strong>Automated Test Suite:</strong> 26 Unity test cases are included, covering strict numeric parsers, medication safety, slew-rate mechanics, telemetry validity, sensor-fault transitions, queue-retry bookkeeping, default threshold overrides, and bed emergency posture latching. The ESP32 test runner has been build-verified.</li>
       <li><strong>Open Source &amp; Credentials Safety:</strong> Released under the MIT License with complete credential isolation (private keys never committed to Git).</li>
     </ul>
@@ -669,7 +669,7 @@
     <rect x="0" y="545" width="280" height="135" rx="8" fill="#064e3b" stroke="#059669" stroke-width="1"/>
     <text x="15" y="568" fill="#6ee7b7" font-size="12" font-weight="bold">ESP32 DevKit v4 SoC Specs</text>
     <text x="15" y="586" fill="#ecfdf5" font-size="11">&#8226; Dual Tensilica Xtensa LX6 @ 240 MHz</text>
-    <text x="15" y="602" fill="#ecfdf5" font-size="11">&#8226; 320 KB SRAM (15.1% static / 49.5 KB)</text>
+    <text x="15" y="602" fill="#ecfdf5" font-size="11">&#8226; 320 KB SRAM (15.1% static / 49.6 KB)</text>
     <text x="15" y="618" fill="#ecfdf5" font-size="11">&#8226; 1.31 MB app partition (80.3% utilized / 1.05 MB)</text>
     <text x="15" y="634" fill="#ecfdf5" font-size="11">&#8226; Hardware TWDT (8000 ms panic)</text>
     <text x="15" y="650" fill="#ecfdf5" font-size="11">&#8226; 0 ms Arduino delay() &#8226; FreeRTOS Task Yielding</text>
@@ -1226,14 +1226,14 @@
     <tbody>
       <tr>
         <td><strong>RAM (SRAM)</strong></td>
-        <td>49,536 Bytes (Static)</td>
+        <td>49,568 Bytes (Static)</td>
         <td>327,680 Bytes (Data SRAM)</td>
         <td><strong>15.1%</strong></td>
         <td>Generous static headroom; runtime minimum free heap is ~108 KB (measured via <code>ESP.getMinFreeHeap()</code> after task stacks, Wi-Fi buffers, and 64-item offline queue). ESP32 SoC contains 520 KB total physical SRAM; 327,680 Bytes is the application data SRAM allocation budget.</td>
       </tr>
       <tr>
         <td><strong>Flash Memory</strong></td>
-        <td>1,052,350 Bytes</td>
+        <td>1,052,526 Bytes</td>
         <td>1,310,720 Bytes</td>
         <td><strong>80.3%</strong></td>
         <td>Fits comfortably within default 1.31 MB application partition (app0).</td>

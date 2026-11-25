@@ -249,8 +249,8 @@ void temperatureTask(void *parameter) {
               Serial.println("[TEMP TASK] DS18B20 85.0 C runtime reset; fault already reported, retrying");
             }
           }
-        } else if (rawTemp == DEVICE_DISCONNECTED_C || rawTemp <= -55.0f ||
-                   rawTemp > 125.0f) {
+        } else if (!isfinite(rawTemp) || rawTemp == DEVICE_DISCONNECTED_C ||
+                   rawTemp <= -55.0f || rawTemp > 125.0f) {
           consecutiveScratchpadCount = 0;
           hasReadValidTemperature = false;
           if (!temperatureFaultReported && !pendingTempDisconnectMessage) {
