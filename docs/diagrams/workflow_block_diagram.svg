@@ -250,23 +250,32 @@
   <text x="657" y="403" text-anchor="middle" fill="#67e8f9" font-size="8" font-weight="bold">Vitals &#8594;</text>
   <text x="657" y="413" text-anchor="middle" fill="#67e8f9" font-size="8">Bed Angle</text>
 
-  <!-- 5 & 6. Stage 4 Vertical Pipeline: Health Matrix -> Buffer -> Replay Engine -> Dashboards -->
+  <!-- 5 & 6. Stage 4 Vertical & Offline Buffer Pipeline -->
   <path d="M 1226 275 L 1226 290" stroke="#f59e0b" stroke-width="2" fill="none" marker-end="url(#wfArrowAmber)"/>
-  <path d="M 1226 400 L 1226 415" stroke="#f59e0b" stroke-width="2" fill="none" marker-end="url(#wfArrowAmber)"/>
+  <path d="M 1368 220 L 1374 220 L 1374 460 L 1368 460" stroke="#f59e0b" stroke-width="1.8" stroke-dasharray="3,2" fill="none" marker-end="url(#wfArrowAmber)"/>
   <path d="M 1226 535 L 1226 550" stroke="#10b981" stroke-width="2" fill="none" marker-end="url(#wfArrowGreen)"/>
   <path d="M 1226 680 L 1226 695" stroke="#10b981" stroke-width="2.5" fill="none" marker-end="url(#wfArrowGreen)"/>
 
+  <!-- 6b. Stage 2 Telemetry & Alerts Uplink -> Stage 4 Cloud / Replay Engine -->
+  <path d="M 618 200 L 646 200 L 646 95 L 1388 95 L 1388 615 L 1368 615" stroke="#38bdf8" stroke-width="2" fill="none" marker-end="url(#wfArrowBlue)"/>
+  <path d="M 1388 492 L 1368 492" stroke="#38bdf8" stroke-width="1.8" stroke-dasharray="3,2" fill="none" marker-end="url(#wfArrowBlue)"/>
+  <circle cx="1388" cy="492" r="2.8" fill="#38bdf8"/>
+  <rect x="782" y="87" width="136" height="16" rx="4" fill="#0f172a" stroke="#38bdf8" stroke-width="0.8"/>
+  <text x="850" y="98" text-anchor="middle" fill="#7dd3fc" font-size="8" font-weight="bold">Telemetry &amp; Alerts &#8594; Stage 4</text>
+
   <!-- 7. Offline Banner Update: Stage 4 Decision Matrix -> Stage 3 OLED Screen (Dashed Amber) -->
-  <path d="M 1084 220 L 1029 220 L 1029 602 L 1006 602" stroke="#f59e0b" stroke-width="2" stroke-dasharray="4,4" fill="none" marker-end="url(#wfArrowAmber)"/>
-  <rect x="1008" y="544" width="44" height="28" rx="4" fill="#451a03" stroke="#f59e0b" stroke-width="0.8"/>
-  <text x="1030" y="556" text-anchor="middle" fill="#fde68a" font-size="7.5" font-weight="bold">Offline &#8594;</text>
-  <text x="1030" y="566" text-anchor="middle" fill="#fde68a" font-size="7.5">OLED Bar</text>
+  <path d="M 1084 220 L 1031 220 L 1031 602 L 1006 602" stroke="#f59e0b" stroke-width="2" stroke-dasharray="4,4" fill="none" marker-end="url(#wfArrowAmber)"/>
+  <rect x="1009" y="544" width="44" height="28" rx="4" fill="#451a03" stroke="#f59e0b" stroke-width="0.8"/>
+  <text x="1031" y="556" text-anchor="middle" fill="#fde68a" font-size="7.5" font-weight="bold">Offline &#8594;</text>
+  <text x="1031" y="566" text-anchor="middle" fill="#fde68a" font-size="7.5">OLED Bar</text>
 
   <!-- 8. Cloud Downlink Bus: Adafruit IO Sliders -> Task 3 (Dosage), Task 4 (Bed), Task 5 (Sampling) -->
-  <path d="M 1084 820 L 1061 820 L 1061 257 L 1006 257" stroke="#a855f7" stroke-width="2" stroke-dasharray="4,4" fill="none" marker-end="url(#wfArrowPurple)"/>
-  <path d="M 1061 460 L 1006 460" stroke="#a855f7" stroke-width="2" stroke-dasharray="4,4" fill="none" marker-end="url(#wfArrowPurple)"/>
-  <path d="M 1061 820 L 657 820 L 657 541 L 618 541" stroke="#a855f7" stroke-width="2" stroke-dasharray="4,4" fill="none" marker-end="url(#wfArrowPurple)"/>
-  <rect x="1021" y="708" width="50" height="28" rx="4" fill="#3b0764" stroke="#a855f7" stroke-width="0.8"/>
-  <text x="1046" y="720" text-anchor="middle" fill="#e9d5ff" font-size="8" font-weight="bold">Sliders &#8594;</text>
-  <text x="1046" y="730" text-anchor="middle" fill="#e9d5ff" font-size="8">T3&#183;T4&#183;T5</text>
+  <path d="M 1084 820 L 1058 820 L 1058 257 L 1006 257" stroke="#a855f7" stroke-width="2" stroke-dasharray="4,4" fill="none" marker-end="url(#wfArrowPurple)"/>
+  <path d="M 1058 460 L 1006 460" stroke="#a855f7" stroke-width="2" stroke-dasharray="4,4" fill="none" marker-end="url(#wfArrowPurple)"/>
+  <circle cx="1058" cy="460" r="2.8" fill="#a855f7"/>
+  <path d="M 1058 820 L 657 820 L 657 541 L 618 541" stroke="#a855f7" stroke-width="2" stroke-dasharray="4,4" fill="none" marker-end="url(#wfArrowPurple)"/>
+  <circle cx="1058" cy="820" r="2.8" fill="#a855f7"/>
+  <rect x="1035" y="708" width="46" height="28" rx="4" fill="#3b0764" stroke="#a855f7" stroke-width="0.8"/>
+  <text x="1058" y="720" text-anchor="middle" fill="#e9d5ff" font-size="8" font-weight="bold">Sliders &#8594;</text>
+  <text x="1058" y="730" text-anchor="middle" fill="#e9d5ff" font-size="8">T3&#183;T4&#183;T5</text>
 </svg>
