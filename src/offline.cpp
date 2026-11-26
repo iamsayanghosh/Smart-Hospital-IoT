@@ -96,7 +96,7 @@ bool initOfflineBuffer() {
  * @return true if successfully queued; false if dropped or queue uninitialized.
  */
 bool enqueueBufferedTelemetry(const char* topic, const char* payload) {
-    if (offlineBufferQueue == NULL) return false;
+    if (offlineBufferQueue == NULL || topic == nullptr || payload == nullptr) return false;
     BufferedTelemetryMessage msg;
     strncpy(msg.topic, topic, sizeof(msg.topic) - 1);
     msg.topic[sizeof(msg.topic) - 1] = '\0';

@@ -25,8 +25,9 @@
  *    - Sensor acquisition occurs every 5 s to 60 s as dictated by samplingPeriods.
  *    - MQTT transmission occurs every 3 s (mqttTask), publishing one changed feed per cycle.
  * 6. Sample-and-Hold Latency Bound:
- *    - In 60 s stable mode, sensor tasks block on vTaskDelay() for up to 60 s. Consequently,
- *      an acute condition arising mid-interval will be detected at the next scheduled acquisition.
+ *    - In 60 s stable mode, sensor tasks yield in watchdog-safe ticks (100 ms / 500 ms) while
+ *      gating acquisition to a 60 s sample-and-hold interval; an acute condition arising
+ *      mid-interval will be detected at the next scheduled acquisition.
  */
 
 #include "sampling.h"
