@@ -136,15 +136,15 @@
   </g>
 
   <!-- STAGE 3: Local Safety & Actuation (Middle-Right Column) -->
-  <rect x="684" y="105" width="334" height="815" rx="12" fill="#111827" stroke="#1f2937" stroke-width="1.5"/>
-  <rect x="696" y="120" width="310" height="32" rx="6" fill="#b91c1c"/>
-  <text x="706" y="142" fill="#fef2f2" font-size="13" font-weight="bold">STAGE 3: LOCAL ACTUATION &amp; SAFETY</text>
+  <rect x="684" y="105" width="318" height="815" rx="12" fill="#111827" stroke="#1f2937" stroke-width="1.5"/>
+  <rect x="696" y="120" width="294" height="32" rx="6" fill="#b91c1c"/>
+  <text x="706" y="142" fill="#fef2f2" font-size="12.5" font-weight="bold">STAGE 3: LOCAL ACTUATION &amp; SAFETY</text>
 
   <!-- Stage 3 Items -->
   <g transform="translate(696, 165)">
     <!-- Task 3 Medication Interlock -->
-    <rect x="0" y="0" width="310" height="185" rx="8" fill="#1e293b" stroke="#ef4444" stroke-width="1.5"/>
-    <text x="12" y="24" fill="#fca5a5" font-size="13" font-weight="bold">Task 3: Smart Medication Infusion Safety</text>
+    <rect x="0" y="0" width="294" height="185" rx="8" fill="#1e293b" stroke="#ef4444" stroke-width="1.5"/>
+    <text x="12" y="24" fill="#fca5a5" font-size="12.5" font-weight="bold">Task 3: Smart Medication Infusion Safety</text>
     <text x="12" y="44" fill="#e2e8f0" font-size="11">&#8226; Requested Dosage: 0 - 100 mg/hr</text>
     <text x="12" y="60" fill="#22c55e" font-size="11">&#8226; 0.0 - 79.9 mg/hr: Normal (Solid Green LED)</text>
     <text x="12" y="76" fill="#eab308" font-size="11">&#8226; 80.0 mg/hr: Warning (Solid Yellow LED)</text>
@@ -156,8 +156,8 @@
     <text x="12" y="172" fill="#60a5fa" font-size="10">&#8226; Slew Rate Limiter: Max step +5.0 mg/hr/sec</text>
 
     <!-- Task 4 Bed Control -->
-    <rect x="0" y="200" width="310" height="155" rx="8" fill="#1e293b" stroke="#06b6d4" stroke-width="1.5"/>
-    <text x="12" y="224" fill="#a5f3fc" font-size="13" font-weight="bold">Task 4: Intelligent Bed Elevation Control</text>
+    <rect x="0" y="200" width="294" height="155" rx="8" fill="#1e293b" stroke="#06b6d4" stroke-width="1.5"/>
+    <text x="12" y="224" fill="#a5f3fc" font-size="12.5" font-weight="bold">Task 4: Intelligent Bed Elevation Control</text>
     <text x="12" y="244" fill="#e2e8f0" font-size="10.5">&#8226; Actuator: SG90 Servo on GPIO 18 (PWM 500-2400 &#956;s)</text>
     <text x="12" y="260" fill="#22d3ee" font-size="11" font-weight="bold">&#8226; Autonomous Patient-Condition Mapping:</text>
     <text x="22" y="278" fill="#cbd5e1" font-size="10">- Sleeping Mode: 10&#176; resting (stable vitals)</text>
@@ -167,8 +167,8 @@
     <text x="12" y="346" fill="#94a3b8" font-size="10">&#8226; Slew: Auto 1.5&#176;/s, Manual 2.0&#176;/s, Emergency 5.0&#176;/s</text>
 
     <!-- SSD1306 OLED UI Rendering -->
-    <rect x="0" y="370" width="310" height="135" rx="8" fill="#1e293b" stroke="#8b5cf6" stroke-width="1"/>
-    <text x="12" y="394" fill="#ddd6fe" font-size="13" font-weight="bold">SSD1306 OLED Screen Layout (128x64)</text>
+    <rect x="0" y="370" width="294" height="135" rx="8" fill="#1e293b" stroke="#8b5cf6" stroke-width="1"/>
+    <text x="12" y="394" fill="#ddd6fe" font-size="12.5" font-weight="bold">SSD1306 OLED Screen Layout (128x64)</text>
     <text x="12" y="414" fill="#c4b5fd" font-size="11">&#8226; Rows y: 0 .. 44 (Medication Live State):</text>
     <text x="22" y="430" fill="#e2e8f0" font-size="10">Dose: xx.x mg/hr | Status: NORMAL/WARN/CRIT</text>
     <text x="22" y="444" fill="#e2e8f0" font-size="10">If Pending: Req / Now / PRESS BUTTON</text>
@@ -178,50 +178,50 @@
   </g>
 
   <!-- STAGE 4: Cloud & Fault-Tolerant Replay (Right Column) -->
-  <rect x="1072" y="105" width="308" height="815" rx="12" fill="#111827" stroke="#1f2937" stroke-width="1.5"/>
-  <rect x="1084" y="120" width="284" height="32" rx="6" fill="#7c3aed"/>
-  <text x="1093" y="141" fill="#f5f3ff" font-size="12" font-weight="bold">STAGE 4: CLOUD &amp; FAULT-TOLERANT REPLAY</text>
+  <rect x="1080" y="105" width="300" height="815" rx="12" fill="#111827" stroke="#1f2937" stroke-width="1.5"/>
+  <rect x="1090" y="120" width="270" height="32" rx="6" fill="#7c3aed"/>
+  <text x="1098" y="141" fill="#f5f3ff" font-size="11.2" font-weight="bold">STAGE 4: CLOUD &amp; FAULT-TOLERANT REPLAY</text>
 
   <!-- Stage 4 Items -->
-  <g transform="translate(1084, 165)">
+  <g transform="translate(1090, 165)">
     <!-- Tri-State Health Evaluator -->
-    <rect x="0" y="0" width="284" height="110" rx="8" fill="#1e293b" stroke="#a855f7" stroke-width="1.5"/>
-    <text x="12" y="24" fill="#e9d5ff" font-size="12.5" font-weight="bold">Tri-State Health Decision Matrix</text>
-    <text x="12" y="44" fill="#22c55e" font-size="10.5">&#8226; ONLINE: Wi-Fi connected &amp; MQTT active</text>
-    <text x="12" y="60" fill="#eab308" font-size="10.5">&#8226; DEGRADED: Transport OK, Task Heartbeat stall</text>
-    <text x="12" y="76" fill="#ef4444" font-size="10.5">&#8226; OFFLINE: Wi-Fi lost or MQTT disconnected</text>
+    <rect x="0" y="0" width="270" height="110" rx="8" fill="#1e293b" stroke="#a855f7" stroke-width="1.5"/>
+    <text x="12" y="24" fill="#e9d5ff" font-size="12" font-weight="bold">Tri-State Health Decision Matrix</text>
+    <text x="12" y="44" fill="#22c55e" font-size="10">&#8226; ONLINE: Wi-Fi connected &amp; MQTT active</text>
+    <text x="12" y="60" fill="#eab308" font-size="10">&#8226; DEGRADED: Transport OK, Task Heartbeat stall</text>
+    <text x="12" y="76" fill="#ef4444" font-size="10">&#8226; OFFLINE: Wi-Fi lost or MQTT disconnected</text>
     <text x="12" y="96" fill="#fca5a5" font-size="9.5">OFFLINE triggers buzzer failure tones &amp; local buffer</text>
 
     <!-- Failure-Specific Buzzer Cadences -->
-    <rect x="0" y="125" width="284" height="110" rx="8" fill="#1e293b" stroke="#f59e0b" stroke-width="1"/>
+    <rect x="0" y="125" width="270" height="110" rx="8" fill="#1e293b" stroke="#f59e0b" stroke-width="1"/>
     <text x="12" y="149" fill="#fde68a" font-size="12" font-weight="bold">Task 6: Acoustic Failure Patterns</text>
-    <text x="12" y="169" fill="#e2e8f0" font-size="10.5">&#8226; Wi-Fi Disconnect: Double-Pip Cadence</text>
+    <text x="12" y="169" fill="#e2e8f0" font-size="10">&#8226; Wi-Fi Disconnect: Double-Pip Cadence</text>
     <text x="22" y="185" fill="#94a3b8" font-size="9.5">0-100 ms ON, 200-300 ms ON per 1000 ms</text>
-    <text x="12" y="203" fill="#e2e8f0" font-size="10.5">&#8226; MQTT Broker Drop: Slow Single Beep</text>
+    <text x="12" y="203" fill="#e2e8f0" font-size="10">&#8226; MQTT Broker Drop: Slow Single Beep</text>
     <text x="22" y="219" fill="#94a3b8" font-size="9.5">0-500 ms ON, 500-1000 ms OFF per 1000 ms</text>
     <text x="12" y="232" fill="#64748b" font-size="9">Medication alarm overrides network beeps</text>
 
     <!-- Local RAM FIFO Buffer (Managed by mqttTask) -->
-    <rect x="0" y="250" width="284" height="120" rx="8" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5"/>
-    <text x="12" y="274" fill="#fde68a" font-size="12" font-weight="bold">Local RAM FIFO Buffer (mqttTask Owned)</text>
-    <text x="12" y="294" fill="#e2e8f0" font-size="10.5">&#8226; Capacity: 64 Telemetry Records (~36.8 KB)</text>
-    <text x="12" y="310" fill="#e2e8f0" font-size="10.5">&#8226; Policy: Drops newest entries when saturated</text>
-    <text x="12" y="326" fill="#e2e8f0" font-size="10.5">&#8226; Structure: topic[64] + payload[512]</text>
+    <rect x="0" y="250" width="270" height="120" rx="8" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5"/>
+    <text x="12" y="274" fill="#fde68a" font-size="11.5" font-weight="bold">Local RAM FIFO Buffer (mqttTask Owned)</text>
+    <text x="12" y="294" fill="#e2e8f0" font-size="10">&#8226; Capacity: 64 Telemetry Records (~36.8 KB)</text>
+    <text x="12" y="310" fill="#e2e8f0" font-size="10">&#8226; Policy: Drops newest entries when saturated</text>
+    <text x="12" y="326" fill="#e2e8f0" font-size="10">&#8226; Structure: topic[64] + payload[512]</text>
     <text x="12" y="344" fill="#cbd5e1" font-size="9.5">&#8226; Exclusively enqueued &amp; drained by mqttTask</text>
     <text x="12" y="358" fill="#64748b" font-size="9">CLI test: SIM_OFFLINE WIFI / MQTT</text>
 
     <!-- Exponential Backoff & Replay -->
-    <rect x="0" y="385" width="284" height="130" rx="8" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
-    <text x="12" y="409" fill="#a7f3d0" font-size="12" font-weight="bold">Exponential Backoff &amp; Replay Engine</text>
-    <text x="12" y="429" fill="#e2e8f0" font-size="10">&#8226; Reconnect Retry: 1s -&gt; 2s -&gt; 4s ... -&gt; 30s max</text>
-    <text x="12" y="445" fill="#e2e8f0" font-size="10">&#8226; On Connect: mqttTask drains offlineBuffer FIFO</text>
-    <text x="12" y="461" fill="#e2e8f0" font-size="10">&#8226; Rate-Limited: Paced to obey Adafruit IO quotas</text>
+    <rect x="0" y="385" width="270" height="130" rx="8" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+    <text x="12" y="409" fill="#a7f3d0" font-size="11.5" font-weight="bold">Exponential Backoff &amp; Replay Engine</text>
+    <text x="12" y="429" fill="#e2e8f0" font-size="9.5">&#8226; Reconnect Retry: 1s -&gt; 2s -&gt; 4s ... -&gt; 30s max</text>
+    <text x="12" y="445" fill="#e2e8f0" font-size="9.5">&#8226; On Connect: mqttTask drains offlineBuffer FIFO</text>
+    <text x="12" y="461" fill="#e2e8f0" font-size="9.5">&#8226; Rate-Limited: Paced to obey Adafruit IO quotas</text>
     <text x="12" y="479" fill="#6ee7b7" font-size="9.5">&#8226; Reconnection preserves data integrity</text>
     <text x="12" y="495" fill="#64748b" font-size="9">CLI test: SIM_ONLINE flushes buffer to cloud</text>
 
     <!-- Adafruit IO Dashboards -->
-    <rect x="0" y="530" width="284" height="185" rx="8" fill="#0f172a" stroke="#6366f1" stroke-width="1"/>
-    <text x="12" y="554" fill="#c7d2fe" font-size="12.5" font-weight="bold">Adafruit IO Dual-Role Dashboards</text>
+    <rect x="0" y="530" width="270" height="185" rx="8" fill="#0f172a" stroke="#6366f1" stroke-width="1"/>
+    <text x="12" y="554" fill="#c7d2fe" font-size="12" font-weight="bold">Adafruit IO Dual-Role Dashboards</text>
     <text x="12" y="574" fill="#93c5fd" font-size="10.5" font-weight="bold">Medical Staff Dashboard (Vitals):</text>
     <text x="20" y="590" fill="#bfdbfe" font-size="9.5">Heart Rate, SpO2, Body Temp Gauges</text>
     <text x="12" y="610" fill="#6ee7b7" font-size="10.5" font-weight="bold">Facility Dashboard (Environment):</text>
@@ -251,31 +251,31 @@
   <text x="657" y="413" text-anchor="middle" fill="#67e8f9" font-size="8">Bed Angle</text>
 
   <!-- 5 & 6. Stage 4 Vertical & Offline Buffer Pipeline -->
-  <path d="M 1226 275 L 1226 290" stroke="#f59e0b" stroke-width="2" fill="none" marker-end="url(#wfArrowAmber)"/>
-  <path d="M 1368 220 L 1374 220 L 1374 460 L 1368 460" stroke="#f59e0b" stroke-width="1.8" stroke-dasharray="3,2" fill="none" marker-end="url(#wfArrowAmber)"/>
-  <path d="M 1226 535 L 1226 550" stroke="#10b981" stroke-width="2" fill="none" marker-end="url(#wfArrowGreen)"/>
-  <path d="M 1226 680 L 1226 695" stroke="#10b981" stroke-width="2.5" fill="none" marker-end="url(#wfArrowGreen)"/>
+  <path d="M 1225 275 L 1225 290" stroke="#f59e0b" stroke-width="2" fill="none" marker-end="url(#wfArrowAmber)"/>
+  <path d="M 1360 220 L 1373 220 L 1373 460 L 1360 460" stroke="#f59e0b" stroke-width="1.8" stroke-dasharray="3,2" fill="none" marker-end="url(#wfArrowAmber)"/>
+  <path d="M 1225 535 L 1225 550" stroke="#10b981" stroke-width="2" fill="none" marker-end="url(#wfArrowGreen)"/>
+  <path d="M 1225 680 L 1225 695" stroke="#10b981" stroke-width="2.5" fill="none" marker-end="url(#wfArrowGreen)"/>
 
   <!-- 6b. Stage 2 Telemetry & Alerts Uplink -> Stage 4 Cloud / Replay Engine -->
-  <path d="M 618 200 L 646 200 L 646 95 L 1388 95 L 1388 615 L 1368 615" stroke="#38bdf8" stroke-width="2" fill="none" marker-end="url(#wfArrowBlue)"/>
-  <path d="M 1388 492 L 1368 492" stroke="#38bdf8" stroke-width="1.8" stroke-dasharray="3,2" fill="none" marker-end="url(#wfArrowBlue)"/>
+  <path d="M 618 200 L 646 200 L 646 95 L 1388 95 L 1388 615 L 1360 615" stroke="#38bdf8" stroke-width="2" fill="none" marker-end="url(#wfArrowBlue)"/>
+  <path d="M 1388 492 L 1360 492" stroke="#38bdf8" stroke-width="1.8" stroke-dasharray="3,2" fill="none" marker-end="url(#wfArrowBlue)"/>
   <circle cx="1388" cy="492" r="2.8" fill="#38bdf8"/>
   <rect x="782" y="87" width="136" height="16" rx="4" fill="#0f172a" stroke="#38bdf8" stroke-width="0.8"/>
   <text x="850" y="98" text-anchor="middle" fill="#7dd3fc" font-size="8" font-weight="bold">Telemetry &amp; Alerts &#8594; Stage 4</text>
 
   <!-- 7. Offline Banner Update: Stage 4 Decision Matrix -> Stage 3 OLED Screen (Dashed Amber) -->
-  <path d="M 1084 220 L 1031 220 L 1031 602 L 1006 602" stroke="#f59e0b" stroke-width="2" stroke-dasharray="4,4" fill="none" marker-end="url(#wfArrowAmber)"/>
-  <rect x="1009" y="544" width="44" height="28" rx="4" fill="#451a03" stroke="#f59e0b" stroke-width="0.8"/>
-  <text x="1031" y="556" text-anchor="middle" fill="#fde68a" font-size="7.5" font-weight="bold">Offline &#8594;</text>
-  <text x="1031" y="566" text-anchor="middle" fill="#fde68a" font-size="7.5">OLED Bar</text>
+  <path d="M 1090 220 L 1026 220 L 1026 602 L 990 602" stroke="#f59e0b" stroke-width="2" stroke-dasharray="4,4" fill="none" marker-end="url(#wfArrowAmber)"/>
+  <rect x="1004" y="544" width="44" height="28" rx="4" fill="#451a03" stroke="#f59e0b" stroke-width="0.8"/>
+  <text x="1026" y="556" text-anchor="middle" fill="#fde68a" font-size="7.5" font-weight="bold">Offline &#8594;</text>
+  <text x="1026" y="566" text-anchor="middle" fill="#fde68a" font-size="7.5">OLED Bar</text>
 
   <!-- 8. Cloud Downlink Bus: Adafruit IO Sliders -> Task 3 (Dosage), Task 4 (Bed), Task 5 (Sampling) -->
-  <path d="M 1084 820 L 1058 820 L 1058 257 L 1006 257" stroke="#a855f7" stroke-width="2" stroke-dasharray="4,4" fill="none" marker-end="url(#wfArrowPurple)"/>
-  <path d="M 1058 460 L 1006 460" stroke="#a855f7" stroke-width="2" stroke-dasharray="4,4" fill="none" marker-end="url(#wfArrowPurple)"/>
-  <circle cx="1058" cy="460" r="2.8" fill="#a855f7"/>
-  <path d="M 1058 820 L 657 820 L 657 541 L 618 541" stroke="#a855f7" stroke-width="2" stroke-dasharray="4,4" fill="none" marker-end="url(#wfArrowPurple)"/>
-  <circle cx="1058" cy="820" r="2.8" fill="#a855f7"/>
-  <rect x="1035" y="708" width="46" height="28" rx="4" fill="#3b0764" stroke="#a855f7" stroke-width="0.8"/>
-  <text x="1058" y="720" text-anchor="middle" fill="#e9d5ff" font-size="8" font-weight="bold">Sliders &#8594;</text>
-  <text x="1058" y="730" text-anchor="middle" fill="#e9d5ff" font-size="8">T3&#183;T4&#183;T5</text>
+  <path d="M 1090 820 L 1054 820 L 1054 257 L 990 257" stroke="#a855f7" stroke-width="2" stroke-dasharray="4,4" fill="none" marker-end="url(#wfArrowPurple)"/>
+  <path d="M 1054 460 L 990 460" stroke="#a855f7" stroke-width="2" stroke-dasharray="4,4" fill="none" marker-end="url(#wfArrowPurple)"/>
+  <circle cx="1054" cy="460" r="2.8" fill="#a855f7"/>
+  <path d="M 1054 820 L 657 820 L 657 541 L 618 541" stroke="#a855f7" stroke-width="2" stroke-dasharray="4,4" fill="none" marker-end="url(#wfArrowPurple)"/>
+  <circle cx="1054" cy="820" r="2.8" fill="#a855f7"/>
+  <rect x="1031" y="708" width="46" height="28" rx="4" fill="#3b0764" stroke="#a855f7" stroke-width="0.8"/>
+  <text x="1054" y="720" text-anchor="middle" fill="#e9d5ff" font-size="8" font-weight="bold">Sliders &#8594;</text>
+  <text x="1054" y="730" text-anchor="middle" fill="#e9d5ff" font-size="8">T3&#183;T4&#183;T5</text>
 </svg>
