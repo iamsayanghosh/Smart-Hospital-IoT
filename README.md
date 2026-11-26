@@ -13,10 +13,10 @@ A concurrent medical telemetry and facility management firmware prototype implem
 * **GitHub Repository:** [github.com/iamsayanghosh/Smart-Hospital-IoT](https://github.com/iamsayanghosh/Smart-Hospital-IoT)
 * **Target Hardware:** Espressif ESP32 DevKit v4 (Dual-Core Xtensa 240 MHz, 320 KB SRAM)
 * **Project Report (PDF):** [Smart_Hospital_IoT_Project_Report.pdf](https://github.com/iamsayanghosh/Smart-Hospital-IoT/blob/main/docs/Smart_Hospital_IoT_Project_Report.pdf)
-
-> **Disclaimer:** This project is an embedded systems engineering prototype and educational simulation developed for academic and technical evaluation. It is not a certified medical device and must not be used for actual clinical diagnosis, life support, or operational medical administration.
 * **System Architecture Blueprint:** [system_architecture.svg](https://github.com/iamsayanghosh/Smart-Hospital-IoT/blob/main/docs/diagrams/system_architecture.svg) | [PNG](https://github.com/iamsayanghosh/Smart-Hospital-IoT/blob/main/docs/diagrams/system_architecture.png)
 * **System Workflow Diagram:** [workflow_block_diagram.svg](https://github.com/iamsayanghosh/Smart-Hospital-IoT/blob/main/docs/diagrams/workflow_block_diagram.svg) | [PNG](https://github.com/iamsayanghosh/Smart-Hospital-IoT/blob/main/docs/diagrams/workflow_block_diagram.png)
+
+> **Disclaimer:** This project is an embedded systems engineering prototype and educational simulation developed for academic and technical evaluation. It is not a certified medical device and must not be used for actual clinical diagnosis, life support, or operational medical administration.
 
 ---
 
@@ -59,7 +59,7 @@ graph TD
     ENV -->|telemetryMux| TEL
     DISP & ENV -->|alertSemaphore| ALERT
     DISP --> HW_OLED
-    TEL --> BED & SAMP & MQTT
+    TEL --> BED & SAMP & ALERT & MQTT
     SAMP -->|samplingPeriods| TEMP & VIT
     MQTT -->|samplingQueue| SAMP
     MQTT -->|bedQueue| BED
@@ -67,7 +67,7 @@ graph TD
     MQTT <--> BUF
     MQTT -->|link-state flag| OFF
     WDT -->|isSystemHealthy| OFF
-    OFF -->|offline banner flag| DISP
+    OFF -->|"offline / degraded flag"| DISP
     BED & MED & OFF --> HW_ACT
     MQTT <--> NET
     NET <--> CLOUD
@@ -179,7 +179,8 @@ Smart-Hospital-IoT/
 │   ├── state.cpp                     # Concurrency helpers & thresholds
 │   └── watchdog.cpp                  # TWDT reset & task audit loop
 ├── docs/                             # Engineering Documentation (Repository / GitHub hosted)
-│   ├── Smart_Hospital_IoT_Project_Report.pdf # Comprehensive Technical Report (PDF)
+│   ├── Smart_Hospital_IoT_Project_Report.html # Report HTML Source
+│   ├── Smart_Hospital_IoT_Project_Report.pdf  # Comprehensive Technical Report (PDF)
 │   └── diagrams/                     # High-Resolution Architectural & Dataflow Diagrams
 │       ├── system_architecture.svg   # Dual-Core SMP Architecture Blueprint
 │       ├── system_architecture.png   # High-DPI Architecture Diagram
@@ -200,7 +201,7 @@ Smart-Hospital-IoT/
 
 ## 5. Interactive Simulation & Testing (Serial CLI)
 
-The firmware includes an interactive Serial Command Line Interface (115200 baud) strictly bounded to the visual dial limits of the Adafruit IO dashboard gauges. CLI vital overrides trigger an immediate sample (<0.5 s, or &le;800 ms if waiting for an active 1-Wire DS18B20 conversion to finish); the nominal autonomous 60 s / 5 s adaptive cadence is unchanged.
+The firmware includes an interactive Serial Command Line Interface (115200 baud) bounded cleanly for simulation and critical threshold testing. Arduino `loop()` polls Serial every 1000 ms; once parsed, `SET_TEMP` aborts any in-flight DS18B20 conversion and samples within 100 ms, while `SET_HR` and `SET_SPO2` trigger `vitalTask` within 500 ms (nominal autonomous 60 s / 5 s cadence is unchanged).
 
 ### Patient Vitals Simulation Commands:
 * `SET_HR <40-140>`: Force patient heart rate (e.g. `SET_HR 105` for Warning, `SET_HR 130` for Emergency).
