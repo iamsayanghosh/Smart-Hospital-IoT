@@ -23,27 +23,16 @@
 // ============================================================================
 
 #include <Arduino.h>
-#include <PubSubClient.h>
-#include <WiFi.h>
-#include <Wire.h>
-#include <math.h>
 
-#include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
-#include "adafruit_io_config.h"
 #include "app.h"
 #include "display.h"
 #include "environment.h"
-#include "esp_task_wdt.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/queue.h"
-#include "freertos/semphr.h"
-#include "freertos/task.h"
 #include "medication.h"
 #include "outputs.h"
 #include "sensors.h"
-#include "state.h"
 
 #define OLED_SDA 21 ///< I2C Data line for SSD1306 OLED display
 #define OLED_SCL 22 ///< I2C Clock line for SSD1306 OLED display

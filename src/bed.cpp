@@ -74,7 +74,7 @@ void bedTask(void *parameter)
 
     // Force an initial update to evaluate telemetry and move from 0°
     bool initialEval = true;
-    static bool tempTriggeredEmergency = false;
+    bool tempTriggeredEmergency = false;
 
     while (true) {
         Telemetry data = getTelemetrySnapshot();

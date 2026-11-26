@@ -195,20 +195,24 @@ void simulateFacilityData()
     const float oxygenDelta = random(-3, 3) * 0.2f;
     const int aqiDelta = random(-12, 18);
 
-    if (simOverrideRoomTemp > -100.0f) {
-        nextState.roomTemperature = simOverrideRoomTemp;
+    const float roomTempOverride = simOverrideRoomTemp.load();
+    const float oxygenOverride = simOverrideOxygen.load();
+    const int aqiOverride = simOverrideAqi.load();
+
+    if (roomTempOverride > -100.0f) {
+        nextState.roomTemperature = roomTempOverride;
     } else {
         nextState.roomTemperature = constrain(22.0f + roomDelta, 18.0f, 30.0f);
     }
 
-    if (simOverrideOxygen > 0.0f) {
-        nextState.oxygenLevel = simOverrideOxygen;
+    if (oxygenOverride > 0.0f) {
+        nextState.oxygenLevel = oxygenOverride;
     } else {
         nextState.oxygenLevel = constrain(20.8f + oxygenDelta, 18.0f, 24.0f);
     }
 
-    if (simOverrideAqi >= 0) {
-        nextState.aqi = simOverrideAqi;
+    if (aqiOverride >= 0) {
+        nextState.aqi = aqiOverride;
     } else {
         nextState.aqi = constrain(35 + aqiDelta, 0, 200);
     }
