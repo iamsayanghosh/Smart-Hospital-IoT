@@ -23,7 +23,6 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "app.h" // For failSetup
-#include <DallasTemperature.h>
 #include "offline.h"
 #include "offline_banner_gate.h"
 

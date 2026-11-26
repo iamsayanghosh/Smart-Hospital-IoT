@@ -117,7 +117,7 @@ bool enqueueBufferedTelemetry(const char* topic, const char* payload) {
  * @return true if an item was successfully removed; false if queue was empty or uninitialized.
  */
 bool dequeueBufferedTelemetry(BufferedTelemetryMessage* msg) {
-    if (offlineBufferQueue == NULL) return false;
+    if (offlineBufferQueue == NULL || msg == nullptr) return false;
     return (xQueueReceive(offlineBufferQueue, msg, 0) == pdTRUE);
 }
 
@@ -131,7 +131,7 @@ bool dequeueBufferedTelemetry(BufferedTelemetryMessage* msg) {
  * @return true if an item was available to peek; false if queue was empty.
  */
 bool peekBufferedTelemetry(BufferedTelemetryMessage* msg) {
-    if (offlineBufferQueue == NULL) return false;
+    if (offlineBufferQueue == NULL || msg == nullptr) return false;
     return (xQueuePeek(offlineBufferQueue, msg, 0) == pdTRUE);
 }
 

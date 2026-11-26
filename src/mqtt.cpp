@@ -341,7 +341,7 @@ MqttMessageRoute mqttRoutes[] = {
 void mqttMessageCallback(char *topic, byte *payload, unsigned int length)
 {
     char payloadBuffer[32];
-    if (length == 0 || length >= sizeof(payloadBuffer)) {
+    if (topic == nullptr || payload == nullptr || length == 0 || length >= sizeof(payloadBuffer)) {
         return;
     }
     memcpy(payloadBuffer, payload, length);
@@ -731,10 +731,7 @@ void publishSummaryData(bool offline)
     }
 
     if (facilitySummaryStats.sampleCount == 0 && facilitySnapshot.initialFacilityProcessed) {
-        facilitySummaryStats.sampleCount = 1;
-        facilitySummaryStats.roomTemperatureTotal = facilitySnapshot.roomTemperature;
-        facilitySummaryStats.oxygenTotal = facilitySnapshot.oxygenLevel;
-        facilitySummaryStats.aqiTotal = facilitySnapshot.aqi;
+        updateFacilitySummaryStats(facilitySnapshot);
     }
 
     char hrBuf[32];
@@ -811,6 +808,7 @@ void publishSummaryData(bool offline)
             fallbackCompactMedicalStatus);
     };
 
+    String hospitalEventsTopic = getAioFeedTopic(HOSPITAL_EVENTS_FEED);
     String hospitalSummaryPayload;
     if (mqttClient.getBufferSize() >= 400) {
         hospitalSummaryPayload = buildHospitalSummaryPayload(
@@ -827,8 +825,12 @@ void publishSummaryData(bool offline)
             facilitySummaryStats.abnormalCount,
             facilitySummaryStats.criticalCount,
             fallbackFullMedicalStatus);
+        const size_t requiredPacketSize = MQTT_MAX_HEADER_SIZE + 2 + hospitalEventsTopic.length() + hospitalSummaryPayload.length();
         if (offline && hospitalSummaryPayload.length() >= sizeof(BufferedTelemetryMessage::payload)) {
             Serial.println("[MQTT] Offline summary exceeds FIFO payload slot; switching to compact payload");
+            hospitalSummaryPayload = buildCompactPayload();
+        } else if (!offline && requiredPacketSize > mqttClient.getBufferSize()) {
+            Serial.println("[MQTT] Online summary exceeds MQTT packet buffer; switching to compact payload");
             hospitalSummaryPayload = buildCompactPayload();
         }
     } else {
@@ -840,7 +842,7 @@ void publishSummaryData(bool offline)
     Serial.println(" bytes");
     Serial.println("[MQTT] HOSPITAL SUMMARY PAYLOAD:");
     Serial.println(hospitalSummaryPayload);
-    const bool hospitalSummaryPublishResult = safePublish(getAioFeedTopic(HOSPITAL_EVENTS_FEED), hospitalSummaryPayload, offline);
+    const bool hospitalSummaryPublishResult = safePublish(hospitalEventsTopic, hospitalSummaryPayload, offline);
     Serial.print("[MQTT] hospital summary publish result: ");
     Serial.println(hospitalSummaryPublishResult ? "SUCCESS" : "FAILURE");
     if (!hospitalSummaryPublishResult) {
@@ -882,7 +884,7 @@ void mqttTask(void *parameter)
     mqttClient.setServer(mqttBroker, mqttPort);
     mqttClient.setSocketTimeout(3);
     configureMqttBuffer();
-    uint32_t nextWifiRetryMs = 0;
+    uint32_t nextWifiRetryMs = millis() + MQTT_INITIAL_RETRY_DELAY_MS;
     uint32_t wifiRetryDelayMs = MQTT_INITIAL_RETRY_DELAY_MS;
     uint32_t lastSummaryPublishMs = 0;
     uint32_t lastPublishMs = 0;

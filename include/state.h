@@ -309,15 +309,6 @@ inline bool isMedicalTelemetryInitializing(const Telemetry &data)
 }
 
 /**
- * @brief Assesses whether a confirmed hardware fault exists for the temperature sensor.
- *
- * Returns true only after a measurement attempt has occurred and confirmed a disconnected
- * or invalid sensor reading (e.g. DEVICE_DISCONNECTED_C or runtime 85°C reset).
- *
- * @param data Patient telemetry snapshot.
- * @return true if temperature acquisition was attempted and failed; false otherwise.
- */
-/**
  * @brief Ingests temperature telemetry updates with source provenance awareness.
  *
  * Separates telemetry measurement availability (validity for OLED and clinical alerts)

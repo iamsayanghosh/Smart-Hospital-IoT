@@ -340,7 +340,7 @@
     <strong>Key Project Accomplishments:</strong>
     <ul>
       <li><strong>Unified Single-Project Integration:</strong> All 6 assigned internship tasks run simultaneously in one firmware image with zero Arduino <code>delay()</code> calls (FreeRTOS tasks use cooperative <code>vTaskDelay()</code> yielding).</li>
-      <li><strong>Resource Efficiency:</strong> Static RAM utilization measured at <strong>15.1%</strong> (49,568 B of 327,680 B data SRAM budget; 520 KB physical on-chip SRAM) and Flash at <strong>80.3%</strong> (1,052,502 B of 1,310,720 B), leaving healthy runtime dynamic heap for FreeRTOS queues.</li>
+      <li><strong>Resource Efficiency:</strong> Static RAM utilization measured at <strong>15.1%</strong> (49,568 B of 327,680 B data SRAM budget; 520 KB physical on-chip SRAM) and Flash at <strong>80.3%</strong> (1,052,886 B of 1,310,720 B), leaving healthy runtime dynamic heap for FreeRTOS queues.</li>
       <li><strong>Automated Test Suite:</strong> 26 Unity test cases are included, covering strict numeric parsers, medication safety, slew-rate mechanics, telemetry validity, sensor-fault transitions, queue-retry bookkeeping, default threshold overrides, and bed emergency posture latching. The ESP32 test runner has been build-verified.</li>
       <li><strong>Open Source &amp; Credentials Safety:</strong> Released under the MIT License with complete credential isolation (private keys never committed to Git).</li>
     </ul>
@@ -1216,7 +1216,7 @@
       </tr>
       <tr>
         <td><strong>Flash Memory</strong></td>
-        <td>1,052,502 Bytes</td>
+        <td>1,052,886 Bytes</td>
         <td>1,310,720 Bytes</td>
         <td><strong>80.3%</strong></td>
         <td>Fits comfortably within default 1.31 MB application partition (app0).</td>

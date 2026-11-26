@@ -115,14 +115,16 @@ const char *taskNameFromId(MonitoredTaskId taskId)
 void failSetup(const char *message)
 {
     Serial.println(message);
-    // Delete any tasks that were successfully created before the failure to avoid orphaned workers
+    // Unsubscribe and delete any tasks that were created before failure to avoid TWDT panic resets
     for (int i = 0; i < TASK_MONITORED_COUNT; i++) {
         if (monitoredHandles[i] != NULL) {
+            (void)esp_task_wdt_delete(monitoredHandles[i]);
             vTaskDelete(monitoredHandles[i]);
             monitoredHandles[i] = NULL;
         }
     }
     if (watchdogHandle != NULL) {
+        (void)esp_task_wdt_delete(watchdogHandle);
         vTaskDelete(watchdogHandle);
         watchdogHandle = NULL;
     }
