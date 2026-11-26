@@ -114,8 +114,10 @@ void watchdogTask(void *parameter)
 
         for (int taskIndex = 0; taskIndex < TASK_MONITORED_COUNT; ++taskIndex) {
             TaskHeartbeat heartbeat;
+            uint32_t sampleNowMs = now;
             if (xSemaphoreTake(heartbeatMutex, pdMS_TO_TICKS(HEARTBEAT_MUTEX_WAIT_MS)) == pdTRUE) {
                 heartbeat = taskHeartbeats[taskIndex];
+                sampleNowMs = millis();
                 xSemaphoreGive(heartbeatMutex);
             } else {
                 Serial.println("[WATCHDOG] Could not read task heartbeat state");
@@ -134,12 +136,13 @@ void watchdogTask(void *parameter)
                 continue;
             }
 
-            if ((now - heartbeat.lastHeartbeatMs) > WATCHDOG_TIMEOUT_MS) {
+            const int32_t elapsedMs = static_cast<int32_t>(sampleNowMs - heartbeat.lastHeartbeatMs);
+            if (elapsedMs > static_cast<int32_t>(WATCHDOG_TIMEOUT_MS)) {
                 unhealthyFound = true;
                 Serial.print("[WATCHDOG] Heartbeat timeout: ");
                 Serial.print(taskNameFromId(static_cast<MonitoredTaskId>(taskIndex)));
                 Serial.print(" missed last heartbeat by ");
-                Serial.print(now - heartbeat.lastHeartbeatMs);
+                Serial.print(elapsedMs);
                 Serial.println(" ms");
             }
         }
