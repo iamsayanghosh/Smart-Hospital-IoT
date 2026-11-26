@@ -197,7 +197,7 @@
   <!-- Connective summary line -->
   <text x="390" y="812" fill="#94a3b8" font-size="10">&#8226; sensorQueue: TEMP, MOT, VIT, ECG -> displayTask -> shared telemetry (telemetryMux)</text>
   <text x="390" y="828" fill="#94a3b8" font-size="10">&#8226; samplingQueue / bedQueue: MQTT commands -> samplingTask / bedTask</text>
-  <text x="390" y="844" fill="#94a3b8" font-size="10">&#8226; offlineBuffer: Owned &amp; drained strictly by mqttTask during network drops</text>
+  <text x="390" y="844" fill="#94a3b8" font-size="10">&#8226; offlineBuffer: Owned by mqttTask (buffers during drops, drains on reconnect)</text>
 
   <!-- Network / Cloud Layer (Right Column) -->
   <rect x="1030" y="105" width="340" height="785" rx="12" fill="url(#cardCloud)" stroke="#9333ea" stroke-width="1.5"/>
