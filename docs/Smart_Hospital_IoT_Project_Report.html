@@ -267,7 +267,7 @@
 <div class="cover-page page-break">
   <div>
     <div class="cover-header">
-      <div class="cover-tag">IoT &amp; Embedded Systems &bull; Capstone Technical Report</div>
+      <div class="cover-tag">IoT &amp; Embedded Systems &bull; Technical Project Report</div>
       <h1 class="cover-title">Smart Hospital IoT System</h1>
       <p class="cover-subtitle">
         A Concurrent Medical Telemetry and Automated Actuation Firmware Prototype<br>
@@ -285,12 +285,12 @@
         <div class="meta-value">IoT &amp; Embedded Systems Engineering</div>
       </div>
       <div class="meta-item">
-        <div class="meta-label">Project Status</div>
-        <div class="meta-value">Integrated Capstone Submission</div>
+        <div class="meta-label">Project Scope</div>
+        <div class="meta-value">Unified Internship Integration (Tasks 1&ndash;6)</div>
       </div>
       <div class="meta-item">
-        <div class="meta-label">Submission Date</div>
-        <div class="meta-value">November 2026</div>
+        <div class="meta-label">Cloud &amp; Simulation</div>
+        <div class="meta-value">Adafruit IO MQTT &bull; Wokwi ESP32</div>
       </div>
       <div class="meta-item">
         <div class="meta-label">Target Hardware Architecture</div>
@@ -312,13 +312,13 @@
       <a href="https://wokwi.com/projects/481027748143740929">wokwi.com/projects/481027748143740929</a>
     </div>
     <div class="footer">
-      <span>Smart Hospital IoT Embedded Firmware Capstone</span>
-      <span>November 2026</span>
+      <span>Smart Hospital IoT Embedded Firmware Report</span>
+      <span>Unified Internship Project</span>
     </div>
   </div>
 </div>
 
-<!-- EXECUTIVE SUMMARY & TABLE OF CONTENTS -->
+<!-- EXECUTIVE SUMMARY -->
 <div class="avoid-break">
   <h1>Executive Summary</h1>
   <p>
@@ -340,8 +340,8 @@
     <strong>Key Project Accomplishments:</strong>
     <ul>
       <li><strong>Unified Single-Project Integration:</strong> All 6 assigned internship tasks run simultaneously in one firmware image with zero Arduino <code>delay()</code> calls (FreeRTOS tasks use cooperative <code>vTaskDelay()</code> yielding).</li>
-      <li><strong>Resource Efficiency:</strong> Static RAM utilization measured at <strong>15.1%</strong> (49,568 B of 327,680 B data SRAM budget; 520 KB physical on-chip SRAM) and Flash at <strong>80.3%</strong> (1,052,898 B of 1,310,720 B), leaving healthy runtime dynamic heap for FreeRTOS queues.</li>
-      <li><strong>Automated Test Suite:</strong> 26 Unity test cases are included, covering strict numeric parsers, medication safety, slew-rate mechanics, telemetry validity, sensor-fault transitions, queue-retry bookkeeping, default threshold overrides, and bed emergency posture latching. The ESP32 test runner has been build-verified.</li>
+      <li><strong>Resource Efficiency:</strong> Static RAM utilization measured at <strong>15.1%</strong> (49,568 B of 327,680 B data SRAM budget; 520 KB physical on-chip SRAM) and Flash at <strong>80.3%</strong> (1,052,830 B of 1,310,720 B), leaving healthy runtime dynamic heap for FreeRTOS queues.</li>
+      <li><strong>Optional Verification Suite:</strong> Beyond the 6 assigned internship tasks, 26 Unity unit test cases (compiled separately from production firmware via <code>test_build_src = no</code> with zero runtime Flash/RAM overhead) are included for verification, covering strict numeric parsers, medication safety, slew-rate mechanics, telemetry validity, sensor-fault transitions, queue-retry bookkeeping, default threshold overrides, and bed emergency posture latching. The ESP32 test runner has been build-verified.</li>
       <li><strong>Open Source &amp; Credentials Safety:</strong> Released under the MIT License with complete credential isolation (private keys never committed to Git).</li>
     </ul>
   </div>
@@ -410,7 +410,7 @@
         <td>Digital Output</td>
         <td><code>GPIO 33</code></td>
         <td>220&Omega; current-limiting resistor</td>
-        <td>Task 3: Normal nominal dosage indicator (0-79 mg/hr)</td>
+        <td>Task 3: Normal baseline dosage indicator (0-79 mg/hr)</td>
       </tr>
       <tr>
         <td><strong>Piezo Buzzer</strong></td>
@@ -439,7 +439,7 @@
 
 <!-- SECTION 2: CONCURRENCY & FREERTOS MODEL -->
 <div class="page-break">
-  <h1>2. Concurrency Model &amp; FreeRTOS Task Scheduling (Task 1)</h1>
+  <h1>2. Concurrency &amp; FreeRTOS Task Scheduling (Task 1)</h1>
   <p>
     The system utilizes FreeRTOS Symmetric Multiprocessing (SMP) to execute 13 application tasks concurrently across a 
     strict priority hierarchy. All 13 application worker tasks are pinned to <strong>Core 1</strong>, alongside Arduino <code>loopTask</code>. 
@@ -1225,7 +1225,7 @@
       </tr>
       <tr>
         <td><strong>Flash Memory</strong></td>
-        <td>1,052,898 Bytes</td>
+        <td>1,052,830 Bytes</td>
         <td>1,310,720 Bytes</td>
         <td><strong>80.3%</strong></td>
         <td>Fits comfortably within default 1.31 MB application partition (app0).</td>
@@ -1261,9 +1261,9 @@
 <div class="page-break">
   <h1>7. Verification Suite &amp; Interactive Simulation Manual</h1>
 
-  <h2>Automated Unit Testing (PlatformIO Unity)</h2>
+  <h2>Automated Unit Testing (Optional Verification Beyond Tasks 1&ndash;6)</h2>
   <p>
-    Unit tests implemented under <code>test/test_main.cpp</code> define 26 test cases covering strict numeric string parsers 
+    As an optional engineering verification suite beyond the 6 assigned internship tasks (compiled separately from production <code>src/</code> firmware via <code>test_build_src = no</code> with zero impact on ESP32 runtime Flash/RAM or Wokwi builds), unit tests under <code>test/test_main.cpp</code> define 26 test cases covering strict numeric string parsers 
     (validating against NaN, Infinity, negative boundaries, float integers, and trailing characters), medication dosage safety clamping, discrete clinical tiers, rate-limiting slew mechanics (20 ms increments, long interruption recovery, timer rollover, immediate downward adjustment), multi-parameter telemetry validity gating, sensor-fault state machine transitions and recovery, DS18B20 invalidation queue-retry resilience, default medical threshold evaluation overrides, and bed elevation emergency retention on sensor disconnect.
   </p>
   <p>
@@ -1328,7 +1328,7 @@
         <td>Clears all environmental overrides; simulation resumes nominal baselines with random variation around 22.0 &deg;C, 20.8% O2, and 35 AQI.</td>
       </tr>
       <tr>
-        <td><code>SIM_OFFLINE WIFI</code></td>
+        <td><code>SIM_OFFLINE WIFI</code> / <code>SIM_OFFLINE</code></td>
         <td>None</td>
         <td>Simulates Wi-Fi drop: Triggers double-pip buzzer cadence, OLED banner, and FIFO buffer.</td>
       </tr>
@@ -1377,7 +1377,7 @@
   </p>
 
   <div class="footer">
-    <span>Smart Hospital IoT Embedded Firmware Capstone Report</span>
+    <span>Smart Hospital IoT Embedded Firmware Report</span>
     <span>Author: Sayan Ghosh</span>
   </div>
 </div>
