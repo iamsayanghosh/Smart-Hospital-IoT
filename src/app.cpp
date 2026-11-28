@@ -212,6 +212,7 @@ void appInit()
     facilityTelemetry = FacilityTelemetry();
     telemetry = Telemetry();
     medicationDosageControl = MedicationDosageControl();
+    samplingPeriods = SamplingPeriods();
 }
 
 /**

@@ -35,6 +35,18 @@ void watchdogInit();
 void watchdogTask(void *parameter);
 
 /**
+ * @brief Subscribes the calling FreeRTOS task to TWDT, deleting safely on failure.
+ *
+ * If subscription fails, clears `monitoredHandles[taskId]` under `heartbeatMutex`
+ * before deleting the task so `watchdogTask` never reads a dangling handle.
+ *
+ * @param taskId Monitored task identifier slot.
+ * @param taskLabel Short human-readable task label for diagnostic logs.
+ * @return true if TWDT registration succeeded; false after self-deletion attempt.
+ */
+bool registerTaskWithWatchdog(MonitoredTaskId taskId, const char *taskLabel);
+
+/**
  * @brief Reports an alive timestamp for the calling task and resets its hardware TWDT.
  *
  * Safe to invoke from any monitored FreeRTOS task; synchronizes access using heartbeatMutex.

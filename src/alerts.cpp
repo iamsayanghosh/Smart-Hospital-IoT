@@ -19,7 +19,6 @@
 #include "alerts.h"
 #include <Arduino.h>
 #include "state.h"
-#include "app.h"
 #include "watchdog.h"
 #include "esp_task_wdt.h"
 
@@ -38,14 +37,9 @@
 void alertTask(void *parameter)
 {
     (void)parameter;
-    esp_err_t wdtResult = esp_task_wdt_add(NULL);
-    if (wdtResult != ESP_OK) {
-        Serial.print("[WATCHDOG] ALERT registration failed: ");
-        Serial.println(esp_err_to_name(wdtResult));
-        vTaskDelete(NULL);
+    if (!registerTaskWithWatchdog(TASK_ALERT, "ALERT")) {
         return;
     }
-    Serial.println("[WATCHDOG] ALERT task registered with TWDT");
 
     while (true) {
         reportTaskHeartbeat(TASK_ALERT);

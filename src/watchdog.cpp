@@ -49,6 +49,32 @@ void watchdogInit()
     }
 }
 
+bool registerTaskWithWatchdog(MonitoredTaskId taskId, const char *taskLabel)
+{
+    const esp_err_t wdtResult = esp_task_wdt_add(NULL);
+    if (wdtResult != ESP_OK) {
+        Serial.print("[WATCHDOG] ");
+        Serial.print(taskLabel);
+        Serial.print(" registration failed: ");
+        Serial.println(esp_err_to_name(wdtResult));
+        if (taskId >= TASK_TEMP && taskId < TASK_MONITORED_COUNT) {
+            if (heartbeatMutex != NULL &&
+                xSemaphoreTake(heartbeatMutex, pdMS_TO_TICKS(HEARTBEAT_MUTEX_WAIT_MS)) == pdTRUE) {
+                monitoredHandles[taskId] = nullptr;
+                xSemaphoreGive(heartbeatMutex);
+            } else {
+                monitoredHandles[taskId] = nullptr;
+            }
+        }
+        vTaskDelete(NULL);
+        return false;
+    }
+    Serial.print("[WATCHDOG] ");
+    Serial.print(taskLabel);
+    Serial.println(" task registered with TWDT");
+    return true;
+}
+
 /**
  * @brief Records task heartbeat timestamp and feeds the calling task's hardware TWDT registration.
  *
@@ -104,13 +130,16 @@ void watchdogTask(void *parameter)
     const uint32_t monitoringStartMs = millis();
     uint32_t lastHealthyLogMs = 0;
     uint32_t lastStackLogMs = 0;
+    bool startupGraceDone = false;
 
     while (true) {
         uint32_t now = millis();
         bool unhealthyFound = false;
 
-        const bool startupGraceActive =
-            (now - monitoringStartMs) < STARTUP_GRACE_PERIOD_MS;
+        if (!startupGraceDone && (now - monitoringStartMs) >= STARTUP_GRACE_PERIOD_MS) {
+            startupGraceDone = true; // latch so 49.7-day millis() rollover cannot re-open boot grace
+        }
+        const bool startupGraceActive = !startupGraceDone;
 
         for (int taskIndex = 0; taskIndex < TASK_MONITORED_COUNT; ++taskIndex) {
             TaskHeartbeat heartbeat;
@@ -163,11 +192,29 @@ void watchdogTask(void *parameter)
             Serial.print("[WATCHDOG] Minimum free heap: ");
             Serial.println(ESP.getMinFreeHeap());
             for (int taskIndex = 0; taskIndex < TASK_MONITORED_COUNT; ++taskIndex) {
-                if (monitoredHandles[taskIndex] != nullptr) {
+                TaskHandle_t handle = nullptr;
+                UBaseType_t highWaterMark = 0;
+                bool hasHandle = false;
+                if (heartbeatMutex != NULL &&
+                    xSemaphoreTake(heartbeatMutex, pdMS_TO_TICKS(HEARTBEAT_MUTEX_WAIT_MS)) == pdTRUE) {
+                    handle = monitoredHandles[taskIndex];
+                    if (handle != nullptr) {
+                        highWaterMark = uxTaskGetStackHighWaterMark(handle);
+                        hasHandle = true;
+                    }
+                    xSemaphoreGive(heartbeatMutex);
+                } else {
+                    handle = monitoredHandles[taskIndex];
+                    if (handle != nullptr) {
+                        highWaterMark = uxTaskGetStackHighWaterMark(handle);
+                        hasHandle = true;
+                    }
+                }
+                if (hasHandle) {
                     Serial.print("[WATCHDOG] ");
                     Serial.print(taskNameFromId(static_cast<MonitoredTaskId>(taskIndex)));
                     Serial.print(" stack high-water mark: ");
-                    Serial.println(uxTaskGetStackHighWaterMark(monitoredHandles[taskIndex]));
+                    Serial.println(highWaterMark);
                 }
             }
         }

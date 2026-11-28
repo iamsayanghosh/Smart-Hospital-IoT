@@ -8,7 +8,6 @@
 
 #include "sensors.h"
 #include "app.h"
-#include "environment.h"
 #include "esp_task_wdt.h"
 #include "state.h"
 #include "watchdog.h"
@@ -117,17 +116,13 @@ void sensorsInit() {
  */
 void temperatureTask(void *parameter) {
   (void)parameter;
-  esp_err_t wdtResult = esp_task_wdt_add(NULL);
-  if (wdtResult != ESP_OK) {
-    Serial.print("[WATCHDOG] TEMP registration failed: ");
-    Serial.println(esp_err_to_name(wdtResult));
-    vTaskDelete(NULL);
+  if (!registerTaskWithWatchdog(TASK_TEMP, "TEMP")) {
     return;
   }
-  Serial.println("[WATCHDOG] TEMP task registered with TWDT");
 
   enum TempReadState { TEMP_IDLE, TEMP_CONVERTING };
   TempReadState tempState = TEMP_IDLE;
+  bool hasSampled = false;
   uint32_t lastSampleMs = 0;
   uint32_t requestStartMs = 0;
   bool hasReadValidTemperature = false;
@@ -135,6 +130,7 @@ void temperatureTask(void *parameter) {
   uint8_t consecutiveScratchpadCount = 0;
   bool temperatureFaultReported = false; // latch: suppress duplicate fault notifications per outage
   bool wasSimulating = false; // tracks simulation mode to update displayTask upon return to physical sensor
+  bool needBusRescan = (temperatureSensor.getDeviceCount() == 0);
 
   while (true) {
     uint32_t now = millis();
@@ -162,7 +158,8 @@ void temperatureTask(void *parameter) {
     }
 
     if (tempState == TEMP_IDLE &&
-        (forced || now - lastSampleMs >= period || lastSampleMs == 0)) {
+        (forced || !hasSampled || now - lastSampleMs >= period)) {
+      hasSampled = true;
       lastSampleMs = now;
       float overrideTemp = simOverrideTemperature.load();
       if (overrideTemp > -100.0f) {
@@ -180,6 +177,12 @@ void temperatureTask(void *parameter) {
         Serial.print(message.temperature, 1);
         Serial.println(" C");
       } else {
+        if (needBusRescan || temperatureSensor.getDeviceCount() == 0) {
+          // Re-enumerate 1-Wire bus so sensors missing at boot or hot-swapped can recover
+          temperatureSensor.begin();
+          temperatureSensor.setWaitForConversion(false);
+          needBusRescan = (temperatureSensor.getDeviceCount() == 0);
+        }
         temperatureSensor
             .requestTemperatures(); // Non-blocking: returns in <1 ms
         requestStartMs = now;
@@ -210,20 +213,29 @@ void temperatureTask(void *parameter) {
           temperatureFaultReported = false;
         }
 
-        // Physical DS18B20 conversion completed: process through hardware state machine
-        float rawTemp = temperatureSensor.getTempCByIndex(0);
+        // Physical DS18B20 conversion completed: inspect raw ticks so DallasTemperature 4.0.6's
+        // DEVICE_POWER_ON_RESET_RAW (-32128 -> -127.0 C) routes through the 3-attempt POR guard
+        // alongside direct +85.0 C scratchpad readings without hiding true open-wire disconnects.
+        DeviceAddress sensorAddr = {0};
+        const bool hasAddress = temperatureSensor.getAddress(sensorAddr, 0);
+        const int32_t rawTicks = hasAddress ? temperatureSensor.getTemp(sensorAddr) : DEVICE_DISCONNECTED_RAW;
+        const float rawTemp = temperatureSensor.rawToCelsius(rawTicks);
+        const bool isPorRaw = hasAddress && (rawTicks == DEVICE_POWER_ON_RESET_RAW);
 
-        // Distinguish initial cold-boot scratchpad (+85.0 C) from runtime sensor reset
-        if (abs(rawTemp - 85.0f) <= 0.05f) {
+        // Distinguish initial cold-boot POR scratchpad from runtime sensor reset
+        if (isDs18b20PorScratchpadReading(hasAddress, rawTicks, DEVICE_POWER_ON_RESET_RAW, rawTemp)) {
           Ds18b20ScratchpadStatus status = classifyDs18b20Scratchpad(
               hasReadValidTemperature, pendingTempDisconnectMessage, consecutiveScratchpadCount);
 
           if (status == DS18B20_SCRATCHPAD_IGNORE_INITIAL) {
-            Serial.print("[TEMP TASK] Ignored initial DS18B20 power-on reset scratchpad reading (85.0 C), attempt ");
+            Serial.print("[TEMP TASK] Ignored initial DS18B20 power-on reset scratchpad reading (");
+            Serial.print(isPorRaw ? "85.0 C POR raw" : "85.0 C");
+            Serial.print("), attempt ");
             Serial.print(consecutiveScratchpadCount);
             Serial.println("/3");
           } else if (status == DS18B20_SCRATCHPAD_PERSISTENT_FAULT) {
             hasReadValidTemperature = false;
+            needBusRescan = true;
             if (!temperatureFaultReported && !pendingTempDisconnectMessage) {
               Serial.println("[TEMP TASK] Warning: Persistent 85.0 C scratchpad detected; marking sensor unavailable");
               SensorMessage message = {};
@@ -237,6 +249,7 @@ void temperatureTask(void *parameter) {
             }
           } else { // DS18B20_SCRATCHPAD_RUNTIME_RESET
             hasReadValidTemperature = false;
+            needBusRescan = true;
             if (!temperatureFaultReported && !pendingTempDisconnectMessage) {
               Serial.println("[TEMP TASK] Warning: DS18B20 reset during operation (85.0 C scratchpad); marking unavailable");
               SensorMessage message = {};
@@ -250,9 +263,10 @@ void temperatureTask(void *parameter) {
             }
           }
         } else if (!isfinite(rawTemp) || rawTemp == DEVICE_DISCONNECTED_C ||
-                   rawTemp <= -55.0f || rawTemp > 125.0f) {
+                   rawTemp < -55.0f || rawTemp > 125.0f) {
           consecutiveScratchpadCount = 0;
           hasReadValidTemperature = false;
+          needBusRescan = true;
           if (!temperatureFaultReported && !pendingTempDisconnectMessage) {
             Serial.println("[TEMP TASK] Warning: DS18B20 disconnected");
             SensorMessage message = {};
@@ -300,14 +314,9 @@ void temperatureTask(void *parameter) {
  */
 void motionTask(void *parameter) {
   (void)parameter;
-  esp_err_t wdtResult = esp_task_wdt_add(NULL);
-  if (wdtResult != ESP_OK) {
-    Serial.print("[WATCHDOG] MOTION registration failed: ");
-    Serial.println(esp_err_to_name(wdtResult));
-    vTaskDelete(NULL);
+  if (!registerTaskWithWatchdog(TASK_MOTION, "MOTION")) {
     return;
   }
-  Serial.println("[WATCHDOG] MOTION task registered with TWDT");
 
   while (true) {
     SensorMessage message = {};
@@ -339,15 +348,11 @@ void motionTask(void *parameter) {
  */
 void vitalTask(void *parameter) {
   (void)parameter;
-  esp_err_t wdtResult = esp_task_wdt_add(NULL);
-  if (wdtResult != ESP_OK) {
-    Serial.print("[WATCHDOG] VITAL registration failed: ");
-    Serial.println(esp_err_to_name(wdtResult));
-    vTaskDelete(NULL);
+  if (!registerTaskWithWatchdog(TASK_VITAL, "VITAL")) {
     return;
   }
-  Serial.println("[WATCHDOG] VITAL task registered with TWDT");
 
+  bool hasSampled = false;
   uint32_t lastSampleMs = 0;
   while (true) {
     uint32_t now = millis();
@@ -355,7 +360,8 @@ void vitalTask(void *parameter) {
 
     bool forced = simImmediateVitalSample.exchange(false);
 
-    if (forced || now - lastSampleMs >= period || lastSampleMs == 0) {
+    if (forced || !hasSampled || now - lastSampleMs >= period) {
+      hasSampled = true;
       lastSampleMs = now;
       SensorMessage message = {};
       message.type = VITAL_DATA;
@@ -407,14 +413,9 @@ static float generateEcgWaveform(float phase) {
  */
 void ecgTask(void *parameter) {
   (void)parameter;
-  esp_err_t wdtResult = esp_task_wdt_add(NULL);
-  if (wdtResult != ESP_OK) {
-    Serial.print("[WATCHDOG] ECG registration failed: ");
-    Serial.println(esp_err_to_name(wdtResult));
-    vTaskDelete(NULL);
+  if (!registerTaskWithWatchdog(TASK_ECG, "ECG")) {
     return;
   }
-  Serial.println("[WATCHDOG] ECG task registered with TWDT");
 
   float phase = 0.0f;
   int ecgRate = 72;

@@ -6,7 +6,7 @@
 <style>
   @page {
     size: A4;
-    margin: 20mm 15mm 20mm 15mm;
+    margin: 14mm 13mm 15mm 13mm;
     @bottom-right {
       content: counter(page);
     }
@@ -15,16 +15,19 @@
   body {
     font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
     color: #1e293b;
-    line-height: 1.55;
-    font-size: 10.5pt;
+    line-height: 1.46;
+    font-size: 10pt;
     background: #ffffff;
     margin: 0;
     padding: 0;
   }
 
   /* Page Break Helpers */
-  .page-break { page-break-after: always; }
-  .avoid-break { page-break-inside: avoid; }
+  .page-break { page-break-after: always; break-after: page; }
+  .avoid-break { page-break-inside: avoid; break-inside: avoid; }
+  h1, h2, h3 { page-break-after: avoid; break-after: avoid; }
+  thead { display: table-header-group; }
+  tr, .callout, pre, .diagram-container, .cover-meta-grid { page-break-inside: avoid; break-inside: avoid; }
 
   /* Cover Page */
   .cover-page {
@@ -64,6 +67,7 @@
     font-weight: 400;
     line-height: 1.45;
     margin: 0;
+    text-align: left;
   }
 
   .cover-meta-grid {
@@ -111,57 +115,57 @@
 
   /* Typography */
   h1 {
-    font-size: 18pt;
+    font-size: 17pt;
     font-weight: 800;
     color: #0f172a;
     border-bottom: 2px solid #0284c7;
-    padding-bottom: 6px;
-    margin-top: 25px;
-    margin-bottom: 15px;
+    padding-bottom: 5px;
+    margin-top: 18px;
+    margin-bottom: 12px;
   }
 
   h2 {
-    font-size: 13.5pt;
+    font-size: 13pt;
     font-weight: 700;
     color: #1e3a8a;
-    margin-top: 20px;
-    margin-bottom: 10px;
+    margin-top: 14px;
+    margin-bottom: 8px;
     border-left: 4px solid #38bdf8;
     padding-left: 10px;
   }
 
   h3 {
-    font-size: 11pt;
+    font-size: 10.8pt;
     font-weight: 700;
     color: #334155;
-    margin-top: 15px;
-    margin-bottom: 8px;
+    margin-top: 12px;
+    margin-bottom: 6px;
   }
 
   p {
-    margin: 0 0 10px 0;
+    margin: 0 0 8px 0;
     text-align: justify;
   }
 
   ul, ol {
-    margin: 0 0 12px 0;
+    margin: 0 0 10px 0;
     padding-left: 22px;
   }
 
   li {
-    margin-bottom: 4px;
+    margin-bottom: 3px;
   }
 
   /* Tables */
   table {
     width: 100%;
     border-collapse: collapse;
-    margin: 14px 0 18px 0;
-    font-size: 9pt;
+    margin: 8px 0 12px 0;
+    font-size: 8.5pt;
   }
 
   th, td {
-    padding: 8px 10px;
+    padding: 5px 7px;
     border: 1px solid #cbd5e1;
     text-align: left;
   }
@@ -340,8 +344,8 @@
     <strong>Key Project Accomplishments:</strong>
     <ul>
       <li><strong>Unified Single-Project Integration:</strong> All 6 assigned internship tasks run simultaneously in one firmware image with zero Arduino <code>delay()</code> calls (FreeRTOS tasks use cooperative <code>vTaskDelay()</code> yielding).</li>
-      <li><strong>Resource Efficiency:</strong> Static RAM utilization measured at <strong>15.1%</strong> (49,568 B of 327,680 B data SRAM budget; 520 KB physical on-chip SRAM) and Flash at <strong>80.3%</strong> (1,052,830 B of 1,310,720 B), leaving healthy runtime dynamic heap for FreeRTOS queues.</li>
-      <li><strong>Optional Verification Suite:</strong> Beyond the 6 assigned internship tasks, 26 Unity unit test cases (compiled separately from production firmware via <code>test_build_src = no</code> with zero runtime Flash/RAM overhead) are included for verification, covering strict numeric parsers, medication safety, slew-rate mechanics, telemetry validity, sensor-fault transitions, queue-retry bookkeeping, default threshold overrides, and bed emergency posture latching. The ESP32 test runner has been build-verified.</li>
+      <li><strong>Resource Efficiency:</strong> Static RAM utilization measured at <strong>15.1%</strong> (49,576 B of 327,680 B data SRAM budget; 520 KB physical on-chip SRAM) and Flash at <strong>80.4%</strong> (1,053,906 B of 1,310,720 B), leaving healthy runtime dynamic heap for FreeRTOS queues.</li>
+      <li><strong>Optional Verification Suite:</strong> Beyond the 6 assigned internship tasks, 31 Unity unit test cases (isolated under <code>[env:esp32dev_test]</code> with <code>test_build_src = no</code> so production Flash/RAM and Wokwi binaries remain untouched) are included for verification, covering strict numeric parsers (including hex-float rejection), medication safety, slew-rate mechanics, telemetry validity, sensor-fault transitions, raw/Celsius POR scratchpad guards, queue-retry bookkeeping, default threshold overrides, bed emergency posture latching, alert-latch clearing during active sensor faults, <code>OfflineBannerGate</code> rollover debouncing, and clinical/facility abnormality evaluators. The ESP32 test runner has been build-verified (354,220 B Flash).</li>
       <li><strong>Open Source &amp; Credentials Safety:</strong> Released under the MIT License with complete credential isolation (private keys never committed to Git).</li>
     </ul>
   </div>
@@ -403,14 +407,14 @@
         <td>Digital Output</td>
         <td><code>GPIO 26</code></td>
         <td>220&Omega; current-limiting resistor</td>
-        <td>Task 3: Warning dosage indicator (solid at 80 mg/hr)</td>
+        <td>Task 3: Warning dosage indicator (solid at 80.0 mg/hr)</td>
       </tr>
       <tr>
         <td><strong>Green Indicator LED</strong></td>
         <td>Digital Output</td>
         <td><code>GPIO 33</code></td>
         <td>220&Omega; current-limiting resistor</td>
-        <td>Task 3: Normal baseline dosage indicator (0-79 mg/hr)</td>
+        <td>Task 3: Normal baseline dosage indicator (0.0 - 79.9 mg/hr)</td>
       </tr>
       <tr>
         <td><strong>Piezo Buzzer</strong></td>
@@ -539,7 +543,7 @@
         <td><strong>Priority 2</strong></td>
         <td>3000 ms round-robin</td>
         <td>8192 Bytes</td>
-        <td>PubSubClient transport, exponential backoff (1s to 30s), and FIFO offline replay.</td>
+        <td>PubSubClient over <code>BoundedWiFiClient</code> (1500 ms connect/TX bounds, 2 s socket timeout), inter-step heartbeat feeds, backoff (1s to 30s), and FIFO replay.</td>
       </tr>
       <tr>
         <td><code>displayTask</code></td>
@@ -561,7 +565,7 @@
     <li><code>sensorQueue</code>: 16-slot FreeRTOS queue (<code>xQueueCreate(16, sizeof(SensorMessage))</code>) delivering sensor data to <code>displayTask</code>.</li>
     <li><code>samplingQueue</code>: Single-element FreeRTOS queue (<code>xQueueCreate(1, sizeof(uint32_t))</code>) with overwrite semantics delivering doctor sampling rate overrides from MQTT.</li>
     <li><code>bedQueue</code>: Single-element FreeRTOS queue (<code>xQueueCreate(1, sizeof(float))</code>) with overwrite semantics delivering doctor bed elevation angle overrides from MQTT.</li>
-    <li><code>offlineBuffer</code>: 64-slot FreeRTOS RAM queue storing outbound MQTT messages (<code>topic</code> + <code>payload</code>) without timestamps during network outages, drained in FIFO order upon reconnect.</li>
+    <li><code>offlineBufferQueue</code>: 64-slot FreeRTOS RAM queue (initialized via <code>initOfflineBuffer()</code>) storing outbound MQTT messages (<code>topic</code> + <code>payload</code>) without timestamps during network outages, drained in FIFO order upon reconnect.</li>
   </ul>
 </div>
 
@@ -630,8 +634,8 @@
     <!-- Status LEDs -->
     <rect x="0" y="210" width="280" height="85" rx="8" fill="#0f172a" stroke="#10b981" stroke-width="1"/>
     <text x="15" y="234" fill="#f8fafc" font-size="13" font-weight="bold">Status Indicator LEDs</text>
-    <text x="15" y="252" fill="#ef4444" font-size="11">&#8226; RED (GPIO 25): Critical (&gt;80 mg/hr)</text>
-    <text x="15" y="268" fill="#eab308" font-size="11">&#8226; YELLOW (GPIO 26): Warning (80 mg/hr)</text>
+    <text x="15" y="252" fill="#ef4444" font-size="11">&#8226; RED (GPIO 25): Critical (&gt;80.0 mg/hr)</text>
+    <text x="15" y="268" fill="#eab308" font-size="11">&#8226; YELLOW (GPIO 26): Warning (80.0 mg/hr)</text>
     <text x="15" y="284" fill="#22c55e" font-size="11">&#8226; GREEN (GPIO 33): Normal (0.0 - 79.9 mg/hr)</text>
 
     <!-- Buzzer -->
@@ -644,7 +648,7 @@
     <rect x="0" y="380" width="280" height="80" rx="8" fill="#0f172a" stroke="#10b981" stroke-width="1"/>
     <text x="15" y="404" fill="#f8fafc" font-size="13" font-weight="bold">SSD1306 128x64 I2C OLED</text>
     <text x="15" y="422" fill="#a7f3d0" font-size="11">I2C: GPIO 21 (SDA), GPIO 22 (SCL)</text>
-    <text x="15" y="437" fill="#94a3b8" font-size="10">Medication Live Status (y: 0..44)</text>
+    <text x="15" y="437" fill="#94a3b8" font-size="10">Medication Live Status (y: 0..43)</text>
     <text x="15" y="451" fill="#94a3b8" font-size="9.5">Task 6 OFFLINE / SYSTEM DEGRADED Banner (y: 54..63)</text>
 
     <!-- SG90 Servo -->
@@ -657,8 +661,8 @@
     <rect x="0" y="545" width="280" height="135" rx="8" fill="#064e3b" stroke="#059669" stroke-width="1"/>
     <text x="15" y="568" fill="#6ee7b7" font-size="12" font-weight="bold">ESP32 DevKit v4 SoC Specs</text>
     <text x="15" y="586" fill="#ecfdf5" font-size="11">&#8226; Dual Tensilica Xtensa LX6 @ 240 MHz</text>
-    <text x="15" y="602" fill="#ecfdf5" font-size="11">&#8226; 320 KB SRAM (15.1% static / 49.6 KB)</text>
-    <text x="15" y="618" fill="#ecfdf5" font-size="11">&#8226; 1.31 MB app partition (80.3% utilized / 1.05 MB)</text>
+    <text x="15" y="602" fill="#ecfdf5" font-size="10.5">&#8226; Data SRAM: 49,576 / 327,680 B (15.1% static)</text>
+    <text x="15" y="618" fill="#ecfdf5" font-size="10.5">&#8226; App Flash: 1,053,906 / 1,310,720 B (80.4%)</text>
     <text x="15" y="634" fill="#ecfdf5" font-size="11">&#8226; Hardware TWDT (8000 ms panic)</text>
     <text x="15" y="650" fill="#ecfdf5" font-size="11">&#8226; 0 ms Arduino delay() &#8226; FreeRTOS Task Yielding</text>
   </g>
@@ -676,7 +680,7 @@
   <!-- Alert Tier -->
   <rect x="375" y="224" width="620" height="46" rx="8" fill="#1e293b" stroke="#f59e0b" stroke-width="1"/>
   <text x="390" y="245" fill="#fde68a" font-size="13" font-weight="bold">alertTask [Priority 2] (Binary Semaphore Triggered)</text>
-  <text x="390" y="261" fill="#94a3b8" font-size="11">Dispatches clinical/facility rising-edge anomalies to Serial and coordinates alert states</text>
+  <text x="390" y="261" fill="#94a3b8" font-size="11">Logs clinical and facility rising-edge anomalies to Serial console only (diagnostics)</text>
 
   <!-- Sensor & Telemetry Tier -->
   <g transform="translate(375, 278)">
@@ -736,8 +740,8 @@
     <!-- mqttTask on Core 1 -->
     <rect x="0" y="136" width="620" height="60" rx="8" fill="#1e1b4b" stroke="#6366f1" stroke-width="1.5"/>
     <text x="12" y="156" fill="#c7d2fe" font-size="12" font-weight="bold">mqttTask [P2] (Core 1 Cloud Bridge: PubSubClient 8192 B stack, 3000 ms cadence)</text>
-    <text x="12" y="172" fill="#a5b4fc" font-size="10">&#8226; Round-Robin Rate Limiting &#8226; Exponential Backoff &#8226; Enqueues/Dequeues offlineBuffer (64 FIFO)</text>
-    <text x="12" y="186" fill="#94a3b8" font-size="9">&#8226; Aggregates 60s summary &#8226; Transmits via lwIP stack on Core 0</text>
+    <text x="12" y="172" fill="#a5b4fc" font-size="10">&#8226; Round-Robin Rate Limiting &#8226; Exponential Backoff &#8226; Enqueues/Dequeues offlineBufferQueue (64 FIFO)</text>
+    <text x="12" y="186" fill="#94a3b8" font-size="9">&#8226; Aggregates 60s summary &#8226; BoundedWiFiClient (1.5s connect/TX) via lwIP on Core 0</text>
   </g>
 
   <!-- Thread-Safe IPC Bus Container -->
@@ -768,12 +772,12 @@
   <text x="700" y="778" fill="#e0f2fe" font-size="10">bedQueue (Depth 1)</text>
 
   <rect x="845" y="758" width="135" height="32" rx="6" fill="#1e293b" stroke="#f59e0b"/>
-  <text x="851" y="778" fill="#fef3c7" font-size="9.5">offlineBuffer (64 RAM FIFO)</text>
+  <text x="912" y="778" text-anchor="middle" fill="#fef3c7" font-size="8.3">offlineBufferQueue (64 FIFO)</text>
 
   <!-- Connective summary line -->
   <text x="390" y="812" fill="#94a3b8" font-size="10">&#8226; sensorQueue: TEMP, MOT, VIT, ECG -> displayTask -> shared telemetry (telemetryMux)</text>
   <text x="390" y="828" fill="#94a3b8" font-size="10">&#8226; samplingQueue / bedQueue: MQTT commands -> samplingTask / bedTask</text>
-  <text x="390" y="844" fill="#94a3b8" font-size="10">&#8226; offlineBuffer: Owned by mqttTask (buffers during drops, drains on reconnect)</text>
+  <text x="390" y="844" fill="#94a3b8" font-size="10">&#8226; offlineBufferQueue: Owned by mqttTask (buffers during drops, drains on reconnect)</text>
 
   <!-- Network / Cloud Layer (Right Column) -->
   <rect x="1030" y="105" width="340" height="785" rx="12" fill="url(#cardCloud)" stroke="#9333ea" stroke-width="1.5"/>
@@ -884,8 +888,8 @@
     <text x="12" y="40" fill="#94a3b8" font-size="10">2-state cycle (IDLE &#8594; CONVERTING):</text>
     <text x="12" y="58" fill="#e2e8f0" font-size="10">&#8226; TEMP_IDLE: Start 12-bit conversion</text>
     <text x="12" y="74" fill="#e2e8f0" font-size="10">&#8226; TEMP_CONVERTING: &#8805;800 ms wait (millis() gate)</text>
-    <text x="12" y="90" fill="#e2e8f0" font-size="10">&#8226; Read scratchpad &amp; dispatch to queue</text>
-    <text x="12" y="104" fill="#64748b" font-size="9">Never stalls RTOS scheduler</text>
+    <text x="12" y="90" fill="#e2e8f0" font-size="9.5">&#8226; POR guard (-32128 / +85&#176;C) &amp; queue dispatch</text>
+    <text x="12" y="104" fill="#64748b" font-size="9">Auto 1-Wire re-scan on boot miss or fault</text>
 
     <!-- PIR -->
     <rect x="0" y="125" width="250" height="70" rx="8" fill="#1e293b" stroke="#10b981" stroke-width="1"/>
@@ -955,7 +959,7 @@
     <text x="12" y="249" fill="#fde68a" font-size="9">&#8226; FACILITY WARN: Room 16-18/28-30&#176;C, AQI 101-150</text>
     <text x="24" y="261" fill="#fde68a" font-size="9">O2 18-19.5 / 24-24.5%</text>
     <text x="12" y="275" fill="#fca5a5" font-size="9">&#8226; FACILITY CRIT: Room &lt;16/&gt;30&#176;C, O2 &lt;18/&gt;24.5%</text>
-    <text x="24" y="287" fill="#fca5a5" font-size="8.5">AQI &gt;150 &#8226; Gives alertSemaphore</text>
+    <text x="24" y="287" fill="#fca5a5" font-size="8.5">AQI &gt;150 &#8226; Abnormal edges signal alertTask</text>
 
     <!-- Dynamic Rate Adjustment Logic -->
     <rect x="0" y="321" width="280" height="110" rx="8" fill="#1e293b" stroke="#3b82f6" stroke-width="1"/>
@@ -1010,7 +1014,7 @@
     <!-- SSD1306 OLED UI Rendering -->
     <rect x="0" y="370" width="294" height="135" rx="8" fill="#1e293b" stroke="#8b5cf6" stroke-width="1"/>
     <text x="12" y="394" fill="#ddd6fe" font-size="12.5" font-weight="bold">SSD1306 OLED Screen Layout (128x64)</text>
-    <text x="12" y="414" fill="#c4b5fd" font-size="11">&#8226; Rows y: 0 .. 44 (Medication Live State):</text>
+    <text x="12" y="414" fill="#c4b5fd" font-size="11">&#8226; Rows y: 0 .. 43 (Medication Live State):</text>
     <text x="22" y="430" fill="#e2e8f0" font-size="10">Dose: xx.x mg/hr | Status: NORMAL/WARN/CRIT</text>
     <text x="22" y="444" fill="#e2e8f0" font-size="10">If Pending: Req / Now / PRESS BUTTON</text>
     <text x="12" y="464" fill="#f59e0b" font-size="11">&#8226; Rows y: 54 .. 63 (Inverted Banner):</text>
@@ -1044,7 +1048,7 @@
 
     <!-- Local RAM FIFO Buffer (Managed by mqttTask) -->
     <rect x="0" y="250" width="270" height="120" rx="8" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5"/>
-    <text x="12" y="274" fill="#fde68a" font-size="11.5" font-weight="bold">Local RAM FIFO Buffer (mqttTask Owned)</text>
+    <text x="12" y="274" fill="#fde68a" font-size="11.5" font-weight="bold">FIFO Buffer (offlineBufferQueue)</text>
     <text x="12" y="294" fill="#e2e8f0" font-size="10">&#8226; Capacity: 64 Telemetry Records (~36.8 KB)</text>
     <text x="12" y="310" fill="#e2e8f0" font-size="10">&#8226; Policy: Drops newest entries when saturated</text>
     <text x="12" y="326" fill="#e2e8f0" font-size="10">&#8226; Structure: topic[64] + payload[512]</text>
@@ -1055,9 +1059,9 @@
     <rect x="0" y="385" width="270" height="130" rx="8" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
     <text x="12" y="409" fill="#a7f3d0" font-size="11.5" font-weight="bold">Exponential Backoff &amp; Replay Engine</text>
     <text x="12" y="429" fill="#e2e8f0" font-size="9.5">&#8226; Reconnect Retry: 1s -&gt; 2s -&gt; 4s ... -&gt; 30s max</text>
-    <text x="12" y="445" fill="#e2e8f0" font-size="9.5">&#8226; On Connect: mqttTask drains offlineBuffer FIFO</text>
+    <text x="12" y="445" fill="#e2e8f0" font-size="9.5">&#8226; On Connect: mqttTask drains offlineBufferQueue</text>
     <text x="12" y="461" fill="#e2e8f0" font-size="9.5">&#8226; Rate-Limited: Paced to obey Adafruit IO quotas</text>
-    <text x="12" y="479" fill="#6ee7b7" font-size="9.5">&#8226; Reconnection preserves data integrity</text>
+    <text x="12" y="479" fill="#6ee7b7" font-size="9.5">&#8226; BoundedWiFiClient (1.5s connect/TX timeout)</text>
     <text x="12" y="495" fill="#64748b" font-size="9">CLI test: SIM_ONLINE flushes buffer to cloud</text>
 
     <!-- Adafruit IO Dashboards -->
@@ -1133,8 +1137,8 @@
   <p>
     The system concurrently manages physical and simulated parameters. Physical core temperature is sampled via a 
     Dallas DS18B20 1-Wire sensor on <code>GPIO 4</code> using a non-blocking two-state machine (<code>TEMP_IDLE</code> &rarr; 
-    <code>TEMP_CONVERTING</code>). This ensures the &ge;800 ms 12-bit conversion delay (checked via non-blocking <code>millis()</code> gate in <code>sensors.cpp</code>) never stalls 
-    the FreeRTOS scheduler. Optical Photoplethysmogram (PPG) vitals (68-80 BPM, 95-98% SpO2 resting; thresholds 50-100 BPM, 92-100%) and a 5 Hz Gaussian 
+    <code>TEMP_CONVERTING</code>). This ensures the &ge;800 ms 12-bit conversion delay (800 ms gate plus 100 ms polling cadence via <code>millis()</code> in <code>sensors.cpp</code>) never stalls 
+    the FreeRTOS scheduler. Both <code>DallasTemperature 4.0.6</code>'s raw power-on scratchpad code (<code>DEVICE_POWER_ON_RESET_RAW</code> = <code>-32128</code>) and direct <code>+85.0&deg;C</code> POR readings route through <code>isDs18b20PorScratchpadReading()</code> into a 3-attempt cold-boot guard without masking open-wire <code>DEVICE_DISCONNECTED_RAW</code> faults, while scheduled 1-Wire re-enumeration (<code>needBusRescan</code> calling <code>begin()</code>) recovers boot-missing or hot-swapped sensors. A 3-state physical health model (<code>UNKNOWN</code>, <code>HEALTHY</code>, <code>FAULT</code>) isolates hardware availability from synthetic <code>SET_TEMP</code> overrides. Optical Photoplethysmogram (PPG) vitals (68-80 BPM, 95-98% SpO2 resting; thresholds 50-100 BPM, 92-100%) and a 5 Hz Gaussian 
     ECG waveform model are synthesized concurrently with independent tiered threshold monitoring across all vital modalities (Heart Rate, ECG Rate, SpO2, and Body Temperature). Dual-tier watchdog protection couples the hardware ESP-IDF TWDT (8000 ms hardware panic) 
     with a software heartbeat monitor (<code>watchdogTask</code>) auditing the 12 FreeRTOS worker tasks every 1000 ms against a 6000 ms silence limit while servicing its own hardware TWDT registration.
   </p>
@@ -1195,8 +1199,8 @@
   <ul>
     <li><strong>OLED Notification:</strong> Inverted status bar on bottom rows (y: 54..63) displays <strong><code>LOGGING OFFLINE</code></strong> or <strong><code>SYSTEM DEGRADED</code></strong> without obstructing medication data.</li>
     <li><strong>Acoustic Discrimination:</strong> Wi-Fi failure triggers a rapid double-pip tone (0-100 ms, 200-300 ms ON), while MQTT failure triggers a slow single beep (0-500 ms ON).</li>
-    <li><strong>FIFO Offline Buffer:</strong> An in-memory queue stores up to 64 telemetry records (~36.8 KB SRAM) providing best-effort local data retention during transport outages under QoS 0 at-most-once delivery. Timestamps are assigned upon broker receipt during replay.</li>
-    <li><strong>Exponential Backoff &amp; Replay:</strong> Reconnection retry delay doubles from 1s up to 30s (1s &rarr; 2s &rarr; 4s ... &rarr; 30s max). Upon reconnection, <code>mqttTask</code> drains buffered records in FIFO order, sharing the 3000 ms round-robin slot (20 msgs/min baseline); event bursts and 60 s summaries contribute toward Adafruit IO's 30 data points/minute quota.</li>
+    <li><strong>FIFO Offline Buffer:</strong> An in-memory queue (<code>offlineBufferQueue</code>) stores up to 64 telemetry records (~36.8 KB SRAM) providing best-effort local data retention during transport outages under QoS 0 at-most-once delivery. Timestamps are assigned upon broker receipt during replay.</li>
+    <li><strong>Bounded Network Stalls, Backoff &amp; Replay:</strong> <code>BoundedWiFiClient</code> limits TCP connect and write stalls to 1,500 ms (paired with a 2 s MQTT socket timeout and inter-publish <code>TASK_MQTT</code> heartbeat feeds). Reconnection retry delay doubles from 1s up to 30s (1s &rarr; 2s &rarr; 4s ... &rarr; 30s max). Upon reconnection, <code>mqttTask</code> drains buffered records in FIFO order, sharing the 3000 ms round-robin slot (20 msgs/min baseline); event bursts and 60 s summaries contribute toward Adafruit IO's 30 data points/minute quota.</li>
   </ul>
 </div>
 
@@ -1218,16 +1222,16 @@
     <tbody>
       <tr>
         <td><strong>RAM (SRAM)</strong></td>
-        <td>49,568 Bytes (Static)</td>
+        <td>49,576 Bytes (Static)</td>
         <td>327,680 Bytes (Data SRAM)</td>
         <td><strong>15.1%</strong></td>
-        <td>Generous static headroom; runtime minimum free heap is ~108 KB (measured via <code>ESP.getMinFreeHeap()</code> after task stacks, Wi-Fi buffers, and 64-item offline queue). ESP32 SoC contains 520 KB total physical SRAM; 327,680 Bytes is the application data SRAM allocation budget.</td>
+        <td>278,104 Bytes of static headroom remain within the 327,680 B data SRAM budget for FreeRTOS task stacks (13 tasks: 12 &times; 4 KB + 8 KB MQTT), Wi-Fi/lwIP buffers, and the 36,864 B <code>offlineBufferQueue</code> (520 KB physical on-chip SRAM); runtime <code>ESP.getMinFreeHeap()</code> is logged every 30 s by <code>watchdogTask</code> during hardware/Wokwi execution.</td>
       </tr>
       <tr>
         <td><strong>Flash Memory</strong></td>
-        <td>1,052,830 Bytes</td>
+        <td>1,053,906 Bytes</td>
         <td>1,310,720 Bytes</td>
-        <td><strong>80.3%</strong></td>
+        <td><strong>80.4%</strong></td>
         <td>Fits comfortably within default 1.31 MB application partition (app0).</td>
       </tr>
       <tr>
@@ -1235,7 +1239,7 @@
         <td>0 ms (Zero Arduino <code>delay()</code>)</td>
         <td>Cooperative yielding</td>
         <td><strong>0.0%</strong></td>
-        <td>Uses FreeRTOS <code>vTaskDelay()</code> yielding; peripheral I/O and network transactions remain synchronous.</td>
+        <td>Uses FreeRTOS <code>vTaskDelay()</code> yielding; 1-Wire/I2C peripheral I/O and synchronous DNS lookup (<code>WiFi.hostByName</code>) remain blocking calls, while TCP connects and socket writes are bounded to 1500 ms via <code>BoundedWiFiClient</code>.</td>
       </tr>
     </tbody>
   </table>
@@ -1245,12 +1249,12 @@
     <li><strong>Multiplexed Event Feed (Adafruit IO Quotas):</strong> Due to Adafruit IO's 10-feed limit on standard accounts (6 sensor feeds + 3 control feeds + 1 event feed), all clinical alerts, facility alerts, and 60-second summary reports are multiplexed onto the single shared <code>hospital-events</code> feed.</li>
     <li><strong>Logical Role Separation:</strong> Role separation between Medical Staff and Facility Management dashboards is implemented at the topic and dashboard layout level rather than through enforced multi-tenant cryptographic access control (RBAC).</li>
     <li><strong>Replayed Telemetry Arrival Timestamps:</strong> Replayed offline records carry the timestamp of broker reconnection/receipt rather than historic capture time due to Adafruit IO's standard MQTT ingestion format and absence of an onboard battery-backed RTC.</li>
-    <li><strong>Bounded FIFO RAM Buffer:</strong> The offline buffer utilizes an in-memory FreeRTOS queue holding up to 64 records of 576 bytes each (~36.8 KB SRAM) under QoS 0 at-most-once delivery. When capacity is reached, it drops newest incoming records to protect initial fault events. It is RAM-only and volatile upon power cycle or hardware reset.</li>
-    <li><strong>Task Watchdog &amp; SYSTEM_DEGRADED Window:</strong> <code>SYSTEM_DEGRADED</code> indicates an internal FreeRTOS worker task has starved its heartbeat while transport remains active. The ESP-IDF Task Watchdog Timer (TWDT) enforces an 8000 ms panic threshold; if a task hangs permanently, the chip resets ~2 seconds after entering <code>SYSTEM_DEGRADED</code> to provide automatic recovery (simulation only).</li>
+    <li><strong>Bounded FIFO RAM Buffer:</strong> The offline buffer (<code>offlineBufferQueue</code>) utilizes an in-memory FreeRTOS queue holding up to 64 records of 576 bytes each (~36.8 KB SRAM) under QoS 0 at-most-once delivery. When capacity is reached, it drops newest incoming records to protect initial fault events. It is RAM-only and volatile upon power cycle or hardware reset.</li>
+    <li><strong>Task Watchdog &amp; SYSTEM_DEGRADED Window:</strong> <code>SYSTEM_DEGRADED</code> indicates an internal FreeRTOS worker task has starved its heartbeat while transport remains active. The ESP-IDF Task Watchdog Timer (TWDT) enforces an 8000 ms panic threshold; if a task hangs permanently, the chip resets ~1&ndash;2 seconds after entering <code>SYSTEM_DEGRADED</code> to provide automatic recovery (and synchronous DNS stalls in <code>WiFi.hostByName</code> can similarly trigger <code>SYSTEM_DEGRADED</code> and <code>mqttTask</code> TWDT expiration if upstream DNS drops all queries).</li>
     <li><strong>Simulated Sensor Telemetry:</strong> In simulation mode, physiological vitals (PPG, ECG) and ambient facility conditions (Room Temp, Oxygen %, AQI) are synthesized via mathematical models (e.g. Gaussian superposition) and UART CLI overrides (<code>SET_HR</code>, <code>SET_SPO2</code>, <code>SET_TEMP</code>, <code>SET_ROOM</code>, <code>SET_OXYGEN</code>, <code>SET_AQI</code>).</li>
     <li><strong>Timer Rollover &amp; Reconnection Hygiene:</strong> Network retry timers employ signed modular delta arithmetic (<code>(int32_t)(now - nextWifiRetryMs) &ge; 0</code> and <code>(int32_t)(now - nextMqttRetryMs) &ge; 0</code>) combined with active timestamp refreshes during healthy connectivity (<code>nextWifiRetryMs = now;</code> and <code>nextMqttRetryMs = now;</code>), systematically preventing both 49.7-day 32-bit <code>millis()</code> rollover lockups and long-uptime signed subtraction stalls.</li>
     <li><strong>Simulated Medication Dosage Controller:</strong> Task 3 demonstrates software-in-the-loop rate limiting (+5 mg/hr/sec), physical button confirmation interlocks, and alert arbitration. It models infusion pump control logic; physical pump actuators or verified flow sensors are not included in the BOM.</li>
-    <li><strong>Network Security:</strong> The prototype connects using standard unencrypted MQTT on port 1883 for Wokwi simulation simplicity. For physical hospital networks, TLS 1.3 on port 8883 with certificate verification is recommended.</li>
+    <li><strong>Network Security:</strong> The prototype connects using standard unencrypted MQTT on port 1883 via <code>BoundedWiFiClient</code> (subclassing <code>WiFiClient</code> to cap socket write stalls at 1,500 ms alongside <code>setConnectionTimeout(1500)</code> for TCP connect and a 2 s MQTT socket timeout) for Wokwi simulation simplicity. For physical hospital networks, TLS 1.3 on port 8883 with certificate verification is recommended.</li>
     <li><strong>Summary Reporting Window Durations:</strong> The periodic 60-second hospital summary report (<code>SUMMARY_INTERVAL_MS = 60000</code>) aggregates telemetry over its nominal 1-minute window. If MQTT publication or buffer queuing temporarily fails during network degradation, the window automatically extends beyond 60 seconds until transmission or buffering succeeds. The accumulator is reset only after successful client publication or successful offline-buffer acceptance. This preserves pending metrics across temporary delivery failures, subject to the bounded volatile buffer and QoS 0 delivery limitations.</li>
     <li><strong>Sensor Availability vs. Clinical Status Integrity:</strong> Sensor availability is decoupled from physiological stability via a 3-state telemetry model (<code>INITIALIZING</code>, <code>SENSOR FAULT</code>, <code>READY</code>). During initialization, clinical <code>NORMAL</code> clearance is suppressed until all required telemetry channels are initialized and verified valid. Confirmed abnormalities in available channels may still be reported independently. Confirmed hardware failures (e.g., DS18B20 85&deg;C scratchpad reset or disconnected wire) are reported immediately during initialization as an explicit <code>SENSOR FAULT</code> once confirmed. Sensor recovery triggers a <code>SENSOR RESTORED</code> event followed by prompt clinical re-evaluation bypassing the standard 60-second cooldown. Crucially, sensor availability events use an independent publication path without modifying the clinical alert timer (<code>lastMedicalAlertPublishMs</code>) or extending its existing cooldown. Concurrent vital abnormalities (e.g. tachycardia, hypoxia) remain fully detectable and are published subject to configured clinical alert rate limits even during an active temperature sensor fault.</li>
     <li><strong>Actuator Power Supply Isolation:</strong> In the Wokwi simulation environment, the SG90 servo motor is powered directly from the ESP32 development board's 5V rail. For physical clinical bed deployments, a separate regulated 5V supply with a common ground is required to prevent actuator inductive kickback and stall current transients from causing ESP32 brownout resets.</li>
@@ -1258,23 +1262,23 @@
 </div>
 
 <!-- SECTION 7: VERIFICATION & CLI GUIDE -->
-<div class="page-break">
+<div>
   <h1>7. Verification Suite &amp; Interactive Simulation Manual</h1>
 
   <h2>Automated Unit Testing (Optional Verification Beyond Tasks 1&ndash;6)</h2>
   <p>
-    As an optional engineering verification suite beyond the 6 assigned internship tasks (compiled separately from production <code>src/</code> firmware via <code>test_build_src = no</code> with zero impact on ESP32 runtime Flash/RAM or Wokwi builds), unit tests under <code>test/test_main.cpp</code> define 26 test cases covering strict numeric string parsers 
-    (validating against NaN, Infinity, negative boundaries, float integers, and trailing characters), medication dosage safety clamping, discrete clinical tiers, rate-limiting slew mechanics (20 ms increments, long interruption recovery, timer rollover, immediate downward adjustment), multi-parameter telemetry validity gating, sensor-fault state machine transitions and recovery, DS18B20 invalidation queue-retry resilience, default medical threshold evaluation overrides, and bed elevation emergency retention on sensor disconnect.
+    As an optional engineering verification suite beyond the 6 assigned internship tasks (isolated under <code>[env:esp32dev_test]</code> with <code>test_build_src = no</code> so production <code>[env:esp32dev]</code> and Wokwi binaries remain untouched), unit tests under <code>test/test_main.cpp</code> define 31 test cases covering strict numeric string parsers 
+    (validating against NaN, Infinity, hex-float syntax, negative boundaries, float integers, and trailing characters), medication dosage safety clamping, discrete clinical tiers, rate-limiting slew mechanics (20 ms increments, long interruption recovery, timer rollover, immediate downward adjustment), multi-parameter telemetry validity gating, sensor-fault state machine transitions and recovery, raw/Celsius DS18B20 POR scratchpad classification, DS18B20 invalidation queue-retry resilience, default medical threshold evaluation overrides, bed elevation emergency retention on sensor disconnect, active-alert latch clearing during temperature sensor faults, <code>OfflineBannerGate</code> 49.7-day rollover latching, and clinical/facility abnormality evaluators plus <code>SamplingPeriods</code> defaults.
   </p>
   <p>
-    <em>Test Architecture &amp; Coverage Qualification:</em> Tests #1 through #22 exercise production parsers, medication controllers, and validity gating helpers. Tests #23 and #24 directly execute extracted production state helpers (<code>evaluateSensorFaultTransition</code>, <code>applySensorFaultTransition</code>, <code>updateQueueRetryState</code>, <code>updateTemperatureFaultReportState</code>, <code>retryTemperatureDisconnect</code>, <code>classifyDs18b20Scratchpad</code>, <code>recordPhysicalTemperatureAcquisition</code>, and <code>applyTemperatureTelemetryUpdate</code>) to verify physical sensor acquisition history, cold-boot versus runtime-reset classification, one-shot fault latching, three-state physical health provenance tracking (UNKNOWN, HEALTHY, FAULT), simulation override isolation, hardware recovery preservation, and queue-retry resilience across FIFO pending transitions. Tests #25 and #26 verify default medical threshold override evaluations and bed elevation emergency latching across sensor disconnects. These unit tests isolate algorithmic and state correctness without mocking or claiming full integration over live FreeRTOS queue saturation or physical MQTT broker network transport.
+    <em>Test Architecture &amp; Coverage Qualification:</em> Tests #1 through #22 exercise production parsers, medication controllers, and validity gating helpers. Tests #23 and #24 directly execute extracted production state helpers (<code>evaluateSensorFaultTransition</code>, <code>applySensorFaultTransition</code>, <code>updateQueueRetryState</code>, <code>updateTemperatureFaultReportState</code>, <code>retryTemperatureDisconnect</code>, <code>classifyDs18b20Scratchpad</code>, <code>recordPhysicalTemperatureAcquisition</code>, and <code>applyTemperatureTelemetryUpdate</code>) to verify physical sensor acquisition history, cold-boot versus runtime-reset classification, one-shot fault latching, three-state physical health provenance tracking (UNKNOWN, HEALTHY, FAULT), simulation override isolation, hardware recovery preservation, and queue-retry resilience across FIFO pending transitions. Tests #25 through #31 verify default medical threshold override evaluations, bed elevation emergency latching across sensor disconnects, hex-float string rejection, repeat medical alert latch clearing during active temperature sensor faults (<code>clearActiveAlertLatch</code> and <code>shouldSuppressAlertPublish</code>), <code>OfflineBannerGate</code> boot-grace/hold/49.7-day rollover latching, header-inline clinical/facility abnormality evaluators (<code>isAbnormal</code>, <code>isFacilityAbnormal</code>, <code>evaluateFacilityAlert</code>, and <code>SamplingPeriods</code> defaults), and <code>DallasTemperature 4.0.6</code> raw POR detection (<code>isDs18b20PorScratchpadReading</code>). These unit tests isolate algorithmic and state correctness without mocking or claiming full integration over live FreeRTOS queue saturation or physical MQTT broker network transport.
   </p>
   <p>
     The test suite is build-verified using PlatformIO:
   </p>
-  <pre><code>pio test -e esp32dev --without-uploading --without-testing</code></pre>
+  <pre><code>pio test -e esp32dev_test --without-uploading --without-testing</code></pre>
   <p>
-    <em>Build-Verification Note:</em> The <code>--without-testing</code> flag compiles and links the complete Unity test framework and test runner binary for the ESP32 Xtensa architecture to verify code correctness and build integrity. Execution of assertions with pass/fail counts occurs when connected to an ESP32 target via <code>pio test -e esp32dev</code> (which halts at the upload stage if no physical USB serial device is attached to the workstation).
+    <em>Build-Verification Note:</em> The <code>--without-testing</code> flag compiles and links the complete Unity test framework and test runner Flash footprint (<code>354,220</code> bytes) for the ESP32 Xtensa architecture inside <code>[env:esp32dev_test]</code> without altering <code>.pio/build/esp32dev/firmware.bin</code>. Execution of assertions with pass/fail counts occurs when connected to an ESP32 target via <code>pio test -e esp32dev_test</code> (which halts at the upload stage if no physical USB serial device is attached to the workstation).
   </p>
 
   <h2>Interactive Serial CLI Command Reference (115200 Baud)</h2>

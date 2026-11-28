@@ -218,18 +218,6 @@ extern FacilityThresholdConfig facilityThresholds;
 extern MedicalSummaryStats medicalSummaryStats;
 extern FacilitySummaryStats facilitySummaryStats;
 extern SamplingPeriods samplingPeriods;
-extern bool medicalAlertPublished;
-extern bool facilityAlertPublished;
-extern bool medicalNormalPending;
-extern bool facilityNormalPending;
-extern String lastMedicalAlertParameter;
-extern String lastFacilityAlertParameter;
-extern AlertSeverity lastMedicalAlertSeverity;
-extern AlertSeverity lastFacilityAlertSeverity;
-extern uint32_t lastMedicalAlertPublishMs;
-extern uint32_t lastFacilityAlertPublishMs;
-extern bool medicalAlertStateKnown;
-extern bool facilityAlertStateKnown;
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -241,19 +229,45 @@ extern bool facilityAlertStateKnown;
  * Checks heart rate [50 - 100 BPM], SpO2 [>= 92%], ECG rate [50 - 100 BPM], and body temperature [36.0 - 38.0 °C].
  *
  * @param data Telemetry snapshot to assess.
+ * @param thresholds Optional threshold configuration (defaults to global `medicalThresholds`).
  * @return true if any vital is outside safe physiological range; false if normal.
  */
-bool isAbnormal(const Telemetry &data);
+inline bool isAbnormal(const Telemetry &data,
+                       const MedicalThresholdConfig &thresholds = medicalThresholds)
+{
+    bool tempAbnormal = false;
+    if (data.temperatureValid) {
+        tempAbnormal = (data.temperature < thresholds.bodyTemperature.low ||
+                        data.temperature > thresholds.bodyTemperature.high);
+    }
+
+    return tempAbnormal ||
+           data.heartRate < thresholds.heartRate.low ||
+           data.heartRate > thresholds.heartRate.high ||
+           data.spo2 < thresholds.spo2.low ||
+           data.ecgRate < thresholds.ecgRate.low ||
+           data.ecgRate > thresholds.ecgRate.high;
+}
 
 /**
  * @brief Evaluates whether room environmental parameters breach facility standards.
  *
- * Checks room temperature [18.0 - 28.0 °C], oxygen [19.5 - 24.0 %], and AQI [<= 100].
+ * Checks room temperature [18.0 - 28.0 °C], oxygen [19.5 - 24.0 %], and AQI [0 - 100].
  *
  * @param data Facility telemetry snapshot to assess.
+ * @param thresholds Optional threshold configuration (defaults to global `facilityThresholds`).
  * @return true if environmental parameters exceed bounds; false if nominal.
  */
-bool isFacilityAbnormal(const FacilityTelemetry &data);
+inline bool isFacilityAbnormal(const FacilityTelemetry &data,
+                               const FacilityThresholdConfig &thresholds = facilityThresholds)
+{
+    return data.roomTemperature < thresholds.roomTemperature.low ||
+           data.roomTemperature > thresholds.roomTemperature.high ||
+           data.oxygenLevel < thresholds.oxygen.low ||
+           data.oxygenLevel > thresholds.oxygen.high ||
+           data.aqi < thresholds.aqi.low ||
+           data.aqi > thresholds.aqi.high;
+}
 
 /**
  * @brief Retrieves a thread-safe atomic copy of current medication control state.
@@ -445,6 +459,23 @@ enum Ds18b20ScratchpadStatus {
 };
 
 /**
+ * @brief Detects whether a DS18B20 conversion result represents a power-on reset scratchpad.
+ *
+ * DallasTemperature 4.0.6 converts raw cold-boot scratchpad `[0x50, 0x05, ..., 0x0C]` to
+ * `DEVICE_POWER_ON_RESET_RAW` (-32128), which `rawToCelsius()` clamps to `-127.0 C`, while
+ * Wokwi/generic paths surface `+85.0 C` directly. Both are routed through `classifyDs18b20Scratchpad()`
+ * when a sensor address is present on the 1-Wire bus.
+ */
+inline bool isDs18b20PorScratchpadReading(bool hasAddress,
+                                          int32_t rawTicks,
+                                          int32_t porRawCode,
+                                          float celsius)
+{
+    return (hasAddress && rawTicks == porRawCode) ||
+           (isfinite(celsius) && fabsf(celsius - 85.0f) <= 0.05f);
+}
+
+/**
  * @brief Classifies a DS18B20 +85.0 C scratchpad reading.
  *
  * Distinguishes initial cold-boot power-on reset scratchpad readings from runtime sensor resets:
@@ -466,7 +497,9 @@ inline Ds18b20ScratchpadStatus classifyDs18b20Scratchpad(bool hasReadValidTemper
     if (hasReadValidTemperature || pendingDisconnect) {
         return DS18B20_SCRATCHPAD_RUNTIME_RESET;
     }
-    consecutiveCount++;
+    if (consecutiveCount < 255U) {
+        consecutiveCount++;
+    }
     if (consecutiveCount < 3) {
         return DS18B20_SCRATCHPAD_IGNORE_INITIAL;
     }
@@ -571,51 +604,59 @@ inline bool updateTemperatureFaultReportState(bool isFault, bool sendSuccess,
  * @param thresholds Clinical threshold configuration (defaults to the global medicalThresholds instance).
  * @return AlertCandidate Populated candidate descriptor.
  */
+/**
+ * @brief Retains the highest-severity alert candidate during multi-parameter scans.
+ */
+inline void selectHigherSeverityAlert(AlertCandidate &bestCandidate,
+                                      const char *param,
+                                      float val,
+                                      const char *msg,
+                                      AlertSeverity sev)
+{
+    if (!bestCandidate.active || (sev > bestCandidate.severity)) {
+        bestCandidate.active = true;
+        bestCandidate.parameter = param;
+        bestCandidate.value = val;
+        bestCandidate.message = msg;
+        bestCandidate.severity = sev;
+    }
+}
+
 inline AlertCandidate evaluateMedicalAlert(const Telemetry &snapshot,
                                            const MedicalThresholdConfig &thresholds = medicalThresholds)
 {
     AlertCandidate bestCandidate;
 
-    auto checkCandidate = [&](const char* param, float val, const char* msg, AlertSeverity sev) {
-        if (!bestCandidate.active || (sev > bestCandidate.severity)) {
-            bestCandidate.active = true;
-            bestCandidate.parameter = param;
-            bestCandidate.value = val;
-            bestCandidate.message = msg;
-            bestCandidate.severity = sev;
-        }
-    };
-
     // 1. SpO2 (Hypoxia / critical airway priority)
     if (snapshot.spo2 < thresholds.spo2.low) {
-        AlertSeverity sev = (snapshot.spo2 < thresholds.spo2.criticalLow) 
+        AlertSeverity sev = (snapshot.spo2 < thresholds.spo2.criticalLow)
                             ? ALERT_SEVERITY_CRITICAL : ALERT_SEVERITY_WARNING;
-        checkCandidate("spo2", static_cast<float>(snapshot.spo2), "Low SpO2", sev);
+        selectHigherSeverityAlert(bestCandidate, "spo2", static_cast<float>(snapshot.spo2), "Low SpO2", sev);
     }
 
     // 2. Heart Rate
     if (snapshot.heartRate < thresholds.heartRate.low || snapshot.heartRate > thresholds.heartRate.high) {
-        AlertSeverity sev = (snapshot.heartRate < thresholds.heartRate.criticalLow || snapshot.heartRate > thresholds.heartRate.criticalHigh) 
+        AlertSeverity sev = (snapshot.heartRate < thresholds.heartRate.criticalLow || snapshot.heartRate > thresholds.heartRate.criticalHigh)
                             ? ALERT_SEVERITY_CRITICAL : ALERT_SEVERITY_WARNING;
         const char *msg = snapshot.heartRate < thresholds.heartRate.low ? "Low heart rate" : "High heart rate";
-        checkCandidate("heartRate", static_cast<float>(snapshot.heartRate), msg, sev);
+        selectHigherSeverityAlert(bestCandidate, "heartRate", static_cast<float>(snapshot.heartRate), msg, sev);
     }
 
     // 3. ECG Rate
     if (snapshot.ecgRate < thresholds.ecgRate.low || snapshot.ecgRate > thresholds.ecgRate.high) {
-        AlertSeverity sev = (snapshot.ecgRate < thresholds.ecgRate.criticalLow || snapshot.ecgRate > thresholds.ecgRate.criticalHigh) 
+        AlertSeverity sev = (snapshot.ecgRate < thresholds.ecgRate.criticalLow || snapshot.ecgRate > thresholds.ecgRate.criticalHigh)
                             ? ALERT_SEVERITY_CRITICAL : ALERT_SEVERITY_WARNING;
         const char *msg = snapshot.ecgRate < thresholds.ecgRate.low ? "Low ECG rate" : "High ECG rate";
-        checkCandidate("ecgRate", static_cast<float>(snapshot.ecgRate), msg, sev);
+        selectHigherSeverityAlert(bestCandidate, "ecgRate", static_cast<float>(snapshot.ecgRate), msg, sev);
     }
 
     // 4. Body Temperature (only evaluated if sensor is valid/connected)
     if (snapshot.temperatureValid) {
         if (snapshot.temperature < thresholds.bodyTemperature.low || snapshot.temperature > thresholds.bodyTemperature.high) {
-            AlertSeverity sev = (snapshot.temperature < thresholds.bodyTemperature.criticalLow || snapshot.temperature > thresholds.bodyTemperature.criticalHigh) 
+            AlertSeverity sev = (snapshot.temperature < thresholds.bodyTemperature.criticalLow || snapshot.temperature > thresholds.bodyTemperature.criticalHigh)
                                 ? ALERT_SEVERITY_CRITICAL : ALERT_SEVERITY_WARNING;
             const char *msg = snapshot.temperature < thresholds.bodyTemperature.low ? "Low body temperature" : "High body temperature";
-            checkCandidate("bodyTemperature", snapshot.temperature, msg, sev);
+            selectHigherSeverityAlert(bestCandidate, "bodyTemperature", snapshot.temperature, msg, sev);
         }
     }
 
@@ -623,14 +664,110 @@ inline AlertCandidate evaluateMedicalAlert(const Telemetry &snapshot,
 }
 
 /**
+ * @brief Clears active-alert deduplication tracking when vitals or room metrics normalize.
+ *
+ * Resets alertPublished and arms normalPending even if NORMAL publication must still wait
+ * (for example, during an active DS18B20 fault or startup initialization), so a recurring
+ * crisis is never suppressed as an ongoing duplicate.
+ */
+inline void clearActiveAlertLatch(bool &alertPublished,
+                                  bool &normalPending,
+                                  String &lastParameter,
+                                  String &lastMessage,
+                                  AlertSeverity &lastSeverity)
+{
+    if (alertPublished) {
+        alertPublished = false;
+        normalPending = true;
+    }
+    lastParameter = "";
+    lastMessage = "";
+    lastSeverity = ALERT_SEVERITY_NORMAL;
+}
+
+/**
+ * @brief Determines whether an active clinical or facility alert publish should be suppressed.
+ *
+ * Allows prompt publication on new transitions, severity escalations, and same-parameter
+ * polarity flips (after escalationCooldownMs) while suppressing identical active alerts
+ * and throttling non-escalating parameter switches under publishIntervalMs.
+ */
+inline bool shouldSuppressAlertPublish(const AlertCandidate &candidate,
+                                       bool alertPublished,
+                                       bool alertStateKnown,
+                                       const String &lastParameter,
+                                       const String &lastMessage,
+                                       AlertSeverity lastSeverity,
+                                       uint32_t lastPublishMs,
+                                       uint32_t now,
+                                       uint32_t publishIntervalMs = 60000U,
+                                       uint32_t escalationCooldownMs = 2000U)
+{
+    const char *candidateMsg = (candidate.message != nullptr) ? candidate.message : "";
+    if (alertPublished &&
+        lastParameter == candidate.parameter &&
+        lastSeverity == candidate.severity &&
+        lastMessage == candidateMsg) {
+        return true;
+    }
+
+    if (!alertStateKnown) {
+        return false;
+    }
+
+    const bool isNewTransition = !alertPublished;
+    const bool isEscalation = (candidate.severity == ALERT_SEVERITY_CRITICAL &&
+                               (!alertPublished || lastSeverity != ALERT_SEVERITY_CRITICAL));
+    const bool isPolarityFlip = (alertPublished &&
+                                 lastParameter == candidate.parameter &&
+                                 lastMessage != candidateMsg);
+
+    const uint32_t cooldownMs = (isNewTransition || isEscalation || isPolarityFlip)
+                                    ? escalationCooldownMs
+                                    : publishIntervalMs;
+    return (now - lastPublishMs) < cooldownMs;
+}
+
+/**
  * @brief Analyzes room telemetry and constructs an alert candidate if environmental limits fail.
  *
- * Evaluates Room Oxygen (<19.5 or >24 %), Room Temperature (<18 or >28 °C), and AQI (>100); highest severity wins.
+ * Evaluates Room Oxygen (<19.5 or >24 %), Room Temperature (<18 or >28 °C), and AQI (<0 or >100); highest severity wins.
  *
  * @param snapshot Evaluated facility telemetry snapshot.
+ * @param thresholds Optional threshold configuration (defaults to global `facilityThresholds`).
  * @return AlertCandidate Populated candidate descriptor.
  */
-AlertCandidate evaluateFacilityAlert(const FacilityTelemetry &snapshot);
+inline AlertCandidate evaluateFacilityAlert(const FacilityTelemetry &snapshot,
+                                            const FacilityThresholdConfig &thresholds = facilityThresholds)
+{
+    AlertCandidate bestCandidate;
+
+    // 1. Oxygen Level (suffocation / hypoxia risk)
+    if (snapshot.oxygenLevel < thresholds.oxygen.low || snapshot.oxygenLevel > thresholds.oxygen.high) {
+        AlertSeverity sev = (snapshot.oxygenLevel < thresholds.oxygen.criticalLow || snapshot.oxygenLevel > thresholds.oxygen.criticalHigh)
+                            ? ALERT_SEVERITY_CRITICAL : ALERT_SEVERITY_WARNING;
+        const char *msg = snapshot.oxygenLevel < thresholds.oxygen.low ? "Low oxygen level" : "High oxygen level";
+        selectHigherSeverityAlert(bestCandidate, "oxygenLevel", snapshot.oxygenLevel, msg, sev);
+    }
+
+    // 2. Room Temperature
+    if (snapshot.roomTemperature < thresholds.roomTemperature.low || snapshot.roomTemperature > thresholds.roomTemperature.high) {
+        AlertSeverity sev = (snapshot.roomTemperature < thresholds.roomTemperature.criticalLow || snapshot.roomTemperature > thresholds.roomTemperature.criticalHigh)
+                            ? ALERT_SEVERITY_CRITICAL : ALERT_SEVERITY_WARNING;
+        const char *msg = snapshot.roomTemperature < thresholds.roomTemperature.low ? "Low room temperature" : "High room temperature";
+        selectHigherSeverityAlert(bestCandidate, "roomTemperature", snapshot.roomTemperature, msg, sev);
+    }
+
+    // 3. AQI (< 0 maps to warning; > 150 maps to critical)
+    if (snapshot.aqi < thresholds.aqi.low || snapshot.aqi > thresholds.aqi.high) {
+        AlertSeverity sev = (snapshot.aqi > thresholds.aqi.criticalHigh)
+                            ? ALERT_SEVERITY_CRITICAL : ALERT_SEVERITY_WARNING;
+        const char *msg = snapshot.aqi > thresholds.aqi.high ? "AQI elevated" : "AQI unusually low";
+        selectHigherSeverityAlert(bestCandidate, "aqi", static_cast<float>(snapshot.aqi), msg, sev);
+    }
+
+    return bestCandidate;
+}
 
 /**
  * @brief Accumulates valid patient vitals into rolling medical statistics window.

@@ -19,7 +19,6 @@
 #include "medication.h"
 #include "outputs.h"
 #include "watchdog.h"
-#include "app.h"
 #include <math.h>
 #include "esp_task_wdt.h"
 
@@ -174,14 +173,9 @@ static void updateMedicationSafetyOutputs()
 void medicationTask(void *parameter)
 {
     (void)parameter;
-    esp_err_t wdtResult = esp_task_wdt_add(NULL);
-    if (wdtResult != ESP_OK) {
-        Serial.print("[WATCHDOG] MEDICATION registration failed: ");
-        Serial.println(esp_err_to_name(wdtResult));
-        vTaskDelete(NULL);
+    if (!registerTaskWithWatchdog(TASK_MEDICATION, "MEDICATION")) {
         return;
     }
-    Serial.println("[WATCHDOG] MEDICATION task registered with TWDT");
 
     while (true) {
         handleMedicationConfirmationButton();

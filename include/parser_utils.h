@@ -1,6 +1,5 @@
 #pragma once
 
-#include <ctype.h>
 #include <math.h>
 #include <stdlib.h>
 
@@ -33,6 +32,10 @@ inline bool parseFloatStrict(const char *str, float minVal, float maxVal, float 
         return false;
     }
     if (minVal >= 0.0f && *str == '-') {
+        return false;
+    }
+    const char *numStart = (*str == '+' || *str == '-') ? (str + 1) : str;
+    if (numStart[0] == '0' && (numStart[1] == 'x' || numStart[1] == 'X')) {
         return false;
     }
 

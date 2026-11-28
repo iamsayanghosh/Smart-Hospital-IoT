@@ -52,17 +52,13 @@ void bedDetachServo()
 void bedTask(void *parameter)
 {
     (void)parameter;
-    esp_err_t wdtResult = esp_task_wdt_add(NULL);
-    if (wdtResult != ESP_OK) {
-        Serial.print("[WATCHDOG] BED registration failed: ");
-        Serial.println(esp_err_to_name(wdtResult));
-        vTaskDelete(NULL);
+    if (!registerTaskWithWatchdog(TASK_BED, "BED")) {
         return;
     }
-    Serial.println("[WATCHDOG] BED task registered with TWDT");
 
     bedServo.setPeriodHertz(50);
     bedServo.attach(BED_SERVO_PIN, BED_SERVO_MIN_PULSE, BED_SERVO_MAX_PULSE);
+    bedServo.setTimerWidth(14); // 14-bit resolution (~1.22 us/LSB -> ~0.12 deg smoothness at 50 Hz)
 
     // Startup requirement: Servo starts at exactly 0°.
     float currentAngle = 0.0f;

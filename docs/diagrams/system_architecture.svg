@@ -54,8 +54,8 @@
     <!-- Status LEDs -->
     <rect x="0" y="210" width="280" height="85" rx="8" fill="#0f172a" stroke="#10b981" stroke-width="1"/>
     <text x="15" y="234" fill="#f8fafc" font-size="13" font-weight="bold">Status Indicator LEDs</text>
-    <text x="15" y="252" fill="#ef4444" font-size="11">&#8226; RED (GPIO 25): Critical (&gt;80 mg/hr)</text>
-    <text x="15" y="268" fill="#eab308" font-size="11">&#8226; YELLOW (GPIO 26): Warning (80 mg/hr)</text>
+    <text x="15" y="252" fill="#ef4444" font-size="11">&#8226; RED (GPIO 25): Critical (&gt;80.0 mg/hr)</text>
+    <text x="15" y="268" fill="#eab308" font-size="11">&#8226; YELLOW (GPIO 26): Warning (80.0 mg/hr)</text>
     <text x="15" y="284" fill="#22c55e" font-size="11">&#8226; GREEN (GPIO 33): Normal (0.0 - 79.9 mg/hr)</text>
 
     <!-- Buzzer -->
@@ -68,7 +68,7 @@
     <rect x="0" y="380" width="280" height="80" rx="8" fill="#0f172a" stroke="#10b981" stroke-width="1"/>
     <text x="15" y="404" fill="#f8fafc" font-size="13" font-weight="bold">SSD1306 128x64 I2C OLED</text>
     <text x="15" y="422" fill="#a7f3d0" font-size="11">I2C: GPIO 21 (SDA), GPIO 22 (SCL)</text>
-    <text x="15" y="437" fill="#94a3b8" font-size="10">Medication Live Status (y: 0..44)</text>
+    <text x="15" y="437" fill="#94a3b8" font-size="10">Medication Live Status (y: 0..43)</text>
     <text x="15" y="451" fill="#94a3b8" font-size="9.5">Task 6 OFFLINE / SYSTEM DEGRADED Banner (y: 54..63)</text>
 
     <!-- SG90 Servo -->
@@ -81,8 +81,8 @@
     <rect x="0" y="545" width="280" height="135" rx="8" fill="#064e3b" stroke="#059669" stroke-width="1"/>
     <text x="15" y="568" fill="#6ee7b7" font-size="12" font-weight="bold">ESP32 DevKit v4 SoC Specs</text>
     <text x="15" y="586" fill="#ecfdf5" font-size="11">&#8226; Dual Tensilica Xtensa LX6 @ 240 MHz</text>
-    <text x="15" y="602" fill="#ecfdf5" font-size="11">&#8226; 320 KB SRAM (15.1% static / 49.6 KB)</text>
-    <text x="15" y="618" fill="#ecfdf5" font-size="11">&#8226; 1.31 MB app partition (80.3% utilized / 1.05 MB)</text>
+    <text x="15" y="602" fill="#ecfdf5" font-size="10.5">&#8226; Data SRAM: 49,576 / 327,680 B (15.1% static)</text>
+    <text x="15" y="618" fill="#ecfdf5" font-size="10.5">&#8226; App Flash: 1,053,906 / 1,310,720 B (80.4%)</text>
     <text x="15" y="634" fill="#ecfdf5" font-size="11">&#8226; Hardware TWDT (8000 ms panic)</text>
     <text x="15" y="650" fill="#ecfdf5" font-size="11">&#8226; 0 ms Arduino delay() &#8226; FreeRTOS Task Yielding</text>
   </g>
@@ -100,7 +100,7 @@
   <!-- Alert Tier -->
   <rect x="375" y="224" width="620" height="46" rx="8" fill="#1e293b" stroke="#f59e0b" stroke-width="1"/>
   <text x="390" y="245" fill="#fde68a" font-size="13" font-weight="bold">alertTask [Priority 2] (Binary Semaphore Triggered)</text>
-  <text x="390" y="261" fill="#94a3b8" font-size="11">Dispatches clinical/facility rising-edge anomalies to Serial and coordinates alert states</text>
+  <text x="390" y="261" fill="#94a3b8" font-size="11">Logs clinical and facility rising-edge anomalies to Serial console only (diagnostics)</text>
 
   <!-- Sensor & Telemetry Tier -->
   <g transform="translate(375, 278)">
@@ -160,8 +160,8 @@
     <!-- mqttTask on Core 1 -->
     <rect x="0" y="136" width="620" height="60" rx="8" fill="#1e1b4b" stroke="#6366f1" stroke-width="1.5"/>
     <text x="12" y="156" fill="#c7d2fe" font-size="12" font-weight="bold">mqttTask [P2] (Core 1 Cloud Bridge: PubSubClient 8192 B stack, 3000 ms cadence)</text>
-    <text x="12" y="172" fill="#a5b4fc" font-size="10">&#8226; Round-Robin Rate Limiting &#8226; Exponential Backoff &#8226; Enqueues/Dequeues offlineBuffer (64 FIFO)</text>
-    <text x="12" y="186" fill="#94a3b8" font-size="9">&#8226; Aggregates 60s summary &#8226; Transmits via lwIP stack on Core 0</text>
+    <text x="12" y="172" fill="#a5b4fc" font-size="10">&#8226; Round-Robin Rate Limiting &#8226; Exponential Backoff &#8226; Enqueues/Dequeues offlineBufferQueue (64 FIFO)</text>
+    <text x="12" y="186" fill="#94a3b8" font-size="9">&#8226; Aggregates 60s summary &#8226; BoundedWiFiClient (1.5s connect/TX) via lwIP on Core 0</text>
   </g>
 
   <!-- Thread-Safe IPC Bus Container -->
@@ -192,12 +192,12 @@
   <text x="700" y="778" fill="#e0f2fe" font-size="10">bedQueue (Depth 1)</text>
 
   <rect x="845" y="758" width="135" height="32" rx="6" fill="#1e293b" stroke="#f59e0b"/>
-  <text x="851" y="778" fill="#fef3c7" font-size="9.5">offlineBuffer (64 RAM FIFO)</text>
+  <text x="912" y="778" text-anchor="middle" fill="#fef3c7" font-size="8.3">offlineBufferQueue (64 FIFO)</text>
 
   <!-- Connective summary line -->
   <text x="390" y="812" fill="#94a3b8" font-size="10">&#8226; sensorQueue: TEMP, MOT, VIT, ECG -> displayTask -> shared telemetry (telemetryMux)</text>
   <text x="390" y="828" fill="#94a3b8" font-size="10">&#8226; samplingQueue / bedQueue: MQTT commands -> samplingTask / bedTask</text>
-  <text x="390" y="844" fill="#94a3b8" font-size="10">&#8226; offlineBuffer: Owned by mqttTask (buffers during drops, drains on reconnect)</text>
+  <text x="390" y="844" fill="#94a3b8" font-size="10">&#8226; offlineBufferQueue: Owned by mqttTask (buffers during drops, drains on reconnect)</text>
 
   <!-- Network / Cloud Layer (Right Column) -->
   <rect x="1030" y="105" width="340" height="785" rx="12" fill="url(#cardCloud)" stroke="#9333ea" stroke-width="1.5"/>

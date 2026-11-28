@@ -3,9 +3,11 @@
 #include "parser_utils.h"
 #include "medication.h"
 #include "bed.h"
+#include "offline_banner_gate.h"
 
-// Define global medicalThresholds instance for unit testing environment
+// Define global threshold instances for unit testing environment
 MedicalThresholdConfig medicalThresholds;
+FacilityThresholdConfig facilityThresholds;
 
 void setUp(void) {}
 void tearDown(void) {}
@@ -459,6 +461,11 @@ void test_temperature_sensor_disconnect_queue_retry() {
         freshValid, false, freshCount);
     TEST_ASSERT_EQUAL(DS18B20_SCRATCHPAD_PERSISTENT_FAULT, statusPersistent);
     TEST_ASSERT_EQUAL_UINT8(3, freshCount);
+    for (int iter = 0; iter < 260; ++iter) {
+        TEST_ASSERT_EQUAL(DS18B20_SCRATCHPAD_PERSISTENT_FAULT,
+                          classifyDs18b20Scratchpad(freshValid, false, freshCount));
+    }
+    TEST_ASSERT_EQUAL_UINT8(255, freshCount);
 
     // 14. Legacy updateQueueRetryState helper verification
     bool legacyPending = false;
@@ -527,6 +534,125 @@ void test_bed_emergency_retention_on_sensor_disconnect() {
     TEST_ASSERT_FALSE(tempTriggeredEmergency);
 }
 
+void test_parse_float_strict_rejects_hex_float() {
+    float val = 0.0f;
+    TEST_ASSERT_FALSE(parseFloatStrict("0x10", 0.0f, 100.0f, val));
+    TEST_ASSERT_FALSE(parseFloatStrict("+0X10", 0.0f, 100.0f, val));
+    TEST_ASSERT_FALSE(parseFloatStrict("-0x1.8", -10.0f, 10.0f, val));
+}
+
+void test_medical_alert_latch_clears_during_temp_sensor_fault() {
+    bool alertPublished = true;
+    bool normalPending = false;
+    bool stateKnown = true;
+    String lastParam = "heartRate";
+    String lastMsg = "High heart rate";
+    AlertSeverity lastSev = ALERT_SEVERITY_CRITICAL;
+    uint32_t lastPubMs = 10000U;
+
+    // Patient HR normalizes while temperature sensor fault prevents NORMAL publication.
+    clearActiveAlertLatch(alertPublished, normalPending, lastParam, lastMsg, lastSev);
+    TEST_ASSERT_FALSE(alertPublished);
+    TEST_ASSERT_TRUE(normalPending);
+    TEST_ASSERT_EQUAL_STRING("", lastParam.c_str());
+    TEST_ASSERT_EQUAL(ALERT_SEVERITY_NORMAL, lastSev);
+
+    // Repeat identical HR crisis after 2s cooldown must NOT be suppressed as duplicate.
+    Telemetry crit = {};
+    crit.heartRate = 135;
+    crit.spo2 = 98;
+    crit.ecgRate = 75;
+    crit.temperatureValid = false;
+    AlertCandidate cand = evaluateMedicalAlert(crit);
+    TEST_ASSERT_TRUE(cand.active);
+    TEST_ASSERT_FALSE(shouldSuppressAlertPublish(
+        cand, alertPublished, stateKnown, lastParam, lastMsg, lastSev, lastPubMs, 13000U));
+}
+
+void test_offline_banner_gate_grace_hold_and_rollover() {
+    OfflineBannerGate gate(5000U, 10000U);
+
+    // During boot grace (< 10000 ms), banner stays hidden even after >5000 ms offline
+    TEST_ASSERT_FALSE(gate.update(true, 1000U));
+    TEST_ASSERT_FALSE(gate.update(true, 7000U));
+    // Once boot grace (10000 ms) AND hold (5000 ms) have elapsed, banner activates
+    TEST_ASSERT_TRUE(gate.update(true, 10000U));
+
+    // Online transition clears immediately and re-arms hold debounce
+    TEST_ASSERT_FALSE(gate.update(false, 10500U));
+    TEST_ASSERT_FALSE(gate.update(true, 11000U));
+    TEST_ASSERT_FALSE(gate.update(true, 15999U));
+    TEST_ASSERT_TRUE(gate.update(true, 16000U));
+
+    // Continuous outage spanning 49.7-day uint32_t rollover stays latched true without flicker
+    const uint32_t preWrap = UINT32_MAX - 2000U;
+    OfflineBannerGate wrapGate(5000U, 10000U);
+    TEST_ASSERT_FALSE(wrapGate.update(false, 10000U)); // latch boot grace
+    TEST_ASSERT_FALSE(wrapGate.update(true, preWrap)); // start outage 2001 ms before UINT32_MAX
+    TEST_ASSERT_FALSE(wrapGate.update(true, 999U));    // 3000 ms elapsed across wrap (< 5000 ms)
+    TEST_ASSERT_TRUE(wrapGate.update(true, 2999U));    // 5000 ms elapsed across wrap -> holdMet latches
+    TEST_ASSERT_TRUE(wrapGate.update(true, preWrap + 1000U)); // 49.7 days later: unlatched diff would < 5000 ms
+    TEST_ASSERT_FALSE(wrapGate.update(false, preWrap + 2000U));
+}
+
+void test_medical_and_facility_abnormal_evaluators() {
+    Telemetry normalMed = {};
+    normalMed.heartRate = 75;
+    normalMed.spo2 = 97;
+    normalMed.ecgRate = 72;
+    normalMed.temperature = 36.8f;
+    normalMed.temperatureValid = true;
+    TEST_ASSERT_FALSE(isAbnormal(normalMed));
+
+    // Faulty temp must not trigger false medical vital abnormality when HR/SpO2/ECG are normal
+    Telemetry faultTempMed = normalMed;
+    faultTempMed.temperatureValid = false;
+    faultTempMed.temperature = -127.0f;
+    TEST_ASSERT_FALSE(isAbnormal(faultTempMed));
+
+    FacilityTelemetry fac = {};
+    TEST_ASSERT_FALSE(isFacilityAbnormal(fac));
+
+    // Negative AQI is outside [0, 100] -> abnormal WARNING (not CRITICAL)
+    fac.aqi = -5;
+    TEST_ASSERT_TRUE(isFacilityAbnormal(fac));
+    AlertCandidate negAqi = evaluateFacilityAlert(fac);
+    TEST_ASSERT_TRUE(negAqi.active);
+    TEST_ASSERT_EQUAL(ALERT_SEVERITY_WARNING, negAqi.severity);
+    TEST_ASSERT_EQUAL_STRING("AQI unusually low", negAqi.message);
+
+    // High AQI (> 150) escalates to CRITICAL and wins over WARNING room temperature
+    fac.roomTemperature = 29.0f;
+    fac.aqi = 175;
+    AlertCandidate critFac = evaluateFacilityAlert(fac);
+    TEST_ASSERT_TRUE(critFac.active);
+    TEST_ASSERT_EQUAL(ALERT_SEVERITY_CRITICAL, critFac.severity);
+    TEST_ASSERT_EQUAL_STRING("aqi", critFac.parameter);
+
+    SamplingPeriods periods;
+    TEST_ASSERT_EQUAL_UINT32(2000U, periods.temperatureMs);
+    TEST_ASSERT_EQUAL_UINT32(2000U, periods.vitalMs);
+    TEST_ASSERT_EQUAL_UINT32(200U, periods.ecgMs);
+}
+
+void test_ds18b20_por_raw_and_celsius_scratchpad_detection() {
+    const int32_t kPorRaw = -32128;          // DEVICE_POWER_ON_RESET_RAW
+    const int32_t kDisconnectedRaw = -7040;  // DEVICE_DISCONNECTED_RAW
+
+    // Real silicon POR scratchpad clamped to -127 C by DallasTemperature 4.0.6 must trigger POR handling
+    TEST_ASSERT_TRUE(isDs18b20PorScratchpadReading(true, kPorRaw, kPorRaw, -127.0f));
+
+    // Wokwi / generic +85.0 C POR reading must trigger POR handling
+    TEST_ASSERT_TRUE(isDs18b20PorScratchpadReading(true, 10880, kPorRaw, 85.0f));
+
+    // Missing 1-Wire address / true open-wire disconnect must NOT be misclassified as POR
+    TEST_ASSERT_FALSE(isDs18b20PorScratchpadReading(false, kDisconnectedRaw, kPorRaw, -127.0f));
+    TEST_ASSERT_FALSE(isDs18b20PorScratchpadReading(true, kDisconnectedRaw, kPorRaw, -127.0f));
+
+    // Normal valid temperature conversion must NOT be flagged as POR
+    TEST_ASSERT_FALSE(isDs18b20PorScratchpadReading(true, 4672, kPorRaw, 36.5f));
+}
+
 void setup() {
     UNITY_BEGIN();
     RUN_TEST(test_parse_float_strict_valid);
@@ -555,6 +681,11 @@ void setup() {
     RUN_TEST(test_temperature_sensor_disconnect_queue_retry);
     RUN_TEST(test_evaluate_medical_alert_default_thresholds_override);
     RUN_TEST(test_bed_emergency_retention_on_sensor_disconnect);
+    RUN_TEST(test_parse_float_strict_rejects_hex_float);
+    RUN_TEST(test_medical_alert_latch_clears_during_temp_sensor_fault);
+    RUN_TEST(test_offline_banner_gate_grace_hold_and_rollover);
+    RUN_TEST(test_medical_and_facility_abnormal_evaluators);
+    RUN_TEST(test_ds18b20_por_raw_and_celsius_scratchpad_detection);
     UNITY_END();
 }
 

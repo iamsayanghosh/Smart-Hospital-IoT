@@ -45,7 +45,7 @@ graph TD
         BED["bedTask P2"]
         MED["medicationTask P3"]
         MQTT["mqttTask P2"]
-        BUF[("offlineBuffer 64 x 576 B")]
+        BUF[("offlineBufferQueue 64 x 576 B")]
         OFF["offlineTask P2"]
         WDT["watchdogTask P4 (audits the other 12 tasks)"]
     end
@@ -78,7 +78,7 @@ graph TD
 ## 2. Assignment Task Implementation
 
 ### Task 1: Multi-Sensor Expansion Using FreeRTOS
-* **Physical Temperature:** Dallas DS18B20 on 1-Wire bus (`GPIO 4`). Non-blocking state machine (`TEMP_IDLE` → `TEMP_CONVERTING`) with an 800–900 ms completion window (800 ms conversion gate plus 100 ms polling cadence) ensures thermal conversion never blocks the scheduler. Filters power-on scratchpad reading (+85.0°C) and invalidates telemetry if sensor resets mid-operation. Maintains a 3-state hardware health model (`UNKNOWN`, `HEALTHY`, `FAULT`); CLI simulated values provide measurement availability for testing without clearing active physical hardware faults.
+* **Physical Temperature:** Dallas DS18B20 on 1-Wire bus (`GPIO 4`). Non-blocking state machine (`TEMP_IDLE` → `TEMP_CONVERTING`) with an 800–900 ms completion window (800 ms conversion gate plus 100 ms polling cadence) ensures thermal conversion never blocks the scheduler. Routes both `DallasTemperature` `DEVICE_POWER_ON_RESET_RAW` (`-32128`) and direct `+85.0°C` POR scratchpads through the 3-attempt cold-boot filter without masking open-wire disconnects, and re-scans the 1-Wire bus on scheduled faults/missing boot probes. Maintains a 3-state hardware health model (`UNKNOWN`, `HEALTHY`, `FAULT`); CLI simulated values provide measurement availability for testing without clearing active physical hardware faults.
 * **Physical Motion:** HC-SR501 PIR sensor on `GPIO 27`, powered from 5V (`esp:5V`) in circuit diagram to ensure reliable operation of the module's onboard 3.3V LDO regulator on physical hardware.
 * **Simulated Photoplethysmogram (PPG):** Optical Heart Rate and SpO2 autonomous synthesis (nominal baseline 68–80 BPM, 95–98% SpO2) evaluated against clinical safety thresholds (`50 - 100 BPM` and `92 - 100 %`), with UART overrides (`SET_HR 40-140`, `SET_SPO2 80-100`) for anomalous scenarios.
 * **Simulated Electrocardiogram (ECG):** Illustrative real-time Gaussian superposition model synthesizing coarse cardiac cycle morphology at 5 Hz (200 ms cadence) for IoT demonstration (clinical diagnostic ECG requires ≥ 250 Hz).
@@ -114,11 +114,13 @@ graph TD
 * **Clinician Rate Adjustment & Safety Floor:** Clinicians can adjust the acquisition interval (5 s to 60 s) via `sampling-rate`. The manual setting is maintained during stable monitoring. However, to prevent a slow manual rate from blinding clinicians during life-threatening crises, an acute escalation to `CRITICAL` severity immediately cancels slower overrides and enforces rapid 5-second monitoring as an autonomous safety floor (rates > 5 s are clamped during active critical crises).
 
 ### Task 6: Fault-Tolerant Offline Detection & Buffering
+* **DS18B20 Hot-Plug & Boot Recovery:** Periodic 1-Wire bus re-scan (`begin()`) recovers sensors absent at power-up or hot-swapped at runtime.
 * **Three Health States:** `SYSTEM_ONLINE`, `SYSTEM_DEGRADED` (detected when transport is online but a worker task misses its watchdog heartbeat), and `SYSTEM_OFFLINE` (Wi-Fi or MQTT disconnected).
-* **Unified Quiet Bootup & Debounce:** An `OfflineBannerGate` suppresses the offline banner and buzzer during the first 10 seconds of power-up and ignores transient network hiccups under 5 seconds.
+* **Unified Quiet Bootup & Debounce:** An `OfflineBannerGate` suppresses the offline banner and buzzer during the first 10 seconds of power-up and ignores transient network hiccups under 5 seconds (both grace and hold latch across 49.7-day `millis()` rollover).
 * **Non-Clobbering OLED Banner:** Inverted ticker bar on bottom rows (`y = 54..63`) displays `LOGGING OFFLINE` during network drops or `SYSTEM DEGRADED` during task stalls, while medication dosage remains permanently visible.
 * **Acoustic Cadences:** Distinct failure cadences for Wi-Fi failure (rapid double-pip) vs. MQTT broker failure (slow beep). Medication critical alarms take absolute priority over network beeps.
-* **Offline SRAM Buffer:** Outgoing telemetry packets are diverted to a 64-item **bounded FIFO queue** storing 576-byte records (64-byte topic + 512-byte payload, ~36.8 KB SRAM total). Provides best-effort local data retention during outages under QoS 0 at-most-once delivery. If network disconnection persists beyond 64 messages, the queue safely preserves earlier historical data.
+* **Bounded Network Stalls (`BoundedWiFiClient`):** TCP connect and socket write stalls are bounded to 1,500 ms (`2 s` MQTT socket timeout) with inter-publish `TASK_MQTT` heartbeat feeds so transient broker dropouts trigger `SYSTEM_OFFLINE` + buffering without tripping watchdog resets (synchronous DNS lookup via `WiFi.hostByName` still depends on lwIP retries).
+* **Offline SRAM Buffer:** Outgoing telemetry packets are diverted to a 64-item **bounded FIFO queue** (`offlineBufferQueue`) storing 576-byte records (64-byte topic + 512-byte payload, ~36.8 KB SRAM total). Provides best-effort local data retention during outages under QoS 0 at-most-once delivery. If network disconnection persists beyond 64 messages, the queue safely preserves earlier historical data.
 * **Reconnection Replay:** Replays missed records in strict FIFO order, sharing the 3000 ms round-robin slot (20 msgs/min baseline). Normal telemetry runs at 20 msgs/min; event notifications and 60 s summaries contribute toward Adafruit IO's 30 data points/minute free account quota. Pending `STATUS: NORMAL` clear events are retained until successfully delivered or buffered.
 
 ---
@@ -134,7 +136,7 @@ graph TD
 | **Bedside Button** | `btn1` | `GPIO 13` | Momentary pushbutton with internal pull-up (Active-LOW) |
 | **Red Status LED** | `led1` | `GPIO 25` | Medication Critical Indicator (Rapid 3.3 Hz blink / solid confirmed) |
 | **Yellow Status LED**| `led2` | `GPIO 26` | Medication Warning Indicator (Solid at 80.0 mg/hr) |
-| **Green Status LED** | `led3` | `GPIO 33` | Medication Normal Baseline Indicator (0 - 79.9 mg/hr) |
+| **Green Status LED** | `led3` | `GPIO 33` | Medication Normal Baseline Indicator (0.0 - 79.9 mg/hr) |
 | **Piezo Buzzer** | `bz1` | `GPIO 14` | Acoustic transducer (Medication alarm + Network failure cadences) |
 
 ---
@@ -149,7 +151,7 @@ Smart-Hospital-IoT/
 │   ├── alerts.h                      # Clinical & facility event logger
 │   ├── app.h                         # FreeRTOS setup & task supervisory declarations
 │   ├── bed.h                         # Remote bed elevation servo declarations
-│   ├── connectivity.h                # Network client transport configuration
+│   ├── connectivity.h                # BoundedWiFiClient & transport config
 │   ├── display.h                     # SSD1306 OLED UI & sensorQueue consumer
 │   ├── environment.h                 # Facility simulation & CLI declarations
 │   ├── medication.h                  # Infusion safety state machine & clamping
@@ -166,7 +168,7 @@ Smart-Hospital-IoT/
 │   ├── alerts.cpp                    # Asynchronous alert logging
 │   ├── app.cpp                       # Core 1 task spawning & initialization
 │   ├── bed.cpp                       # Bed elevation kinematic controller
-│   ├── connectivity.cpp              # Connectivity configuration
+│   ├── connectivity.cpp              # BoundedWiFiClient TX & Wi-Fi config
 │   ├── display.cpp                   # Dual-zone OLED rendering
 │   ├── environment.cpp               # Facility data generator & serial parser
 │   ├── main.cpp                      # Application entry point (setup, loop, task start)
@@ -187,7 +189,8 @@ Smart-Hospital-IoT/
 │       ├── workflow_block_diagram.svg # End-to-End Workflow & Dataflow
 │       └── workflow_block_diagram.png # High-DPI Workflow Diagram
 ├── test/                             # Automated Unit Tests
-│   └── test_main.cpp                 # 26 Unity test cases
+│   └── test_main.cpp                 # 31 Unity test cases
+├── ARCHITECTURE_AND_REQUIREMENTS.txt # Architecture, workflow & task requirements spec
 ├── diagram.json                      # Wokwi circuit schematic wiring
 ├── libraries.txt                     # Wokwi library manifest
 ├── platformio.ini                    # PlatformIO project configuration
@@ -234,7 +237,7 @@ The firmware includes an interactive Serial Command Line Interface (115200 baud)
 4. **Bounded FIFO RAM Buffer:**
    The offline buffer utilizes an in-memory FreeRTOS queue holding up to 64 records of 576 bytes each (~36.8 KB SRAM). When capacity is reached, it drops newest incoming records to protect initial fault events. It is RAM-only and lost upon power cycle or hardware reset.
 5. **Task Watchdog & SYSTEM_DEGRADED Window:**
-   `SYSTEM_DEGRADED` indicates an internal FreeRTOS worker task has starved its heartbeat while transport remains active. The ESP-IDF Task Watchdog Timer (TWDT) enforces an 8000 ms panic threshold; if a task hangs permanently, the chip resets ~2 seconds after entering `SYSTEM_DEGRADED` to provide automatic recovery (simulation only).
+   `SYSTEM_DEGRADED` indicates an internal FreeRTOS worker task has starved its heartbeat while transport remains active. The ESP-IDF Task Watchdog Timer (TWDT) enforces an 8000 ms panic threshold; if a task hangs permanently, the chip resets ~1-2 seconds after entering `SYSTEM_DEGRADED` to provide automatic recovery (simulation only).
 6. **Simulated Sensor Telemetry:**
    In simulation mode, physiological vitals (PPG, ECG) and ambient facility conditions (Room Temp, Oxygen %, AQI) are synthesized via mathematical models (e.g. Gaussian superposition) and UART CLI overrides (`SET_HR`, `SET_SPO2`, `SET_TEMP`, `SET_ROOM`, `SET_OXYGEN`, `SET_AQI`).
 
@@ -262,9 +265,9 @@ pio run --target upload
   ```
 * **Compile Unit Test Binary (`test/`):**
   ```bash
-  pio test -e esp32dev --without-uploading --without-testing
+  pio test -e esp32dev_test --without-uploading --without-testing
   ```
-  *Optional Engineering Verification:* This Unity test suite (`test/test_main.cpp`) is an optional verification addition beyond the 6 assigned internship tasks and compiles separately from production firmware (`src/`) via `test_build_src = no`, adding zero overhead to ESP32 Flash/RAM or Wokwi builds. It defines 26 test cases for strict numeric string parsers (NaN, Inf, float integers, negative boundary handling), medication dosage safety clamping, slew-rate timing mechanics, telemetry validity guards, sensor fault state transitions, queue retry bookkeeping, default threshold evaluation overrides, and bed elevation emergency retention on sensor disconnect.
+  *Optional Engineering Verification:* This Unity test suite (`test/test_main.cpp`) runs under an isolated `[env:esp32dev_test]` environment (`test_build_src = no`), keeping Unity out of production builds and preserving Wokwi's `.pio/build/esp32dev/firmware.bin`. It defines 31 test cases for strict numeric string parsers (NaN, Inf, float integers, hex-float rejection, negative boundary handling), medication dosage safety clamping, slew-rate timing mechanics, telemetry validity guards, sensor fault state transitions, raw/Celsius DS18B20 POR scratchpad classification, queue retry bookkeeping, default threshold evaluation overrides, bed elevation emergency retention on sensor disconnect, repeat medical alert latch clearing during active temperature sensor faults, `OfflineBannerGate` boot-grace/hold/49.7-day rollover latching, and clinical/facility abnormality evaluators plus `SamplingPeriods` defaults.
 
 ---
 
@@ -272,8 +275,8 @@ pio run --target upload
 
 | Metric | Measured Value | Budget / Limit | Utilization |
 | :--- | :--- | :--- | :--- |
-| **Static RAM (SRAM)** | 49,568 Bytes | 327,680 Bytes | **15.1%** |
-| **Flash Memory** | 1,052,830 Bytes | 1,310,720 Bytes | **80.3%** |
+| **Static RAM (SRAM)** | 49,576 Bytes | 327,680 Bytes | **15.1%** |
+| **Flash Memory** | 1,053,906 Bytes | 1,310,720 Bytes | **80.4%** |
 | **FreeRTOS Application Tasks** | 13 tasks (all Core 1) | Dual Core Xtensa | Pinned to Core 1 (with loopTask) |
 | **Watchdog Timeout** | 8000 ms (Hardware TWDT) | 6000 ms (Heartbeat) | 100% monitored |
 | **Task Scheduling Delays** | 0 ms (Zero Arduino `delay()`) | Cooperative yielding | FreeRTOS `vTaskDelay` (peripheral I/O remains synchronous) |
@@ -284,7 +287,7 @@ pio run --target upload
 
 ## 9. Network Security & Production Deployment Note
 
-* **MQTT Encryption:** For educational and Wokwi simulation simplicity, communication uses unencrypted MQTT on port 1883 (`WiFiClient`). For physical hospital deployments handling Protected Health Information (PHI), port 8883 with TLS/SSL encryption (`WiFiClientSecure`) and broker root CA verification is required.
+* **MQTT Encryption:** For educational and Wokwi simulation simplicity, communication uses unencrypted MQTT on port 1883 via `BoundedWiFiClient` (subclassing `WiFiClient` to cap socket write stalls at 1,500 ms alongside `setConnectionTimeout(1500)` for TCP connect and a 2 s MQTT socket timeout). For physical hospital deployments handling Protected Health Information (PHI), port 8883 with TLS/SSL encryption (`WiFiClientSecure`) and broker root CA verification is required.
 * **Credentials Isolation:** When distributing or submitting the project archive, **never include** `include/adafruit_io_config.local.h`.
 The build system in `include/adafruit_io_config.h` automatically detects whether the local configuration file exists:
 - If present: loads private credentials.

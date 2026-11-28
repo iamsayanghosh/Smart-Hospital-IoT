@@ -46,59 +46,6 @@ MedicalSummaryStats medicalSummaryStats;
 FacilitySummaryStats facilitySummaryStats;
 SamplingPeriods samplingPeriods;
 
-bool medicalAlertPublished = false;
-bool facilityAlertPublished = false;
-bool medicalNormalPending = false;
-bool facilityNormalPending = false;
-String lastMedicalAlertParameter = "";
-String lastFacilityAlertParameter = "";
-AlertSeverity lastMedicalAlertSeverity = ALERT_SEVERITY_NORMAL;
-AlertSeverity lastFacilityAlertSeverity = ALERT_SEVERITY_NORMAL;
-uint32_t lastMedicalAlertPublishMs = 0;
-uint32_t lastFacilityAlertPublishMs = 0;
-bool medicalAlertStateKnown = false;
-bool facilityAlertStateKnown = false;
-
-
-
-/**
- * @brief Determines whether medical telemetry is outside configured limits.
- *
- * Requires a valid temperature and evaluates temperature, heart rate, SpO2,
- * and ECG rate against the implemented medical limits.
- */
-bool isAbnormal(const Telemetry &data)
-{
-    bool tempAbnormal = false;
-    if (data.temperatureValid) {
-        tempAbnormal = (data.temperature < medicalThresholds.bodyTemperature.low ||
-                        data.temperature > medicalThresholds.bodyTemperature.high);
-    }
-
-    return tempAbnormal ||
-           data.heartRate < medicalThresholds.heartRate.low ||
-           data.heartRate > medicalThresholds.heartRate.high ||
-           data.spo2 < medicalThresholds.spo2.low ||
-           data.ecgRate < medicalThresholds.ecgRate.low || data.ecgRate > medicalThresholds.ecgRate.high;
-}
-
-
-
-/**
- * @brief Determines whether facility telemetry is outside configured limits.
- *
- * Evaluates the simulated room temperature, oxygen level, and AQI values.
- */
-bool isFacilityAbnormal(const FacilityTelemetry &data)
-{
-    return data.roomTemperature < facilityThresholds.roomTemperature.low ||
-           data.roomTemperature > facilityThresholds.roomTemperature.high ||
-           data.oxygenLevel < facilityThresholds.oxygen.low ||
-           data.oxygenLevel > facilityThresholds.oxygen.high ||
-           data.aqi < facilityThresholds.aqi.low ||
-           data.aqi > facilityThresholds.aqi.high;
-}
-
 /**
  * @brief Retrieves a thread-safe atomic copy of current medication control state.
  *
@@ -174,56 +121,6 @@ AlertSeverity evaluateClinicalSeverity(const Telemetry &data)
 }
 
 /**
- * @brief Selects the most severe active facility alert in a telemetry snapshot.
- */
-AlertCandidate evaluateFacilityAlert(const FacilityTelemetry &snapshot)
-{
-    AlertCandidate bestCandidate;
-
-    auto checkCandidate = [&](const char* param, float val, const char* msg, AlertSeverity sev) {
-        if (!bestCandidate.active || (sev > bestCandidate.severity)) {
-            bestCandidate.active = true;
-            bestCandidate.parameter = param;
-            bestCandidate.value = val;
-            bestCandidate.message = msg;
-            bestCandidate.severity = sev;
-        }
-    };
-
-    // 1. Oxygen Level (suffocation / hypoxia risk)
-    if (snapshot.oxygenLevel < facilityThresholds.oxygen.low || snapshot.oxygenLevel > facilityThresholds.oxygen.high) {
-        AlertSeverity sev = (snapshot.oxygenLevel < facilityThresholds.oxygen.criticalLow || snapshot.oxygenLevel > facilityThresholds.oxygen.criticalHigh) 
-                            ? ALERT_SEVERITY_CRITICAL : ALERT_SEVERITY_WARNING;
-        const char *msg = snapshot.oxygenLevel < facilityThresholds.oxygen.low ? "Low oxygen level" : "High oxygen level";
-        checkCandidate("oxygenLevel", snapshot.oxygenLevel, msg, sev);
-    }
-
-    // 2. Room Temperature
-    if (snapshot.roomTemperature < facilityThresholds.roomTemperature.low || snapshot.roomTemperature > facilityThresholds.roomTemperature.high) {
-        AlertSeverity sev = (snapshot.roomTemperature < facilityThresholds.roomTemperature.criticalLow || snapshot.roomTemperature > facilityThresholds.roomTemperature.criticalHigh) 
-                            ? ALERT_SEVERITY_CRITICAL : ALERT_SEVERITY_WARNING;
-        const char *msg = snapshot.roomTemperature < facilityThresholds.roomTemperature.low ? "Low room temperature" : "High room temperature";
-        checkCandidate("roomTemperature", snapshot.roomTemperature, msg, sev);
-    }
-
-    // 3. AQI
-    if (snapshot.aqi < facilityThresholds.aqi.low || snapshot.aqi > facilityThresholds.aqi.high) {
-        AlertSeverity sev = (snapshot.aqi > facilityThresholds.aqi.criticalHigh) 
-                            ? ALERT_SEVERITY_CRITICAL : ALERT_SEVERITY_WARNING;
-        const char *msg = snapshot.aqi > facilityThresholds.aqi.high ? "AQI elevated" : "AQI unusually low";
-        checkCandidate("aqi", static_cast<float>(snapshot.aqi), msg, sev);
-    }
-
-    return bestCandidate;
-}
-
-
-
-
-
-
-
-/**
  * @brief Adds one valid medical telemetry snapshot to the summary window.
  *
  * The snapshot is supplied by mqttTask while MQTT is connected.
@@ -247,9 +144,13 @@ void updateMedicalSummaryStats(const Telemetry &snapshot)
     medicalSummaryStats.minSpo2 = min(medicalSummaryStats.minSpo2, snapshot.spo2);
 
     if (snapshot.temperatureValid) {
+        if (medicalSummaryStats.temperatureSampleCount == 0) {
+            medicalSummaryStats.maxBodyTemperature = snapshot.temperature;
+        } else {
+            medicalSummaryStats.maxBodyTemperature = max(medicalSummaryStats.maxBodyTemperature, snapshot.temperature);
+        }
         medicalSummaryStats.temperatureSampleCount += 1;
         medicalSummaryStats.bodyTemperatureTotal += snapshot.temperature;
-        medicalSummaryStats.maxBodyTemperature = max(medicalSummaryStats.maxBodyTemperature, snapshot.temperature);
     }
 
     AlertCandidate alert = evaluateMedicalAlert(snapshot);

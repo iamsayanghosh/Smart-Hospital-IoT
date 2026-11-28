@@ -38,14 +38,9 @@ static std::atomic<int> simOverrideAqi{-1};
 void environmentTask(void *parameter)
 {
     (void)parameter;
-    esp_err_t wdtResult = esp_task_wdt_add(NULL);
-    if (wdtResult != ESP_OK) {
-        Serial.print("[WATCHDOG] ENVIRONMENT registration failed: ");
-        Serial.println(esp_err_to_name(wdtResult));
-        vTaskDelete(NULL);
+    if (!registerTaskWithWatchdog(TASK_ENVIRONMENT, "ENVIRONMENT")) {
         return;
     }
-    Serial.println("[WATCHDOG] ENVIRONMENT task registered with TWDT");
 
     while (true) {
         simulateFacilityData();
@@ -78,10 +73,17 @@ void handleSerialCommands()
 {
     static char lineBuffer[96];
     static size_t lineLength = 0;
+    static bool lineTruncated = false;
 
     while (Serial.available() > 0) {
         const char character = static_cast<char>(Serial.read());
         if (character == '\n' || character == '\r') {
+            if (lineTruncated) {
+                lineLength = 0;
+                lineTruncated = false;
+                Serial.println("[SIM CLI] Error: Command too long (max 95 chars); ignored");
+                continue;
+            }
             if (lineLength == 0) {
                 continue;
             }
@@ -155,12 +157,21 @@ void handleSerialCommands()
                 }
             } else if (command == "RESET_VITALS") {
                 resetSimulatedVitals();
-            } else if (command == "SIM_OFFLINE" || command == "SIM_OFFLINE WIFI") {
+            } else if (command == "SIM_OFFLINE") {
                 setSimulateOfflineWifi(true);
                 Serial.println("[SIM CLI] SIM_OFFLINE WIFI: Wi-Fi link dropped; rapid double-pip cadence & buffering active");
-            } else if (command == "SIM_OFFLINE MQTT") {
-                setSimulateOfflineMqtt(true);
-                Serial.println("[SIM CLI] SIM_OFFLINE MQTT: MQTT link dropped; slow single-beep cadence & buffering active");
+            } else if (command.startsWith("SIM_OFFLINE ") || command.startsWith("SIM_OFFLINE\t")) {
+                String arg = command.substring(11);
+                arg.trim();
+                if (arg == "WIFI") {
+                    setSimulateOfflineWifi(true);
+                    Serial.println("[SIM CLI] SIM_OFFLINE WIFI: Wi-Fi link dropped; rapid double-pip cadence & buffering active");
+                } else if (arg == "MQTT") {
+                    setSimulateOfflineMqtt(true);
+                    Serial.println("[SIM CLI] SIM_OFFLINE MQTT: MQTT link dropped; slow single-beep cadence & buffering active");
+                } else {
+                    Serial.println("[SIM CLI] Commands: SET_ROOM <15-40>, SET_OXYGEN <16-25>, SET_AQI <0-300>, RESET_FACILITY, SET_HR <40-140>, SET_SPO2 <80-100>, SET_TEMP <30-42>, RESET_VITALS, SIM_OFFLINE [WIFI|MQTT], SIM_ONLINE, SHOW_TASK2");
+                }
             } else if (command == "SIM_ONLINE") {
                 setSimulateOfflineWifi(false);
                 setSimulateOfflineMqtt(false);
@@ -177,6 +188,8 @@ void handleSerialCommands()
 
         if (lineLength < sizeof(lineBuffer) - 1) {
             lineBuffer[lineLength++] = character;
+        } else {
+            lineTruncated = true;
         }
     }
 }

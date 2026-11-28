@@ -1,0 +1,350 @@
+================================================================================
+SMART HOSPITAL IoT SYSTEM (ESP32 + FreeRTOS + Adafruit IO)
+INTENDED ARCHITECTURE, WORKFLOW, AND TASK REQUIREMENTS SPECIFICATION
+================================================================================
+
+Target Platform : Espressif ESP32 DevKitC v4 (Dual-Core Xtensa LX6 @ 240 MHz)
+Framework       : Arduino Core for ESP32 v3.3.9 / ESP-IDF FreeRTOS SMP
+Cloud Broker    : Adafruit IO MQTT (io.adafruit.com, Port 1883, 10-Feed Budget)
+Simulation      : Unified Wokwi Project (https://wokwi.com/projects/481027748143740929)
+Scope           : Single Integrated Firmware Unifying Internship Tasks 1 through 6
+
+DISCLAIMER: This system is an educational and engineering prototype/simulation.
+It is not a certified medical device and must not be used for clinical diagnosis,
+life support, or patient treatment.
+
+--------------------------------------------------------------------------------
+1. UNIFIED INTEGRATION MANDATE & ENGINEERING CONSTRAINTS
+--------------------------------------------------------------------------------
+All six assigned internship tasks MUST operate concurrently inside one single
+PlatformIO ESP32 firmware image and one unified Wokwi schematic (`diagram.json`):
+  - Modular separation across `include/*.h` and `src/*.cpp` (no monolithic dump).
+  - Strictly non-blocking FreeRTOS task execution: zero Arduino `delay()` inside
+    tasks (`vTaskDelay()` / `millis()` state machines only).
+  - Thread-safe inter-task communication using explicit synchronization primitives
+    (`telemetryMux`, `displayMutex`, `heartbeatMutex`, `alertSemaphore`, FreeRTOS
+    queues, and `std::atomic` flags).
+  - Reliable fault handling across sensor disconnects, power-on scratchpads, Wi-Fi/
+    MQTT dropouts, offline buffering saturation, and hung-task recovery.
+  - Credential isolation: `include/adafruit_io_config.local.h` is excluded by Git;
+    `include/adafruit_io_config.h` falls back safely so builds never fail or leak keys.
+
+--------------------------------------------------------------------------------
+2. HARDWARE ARCHITECTURE & GPIO PINOUT (`diagram.json`)
+--------------------------------------------------------------------------------
+  Component ID | Device                     | ESP32 GPIO     | Mode / Electrical Notes
+  -------------|----------------------------|----------------|--------------------------------------------
+  temp1        | Dallas DS18B20 Temperature | GPIO 4         | 1-Wire digital bus (4.7k pull-up on HW)
+  pir1         | HC-SR501 PIR Motion        | GPIO 27        | Digital INPUT (5V VCC for onboard 3.3V LDO)
+  btn1         | Green Pushbutton           | GPIO 13        | INPUT_PULLUP, active-LOW, 50 ms debounce
+  led1 (+ r1)  | Red Status LED             | GPIO 25        | Digital OUTPUT via 220 ohm resistor
+  led2 (+ r2)  | Yellow Status LED          | GPIO 26        | Digital OUTPUT via 220 ohm resistor
+  led3 (+ r3)  | Green Status LED           | GPIO 33        | Digital OUTPUT via 220 ohm resistor
+  bz1          | Piezo Buzzer               | GPIO 14        | 1200 Hz LEDC tone() output (Timer 1 / Ch 1)
+  oled1        | SSD1306 128x64 I2C OLED    | GPIO 21 / 22   | I2C SDA=21, SCL=22 @ 400 kHz, addr 0x3C
+  servo1       | SG90 Micro-Servo           | GPIO 18        | 50 Hz PWM, 500-2400 us, 14-bit width (Ch 0)
+
+Note on PWM/Tone Isolation: ESP32Servo (50 Hz on GPIO 18) claims LEDC channel 0 /
+timer 0 first at startup; `tone()` on GPIO 14 (1200 Hz) dynamically selects a free
+channel/timer (channel 1 / timer 1) and is driven exclusively by `offlineTask`.
+
+--------------------------------------------------------------------------------
+3. INTENDED SYSTEM ARCHITECTURE & FREERTOS SMP MODEL
+--------------------------------------------------------------------------------
+3.1 Core Affinity
+  - Core 1 (Application & Loop): All 13 application FreeRTOS tasks spawned by
+    `appStartTasks()` (`xTaskCreatePinnedToCore(..., coreID=1)`) plus Arduino's
+    `loopTask` (`CONFIG_ARDUINO_RUNNING_CORE=1`, running `handleSerialCommands()`
+    and `vTaskDelay(1000)`).
+  - Core 0 (Protocol Stack Affinity): ESP-IDF Wi-Fi driver (`wifi` task) and lwIP
+    TCP/IP stack handle network socket transport.
+
+3.2 FreeRTOS Task Inventory (13 Application Tasks)
+  Task Name       | Pri | Stack  | Cadence / Trigger        | Primary Responsibility
+  ----------------|-----|--------|--------------------------|-----------------------------------------
+  watchdogTask    |  4  | 4096 B | 1000 ms periodic         | Audits 12 worker heartbeats (6000 ms
+                  |     |        |                          | timeout), updates `globalSystemHealthy`,
+                  |     |        |                          | reads stack HWM under `heartbeatMutex`,
+                  |     |        |                          | logs heap/HWM every 30 s, feeds self TWDT
+  vitalTask       |  3  | 4096 B | 500 ms tick; sample per  | Simulates PPG HR (68-80) & SpO2 (95-98)
+                  |     |        | `samplingPeriods.vitalMs`| or CLI overrides -> `sensorQueue`
+  ecgTask         |  3  | 4096 B | Fixed 200 ms (5 Hz)      | Synthesizes Gaussian PQRST ECG wave
+                  |     |        |                          | (`ecgRate` 70-78 BPM) -> `sensorQueue`
+  medicationTask  |  3  | 4096 B | 20 ms (50 Hz)            | Debounces GPIO 13, enforces +5 mg/hr/s
+                  |     |        |                          | slew & 80 mg/hr hold, drives LEDs & alarm
+  bedTask         |  2  | 4096 B | 20 ms (50 Hz)            | Evaluates clinical bed posture & manual
+                  |     |        |                          | override (`bedQueue`), slews GPIO 18 PWM
+  temperatureTask |  2  | 4096 B | 100 ms tick; non-blocking| Two-state DS18B20 FSM (`TEMP_IDLE` <->
+                  |     |        | >=800 ms conversion FSM  | `TEMP_CONVERTING`), filters 85 C reset &
+                  |     |        | per `temperatureMs`      | -127 C disconnects -> `sensorQueue`
+  motionTask      |  2  | 4096 B | 1000 ms periodic         | Reads PIR sensor GPIO 27 -> `sensorQueue`
+  samplingTask    |  2  | 4096 B | 200 ms init / 1000 ms run| Arbitrates `5 s` vs `60 s` cadence vs
+                  |     |        |                          | `samplingQueue` manual overrides
+  environmentTask |  2  | 4096 B | 1000 ms periodic         | Simulates facility Room Temp, O2, AQI
+                  |     |        |                          | into `facilityTelemetry` under spinlock
+  alertTask       |  2  | 4096 B | `alertSemaphore` (500 ms)| Serial diagnostic logger on rising-edge
+                  |     |        | max wait for TWDT feed   | clinical or facility anomalies (no LEDs)
+  offlineTask     |  2  | 4096 B | 50 ms periodic           | Supervises Wi-Fi/MQTT/WDT health, runs
+                  |     |        |                          | `OfflineBannerGate`, arbitrates buzzer
+  mqttTask        |  2  | 8192 B | 50 ms loop / 3000 ms pub | Manages Wi-Fi/MQTT backoff, routes RX
+                  |     |        | + 60000 ms summary       | cmds, sends alerts/live/60s summaries,
+                  |     |        |                          | owns `offlineBufferQueue` enqueue/replay
+  displayTask     |  1  | 4096 B | `sensorQueue` 100 ms poll| Drains `sensorQueue` into `telemetry`,
+                  |     |        | + 100 ms yield           | triggers `alertSemaphore`, draws OLED UI
+
+3.3 IPC Primitives & Data Ownership
+  - `telemetryMux` (`portMUX_TYPE` spinlock): Guards cross-task read/write access
+    to `telemetry`, `facilityTelemetry`, `medicationDosageControl`, and
+    `samplingPeriods`. Inside `medicationDosageControl`, `mqttTask` owns writing
+    `.requested`, `.received`, and `.lastReceivedMs`, while `medicationTask` writes
+    back only `.applied`, `.criticalConfirmationPending`, `.criticalConfirmed`,
+    `.lastRateLimitUpdateMs`, `.buttonPressed`, and `.lastButtonTransitionMs`.
+  - `sensorQueue` (`QueueHandle_t`, depth 16, `SensorMessage`): Multi-producer
+    (sensor tasks, 0-tick non-blocking send) -> single-consumer (`displayTask`).
+  - `samplingQueue` (`QueueHandle_t`, depth 1, `uint32_t`, overwrite): `mqttTask`
+    -> `samplingTask`.
+  - `bedQueue` (`QueueHandle_t`, depth 1, `float`, overwrite): `mqttTask` -> `bedTask`.
+  - `offlineBufferQueue` (`QueueHandle_t`, depth 64, `BufferedTelemetryMessage`
+    = `char topic[64] + char payload[512]` = 576 B/item, 36,864 B SRAM): Owned and
+    operated after init exclusively by `mqttTask`. Drops newest item when full so
+    earliest outage events remain intact.
+  - `alertSemaphore` (Binary semaphore): Given by `displayTask` (medical rising
+    edge) and `environmentTask` (facility rising edge) -> consumed by `alertTask`.
+  - `displayMutex` (Mutex, 50 ms timeout): Protects SSD1306 I2C transactions.
+  - `heartbeatMutex` (Mutex, 50 ms timeout): Protects `taskHeartbeats[]` and
+    `monitoredHandles[]` cleanup/stack-HWM reads vs `registerTaskWithWatchdog()`.
+  - File-`static` state in `mqtt.cpp`: `mqttClient`, `medicalSummaryStats`,
+    `facilitySummaryStats` (via `state.cpp` externs), plus `static` single-owner
+    flags/caches (`liveFeedPublished[]`, `medicalAlertPublished`,
+    `facilityAlertPublished`, `medicalNormalPending`, `facilityNormalPending`,
+    alert history strings/timers, and `medicalSensorFaultActive`).
+
+--------------------------------------------------------------------------------
+4. END-TO-END SYSTEM WORKFLOW
+--------------------------------------------------------------------------------
+4.1 Boot & Fail-Safe Startup Sequence (`setup()` in `src/main.cpp`)
+  1. Start UART at 115200 baud (`Serial.begin(115200)`).
+  2. Initialize actuator outputs to silent/OFF (`outputsInit()`), configure
+     pushbutton pull-up (`medicationInit()`), and configure PIR + non-blocking
+     DS18B20 (`sensorsInit()`).
+  3. Initialize I2C @ 400 kHz and SSD1306 (`displayInit(21, 22)` -> "SYSTEM START").
+  4. Allocate all queues, mutexes, semaphores, watchdog table, offline queue, and
+     reset baseline telemetry structs (`appInit()`). Any failure calls `failSetup()`.
+  5. Initialize ESP-IDF TWDT (8000 ms timeout, Core 1 idle mask, panic on expire)
+     and launch all 13 Core 1 tasks (`appStartTasks()`). Each worker uses
+     `registerTaskWithWatchdog()` to subscribe cleanly or clear its handle before
+     `vTaskDelete(NULL)`. Any launch failure stops created tasks, detaches servo
+     PWM (`bedDetachServo()`), resets outputs, and halts cleanly (`failSetup()`).
+
+4.2 Four-Stage Operational Pipeline (Matches `workflow_block_diagram.svg`)
+  - STAGE 1 — Data Acquisition:
+    `temperatureTask`, `motionTask`, `vitalTask`, and `ecgTask` sample physical/
+    simulated patient signals and enqueue `SensorMessage` items into `sensorQueue`.
+    `environmentTask` generates room telemetry directly into `facilityTelemetry`.
+  - STAGE 2 — Aggregation, Threshold Evaluation, Adaptive Rate & Watchdog:
+    `displayTask` drains `sensorQueue` into `telemetry` under `telemetryMux` and
+    gives `alertSemaphore` on `isAbnormal()` rising edges. Threshold tiers evaluate
+    priority severity (`NORMAL < WARNING < CRITICAL`). `samplingTask` sets `5 s` vs
+    `60 s` periods into `samplingPeriods` (subject to doctor slider overrides in
+    `samplingQueue`). `watchdogTask` audits all 12 workers every `1000 ms` against a
+    `6000 ms` timeout and feeds TWDT (`8000 ms`).
+  - STAGE 3 — Local Safety Actuation & Dual-Zone UI:
+    `medicationTask` applies dosage clamping, `+5.0 mg/hr/s` upward slew, immediate
+    reduction, `>80.0 mg/hr` button interlock (`GPIO 13`), LED indicators (`GPIO
+    25/26/33`), and critical buzzer intent. `bedTask` computes posture (`10/45/90`
+    deg) or doctor override (`0-90` deg) and slews `GPIO 18`. `displayTask` renders
+    live medication status within rows `y = 0..43` (leaving `y = 44..53` clear)
+    and Task 6 offline/degraded banners on rows `y = 54..63`.
+  - STAGE 4 — Cloud Transport, Offline Detection, Buffering & Replay:
+    `offlineTask` evaluates `(Wi-Fi, MQTT, isSystemHealthy())`, updates
+    `SystemHealthState`, runs `OfflineBannerGate` (`10 s` boot grace + latched
+    `5 s` hold), and arbitrates acoustic buzzer cadences on `GPIO 14`. `mqttTask`
+    reconnects with exponential backoff (`1 s -> 30 s`) using pre-resolved broker
+    IP (`WiFi.hostByName`), `wifiClient` (`BoundedWiFiClient` `1500 ms` write cap +
+    `WiFiClient` `setConnectionTimeout(1500)`), `2 s` MQTT socket timeout, and
+    inter-step `reportTaskHeartbeat(TASK_MQTT)` feeds, dispatches live feeds and
+    replayed FIFO items round-robin in shared `3000 ms` slots (`20 msgs/min` base),
+    publishes event-driven alerts and `60 s` combined hospital summaries on
+    `hospital-events`, and subscribes to `medication-dosage`, `sampling-rate`, and
+    `bed-angle`.
+
+--------------------------------------------------------------------------------
+5. DETAILED TASK REQUIREMENTS & THRESHOLD MATRIX
+--------------------------------------------------------------------------------
+5.1 Task 1: Multi-Sensor Expansion Using FreeRTOS & Dual-Tier Watchdog
+  - DS18B20 Temperature (`GPIO 4`): Two-state non-blocking FSM (`TEMP_IDLE` ->
+    `TEMP_CONVERTING`, >=800 ms gate at 100 ms task poll = 800-900 ms acquisition).
+    Automatically re-scans the 1-Wire bus (`begin()` + `setWaitForConversion(false)`)
+    on scheduled cycles when zero devices were enumerated at boot or after a fault/
+    disconnect, enabling plug-in and hot-swap recovery. Uses raw `getTemp()` +
+    `isDs18b20PorScratchpadReading()` so both `DallasTemperature 4.0.6`'s
+    `DEVICE_POWER_ON_RESET_RAW` (`-32128` -> `-127.0 C`) and direct `+85.0 C` POR
+    reads route through the 3-attempt cold-boot guard (`DS18B20_SCRATCHPAD_IGNORE_INITIAL`
+    for first 2 reads; >=3 consecutive at boot saturating at `255` -> fault;
+    post-acquisition POR -> `RUNTIME_RESET` fault) without masking open-wire
+    disconnects. Valid datasheet range `[-55.0, +125.0] C` (rejects
+    `DEVICE_DISCONNECTED_C` = `-127` and non-finite reads). Three-state temperature
+    provenance (`PHYSICAL_SENSOR_UNKNOWN`, `HEALTHY`, `FAULT`) keeps CLI `SET_TEMP`
+    overrides from clearing real hardware faults.
+  - PIR Motion (`GPIO 27`): Polled every `1000 ms`; emits `MOTION_DATA`.
+  - Simulated PPG (`vitalTask`): Nominal `68-80 BPM` (`random(68, 81)`), `95-98%`
+    SpO2 (`random(95, 99)`), adaptive `5 s / 60 s` period.
+  - Simulated ECG (`ecgTask`): Fixed `200 ms` (5 Hz) Gaussian PQRST waveform
+    synthesis (`70-78 BPM` via `random(70, 79)`), excluded from Task 5 slowing.
+  - Supervision: Hardware ESP-IDF TWDT `8000 ms` panic + Core 1 idle task check;
+    software `watchdogTask` `6000 ms` stall limit after `2000 ms` latched boot grace.
+
+5.2 Task 2: Dual-Role IoT Monitoring System (Adafruit IO, 10 Feeds)
+  - Medical Staff Feeds (TX): `medical-heart-rate`, `medical-spo2`,
+    `medical-body-temperature` (suppressed when `!temperatureValid`).
+  - Facility Management Feeds (TX): `facility-room-temperature`,
+    `facility-oxygen`, `facility-aqi`.
+  - Interactive Control Feeds (RX): `medication-dosage`, `bed-angle`,
+    `sampling-rate`.
+  - Multiplexed Event Stream (TX): `hospital-events`:
+    1) Clinical & Facility Alerts (highest severity wins; identical active
+       alerts suppressed until state change/clearance; `60 s` parameter-switch
+       throttle, `2 s` cooldown on new transition / escalation / polarity flip;
+       active alert latch clears cleanly on vital normalization even during a temp
+       sensor fault so repeat crises publish reliably).
+    2) Sensor Availability Events (`MEDICAL STATUS: SENSOR FAULT` / `SENSOR
+       RESTORED` / `MEDICAL STATUS: NORMAL`, `FACILITY STATUS: NORMAL`).
+    3) Combined 60-second `HOSPITAL SUMMARY` distinguishing medical `Samples:`
+       (new PPG acquisitions only) from facility `Snapshots:` (3 s ticks), with
+       `maxBodyTemperature` initialized from the first valid temp sample and
+       `minSpo2` guarded by `initialVitalsProcessed`. PubSubClient buffer sized via
+       worst-case UTF-8 sizing payload + `64 B` margin (with `220 B`-buffered
+       compact fallback passing `"N/A"` when uninitialized if enlargement fails,
+       online packet exceeds buffer, or offline summary >= 512 B FIFO slot).
+
+  Threshold Matrix (`include/state.h` & `src/state.cpp`):
+    Parameter          | Normal Range        | Warning Band                 | Critical Band
+    -------------------|---------------------|------------------------------|---------------------
+    Heart Rate (BPM)   | 50.0 .. 100.0       | [45.0, 50.0) / (100.0, 120.0]| < 45.0 or > 120.0
+    ECG Rate (BPM)     | 50.0 .. 100.0       | [45.0, 50.0) / (100.0, 120.0]| < 45.0 or > 120.0
+    SpO2 (%)           | >= 92.0             | [88.0, 92.0)                 | < 88.0
+    Body Temp (deg C)  | 36.0 .. 38.0        | [34.0, 36.0) / (38.0, 39.5]  | < 34.0 or > 39.5
+    Room Temp (deg C)  | 18.0 .. 28.0        | [16.0, 18.0) / (28.0, 30.0]  | < 16.0 or > 30.0
+    Room Oxygen (%)    | 19.5 .. 24.0        | [18.0, 19.5) / (24.0, 24.5]  | < 18.0 or > 24.5
+    Air Quality (AQI)  | 0 .. 100            | < 0 or (100, 150]            | > 150
+
+5.3 Task 3: Smart Medication Dosage Safety Controller
+  - Accepts numeric strings `[0.0, 500.0]` on `medication-dosage` (strict decimal
+    parser rejecting `NaN`, `Inf`, trailing garbage, negative numbers, and `0x`/`0X`
+    hex floats), clamped to `[0.0, 100.0] mg/hr`.
+  - Safety Tiers (`getMedicationSafetyLevel()`):
+    * Normal (`0.0` to `< 79.999` mg/hr): Solid Green LED (`GPIO 33`), OLED `NORMAL`.
+    * Warning (`fabsf(dose - 80.0) < 0.001` mg/hr): Solid Yellow LED (`GPIO 26`),
+      OLED `WARNING`.
+    * Critical (`> 80.0 mg/hr`):
+      - Unconfirmed: Applied rate clamped/held at `80.0 mg/hr`, Red LED (`GPIO 25`)
+        + Buzzer (`GPIO 14`) pulse synchronously at ~3.3 Hz (`150 ms ON / 150 ms OFF`),
+        OLED shows `"CRITICAL REQUEST"`, `"Req:"`, `"Now:"`, `"PRESS BUTTON"`.
+      - Confirmed (`GPIO 13` pressed >= 50 ms stable): Red LED solid ON, buzzer
+        silenced, OLED shows `"CRITICAL"` / `"CONFIRMED"`. Further increases/changes
+        stay authorized while `> 80.0 mg/hr`; reducing `<= 80.0 mg/hr` re-arms the
+        interlock immediately.
+  - Asymmetric Slew Limiting (`calculateSlewStep()`): Upward ramp capped at
+    `+5.0 mg/hr/s` (`deltaMs < 60000 ms` rollover-safe; first zero-timestamp and
+    `>= 60 s` starvation resets baseline without jump). Downward reductions apply
+    instantaneously.
+
+5.4 Task 4: Intelligent Remote Bed Elevation Control
+  - Servo (`GPIO 18`, 50 Hz, `500-2400 us` over `0-180 deg`, `14`-bit PWM width
+    ~`1.22 us/LSB`) starts at `0 deg` until initial vitals & ECG telemetry are processed.
+  - Automatic Clinical Modes (`evaluateBedMode()`):
+    * Sleeping (`10.0 deg`, `1.5 deg/s`): Normal or non-critical vitals.
+    * Breathing Support (`45.0 deg`, `1.5 deg/s`): `SpO2 < 92%` (non-critical).
+    * Emergency (`90.0 deg`, `5.0 deg/s`): Any critical vital (`HR/ECG <45 or >120`,
+      `SpO2 <88`, `Temp <34.0 or >39.5`). Emergency triggered by critical temp is
+      **latched** across subsequent temp sensor disconnects until valid non-critical
+      temperature is restored.
+  - Clinician Manual Override (`bed-angle` `[0.0, 90.0]`, `2.0 deg/s` via `bedQueue`):
+    Doctor retains override authority (e.g. `0 deg` supine for CPR), automatically
+    cancelled upon any clinical `BedMode` state transition (`SLEEPING` <->
+    `BREATHING_SUPPORT` <-> `EMERGENCY`).
+
+5.5 Task 5: Smart Dynamic Sampling Rate (Adaptive Monitoring)
+  - Controls `samplingPeriods.temperatureMs` and `samplingPeriods.vitalMs` (`ecgMs`
+    stays fixed `200 ms`, `motionTask` stays `1000 ms`).
+  - Boot grace: `5000 ms` conservative interval until vitals & ECG converge; temp
+    fault forces `5000 ms` retry cadence on `temperatureMs`.
+  - Automatic mode: `60000 ms` (`STABLE`) vs `5000 ms` (`ABNORMAL` Warning/Critical).
+  - Manual override (`sampling-rate` integer `[5, 60]` s via `samplingQueue`): Held
+    while clinical `AlertSeverity` & `SamplingAutoMode` remain unchanged, except any
+    escalation into or active `ALERT_SEVERITY_CRITICAL` immediately revokes slower
+    manual intervals `> 5 s` and enforces `5 s`.
+
+5.6 Task 6: Advanced Offline Detection, Buffering & Replay
+  - Tri-state Health (`updateSystemHealth()`):
+    * `!wifiConnected` -> `SYSTEM_OFFLINE` + `BUZZER_MODE_WIFI_FAIL` (double-pip:
+      `0-100 ms ON`, `200-300 ms ON` per 1000 ms).
+    * `wifiConnected && !mqttConnected` -> `SYSTEM_OFFLINE` + `BUZZER_MODE_MQTT_FAIL`
+      (slow beep: `0-500 ms ON` per 1000 ms).
+    * `!systemHealthy` -> `SYSTEM_DEGRADED` + `BUZZER_MODE_NORMAL`.
+    * Otherwise -> `SYSTEM_ONLINE` + `BUZZER_MODE_NORMAL`.
+  - `OfflineBannerGate`: Requires `10000 ms` latched uptime AND `5000 ms` latched
+    outage hold before activating offline buzzer cadences or bottom OLED banner;
+    stays latched across 49.7-day `millis()` rollover and clears on reconnect.
+  - OLED Dual-Zone UI: Medication UI occupies rows `y = 0..43` (with `y < 44`
+    reserved); bottom inverted bar (`y = 54..63`) shows `"LOGGING OFFLINE"` or
+    `"SYSTEM DEGRADED"` without erasing medication data.
+  - Buzzer Priority Arbitration (`outputs.cpp`): `medicationBuzzerActive` (Critical
+    unconfirmed dosage) strictly overrides all Task 6 offline buzzer cadences.
+  - Replay: On reconnect, `mqttTask` drains the 64-item `offlineBufferQueue` FIFO
+    alternating with live feeds in shared `3000 ms` slots (`syncTurn`), also using
+    unneeded live slots when no live feed changed, then resynchronizes live states
+    once empty (`resetLiveFeedPublishState()`).
+
+--------------------------------------------------------------------------------
+6. SERIAL CLI TEST COMMANDS (115200 BAUD, UART `loopTask`)
+--------------------------------------------------------------------------------
+  Command                   | Valid Range / Syntax   | Action
+  --------------------------|------------------------|------------------------------------------
+  SET_HR <val>              | int [40, 140]          | Override simulated HR (BPM); immediate
+  SET_SPO2 <val>            | int [80, 100]          | Override simulated SpO2 (%); immediate
+  SET_TEMP <val>            | float [30.0, 42.0]     | Override simulated Temp (C); aborts in-
+                            |                        | flight conversion without clearing fault
+  RESET_VITALS              | exact match            | Restore random HR/SpO2 & physical DS18B20
+  SET_ROOM <val>            | float [15.0, 40.0]     | Override facility room temp (C)
+  SET_OXYGEN <val>          | float [16.0, 25.0]     | Override facility ambient O2 (%)
+  SET_AQI <val>             | int [0, 300]           | Override facility AQI
+  RESET_FACILITY            | exact match            | Clear facility simulation overrides
+  SIM_OFFLINE [WIFI|MQTT]   | `SIM_OFFLINE` / suffix | Drop simulated Wi-Fi or MQTT link -> FIFO
+                            | (arbitrary spaces OK)  | (Lines >= 95 chars rejected with error)
+  SIM_ONLINE                | exact match            | Restore network link -> FIFO replay
+  SHOW_TASK2                | exact match            | Print active Dual-Role MQTT feed names
+
+--------------------------------------------------------------------------------
+7. NON-NEGOTIABLE ARCHITECTURAL & SAFETY INVARIANTS
+--------------------------------------------------------------------------------
+  1. Patient medical vital anomalies NEVER turn on the Task 3 LEDs (GPIO 25/26/33)
+     or Task 3/6 buzzer (GPIO 14). Physical LEDs reflect medication dosage only.
+  2. Medication critical alarm ALWAYS supersedes offline network buzzer beeps.
+  3. Simulated `SET_TEMP` overrides MUST NOT set `physicalTempHealth = HEALTHY` or
+     emit false `"MEDICAL STATUS: SENSOR RESTORED"` / premature `"NORMAL"`.
+  4. Normalization of vitals while a temperature sensor fault or startup init is
+     active MUST clear `medicalAlertPublished` without publishing false `"NORMAL"`,
+     so repeat acute crises are never suppressed.
+  5. Emergency bed elevation (`90 deg`) latched from critical temperature MUST stay
+     latched across sensor disconnect until valid non-critical temp is restored.
+  6. Critical clinical severity ALWAYS revokes manual `sampling-rate > 5 s`.
+  7. When `offlineBufferQueue` reaches 64 items, newest messages are dropped rather
+     than overwriting earlier outage records.
+  8. No FreeRTOS task may call blocking Arduino `delay()` or share non-atomic
+     structs/buffers outside their lock or owning task.
+
+--------------------------------------------------------------------------------
+8. BUILD & OPTIONAL VERIFICATION SUITE (`platformio.ini`)
+--------------------------------------------------------------------------------
+  - Production Firmware (`pio run -e esp32dev`):
+    Measured footprint = 49,576 Bytes static RAM (15.1% of 327,680 B data SRAM),
+    1,053,906 Bytes Flash (80.4% of 1,310,720 B app partition; Unity excluded).
+  - Optional Unit Verification (`test/test_main.cpp`, `[env:esp32dev_test]`,
+    `test_build_src = no`):
+    Added as optional engineering verification beyond the 6 assigned tasks with
+    zero Flash/RAM impact on production firmware or Wokwi `.pio/build/esp32dev/
+    firmware.bin`. Defines 31 Unity tests (`354,220 B` Flash compiled ESP32 test image
+    via `pio test -e esp32dev_test --without-uploading --without-testing`; on-device
+    execution requires USB hardware, and no host `g++` compiler is installed here).
+================================================================================

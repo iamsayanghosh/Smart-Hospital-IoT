@@ -168,17 +168,20 @@ String buildHospitalSummaryPayload(const char *averageHeartRateStr, const char *
 }
 
 /**
- * @brief Builds a condensed summary payload (<200 bytes) for safe transmission when buffer is un-enlarged.
+ * @brief Builds a condensed summary payload (up to 220-byte buffer) when full summary cannot fit.
  */
 String buildCompactHospitalSummaryPayload(const char *averageHeartRateStr, const char *minimumSpo2Str, const char *maxBodyTempStr,
                                          uint32_t medicalAbnormalCount, uint32_t medicalCriticalCount,
                                          const char *averageOxygenStr, uint32_t facilityAbnormalCount, uint32_t facilityCriticalCount,
-                                         const char *medicalStatusOverride = nullptr)
+                                         const char *medicalStatusOverride = nullptr,
+                                         const char *facilityStatusOverride = nullptr)
 {
     const char *medStat = (medicalStatusOverride != nullptr)
                               ? medicalStatusOverride
                               : ((medicalCriticalCount > 0) ? "CRIT" : (medicalAbnormalCount > 0 ? "WARN" : "NORM"));
-    const char *facStat = (facilityCriticalCount > 0) ? "CRIT" : (facilityAbnormalCount > 0 ? "WARN" : "NORM");
+    const char *facStat = (facilityStatusOverride != nullptr)
+                              ? facilityStatusOverride
+                              : ((facilityCriticalCount > 0) ? "CRIT" : (facilityAbnormalCount > 0 ? "WARN" : "NORM"));
 
     char payload[220];
     snprintf(payload, sizeof(payload),
@@ -370,8 +373,21 @@ bool connectMqtt()
     if (WiFi.status() != WL_CONNECTED) {
         return false;
     }
+
+    IPAddress brokerIp;
+    reportTaskHeartbeat(TASK_MQTT);
+    if (WiFi.hostByName(mqttBroker, brokerIp) != 1) {
+        reportTaskHeartbeat(TASK_MQTT);
+        Serial.println("[MQTT TASK] DNS lookup failed for MQTT broker");
+        return false;
+    }
+    reportTaskHeartbeat(TASK_MQTT);
+
+    mqttClient.setServer(brokerIp, mqttPort);
     String clientId = "smart-hospital-" + String(static_cast<uint32_t>(ESP.getEfuseMac()), HEX);
-    if (mqttClient.connect(clientId.c_str(), AIO_USERNAME, AIO_KEY)) {
+    const bool connected = mqttClient.connect(clientId.c_str(), AIO_USERNAME, AIO_KEY);
+    reportTaskHeartbeat(TASK_MQTT);
+    if (connected) {
         medicationDosageTopic = getAioFeedTopic(MEDICATION_DOSAGE_FEED);
         samplingRateTopic = getAioFeedTopic(SAMPLING_RATE_FEED);
         bedAngleTopic = getAioFeedTopic(BED_ANGLE_FEED);
@@ -384,7 +400,9 @@ bool connectMqtt()
         bool sub1 = mqttClient.subscribe(medicationDosageTopic.c_str());
         bool sub2 = mqttClient.subscribe(samplingRateTopic.c_str());
         bool sub3 = mqttClient.subscribe(bedAngleTopic.c_str());
+        reportTaskHeartbeat(TASK_MQTT);
         mqttClient.loop();
+        reportTaskHeartbeat(TASK_MQTT);
         if (!sub1 || !sub2 || !sub3) {
             Serial.println("[MQTT TASK] Warning: One or more topic subscriptions failed; disconnecting socket to retry cleanly");
             mqttClient.disconnect();
@@ -520,49 +538,20 @@ void resetLiveFeedPublishState()
 }
 
 static bool medicalSensorFaultActive = false;
+static bool medicalAlertPublished = false;
+static bool facilityAlertPublished = false;
+static bool medicalNormalPending = false;
+static bool facilityNormalPending = false;
+static String lastMedicalAlertParameter = "";
+static String lastFacilityAlertParameter = "";
 static String lastMedicalAlertMessage = "";
 static String lastFacilityAlertMessage = "";
-
-/**
- * @brief Determines whether an active clinical or facility alert publish should be suppressed.
- *
- * Allows prompt publication on new transitions, severity escalations, and same-parameter
- * polarity flips (after ALERT_ESCALATION_COOLDOWN_MS) while suppressing identical active alerts
- * and throttling non-escalating parameter switches under ALERT_PUBLISH_INTERVAL_MS.
- */
-static bool shouldSuppressAlertPublish(const AlertCandidate &candidate,
-                                       bool alertPublished,
-                                       bool alertStateKnown,
-                                       const String &lastParameter,
-                                       const String &lastMessage,
-                                       AlertSeverity lastSeverity,
-                                       uint32_t lastPublishMs,
-                                       uint32_t now)
-{
-    const char *candidateMsg = (candidate.message != nullptr) ? candidate.message : "";
-    if (alertPublished &&
-        lastParameter == candidate.parameter &&
-        lastSeverity == candidate.severity &&
-        lastMessage == candidateMsg) {
-        return true;
-    }
-
-    if (!alertStateKnown) {
-        return false;
-    }
-
-    const bool isNewTransition = !alertPublished;
-    const bool isEscalation = (candidate.severity == ALERT_SEVERITY_CRITICAL &&
-                               (!alertPublished || lastSeverity != ALERT_SEVERITY_CRITICAL));
-    const bool isPolarityFlip = (alertPublished &&
-                                 lastParameter == candidate.parameter &&
-                                 lastMessage != candidateMsg);
-
-    const uint32_t cooldownMs = (isNewTransition || isEscalation || isPolarityFlip)
-                                    ? ALERT_ESCALATION_COOLDOWN_MS
-                                    : ALERT_PUBLISH_INTERVAL_MS;
-    return (now - lastPublishMs) < cooldownMs;
-}
+static AlertSeverity lastMedicalAlertSeverity = ALERT_SEVERITY_NORMAL;
+static AlertSeverity lastFacilityAlertSeverity = ALERT_SEVERITY_NORMAL;
+static uint32_t lastMedicalAlertPublishMs = 0;
+static uint32_t lastFacilityAlertPublishMs = 0;
+static bool medicalAlertStateKnown = false;
+static bool facilityAlertStateKnown = false;
 
 /**
  * @brief Publishes medical alert or normal-status events when state changes.
@@ -605,14 +594,19 @@ void publishMedicalAlertIfNeeded(const Telemetry &snapshot, bool offline)
     AlertCandidate candidate = evaluateMedicalAlert(snapshot);
 
     if (!candidate.active) {
+        // Clear any active-alert latch when vitals normalize even during a sensor fault or startup init
+        // so a recurring vital crisis is not suppressed and NORMAL publishes once fully valid.
+        if (medicalAlertPublished) {
+            clearActiveAlertLatch(medicalAlertPublished,
+                                  medicalNormalPending,
+                                  lastMedicalAlertParameter,
+                                  lastMedicalAlertMessage,
+                                  lastMedicalAlertSeverity);
+        }
+
         // Suppress false NORMAL if sensor fault is active, system is initializing, or telemetry is not fully valid
         if (medicalSensorFaultActive || isInitializing || !isFullyValid) {
             return;
-        }
-
-        if (medicalAlertPublished) {
-            medicalAlertPublished = false;
-            medicalNormalPending = true;
         }
 
         if (!medicalAlertStateKnown || medicalNormalPending) {
@@ -621,9 +615,6 @@ void publishMedicalAlertIfNeeded(const Telemetry &snapshot, bool offline)
                 lastMedicalAlertPublishMs = now;
                 medicalAlertStateKnown = true;
                 medicalNormalPending = false;
-                lastMedicalAlertParameter = "";
-                lastMedicalAlertMessage = "";
-                lastMedicalAlertSeverity = ALERT_SEVERITY_NORMAL;
             }
         }
         return;
@@ -639,7 +630,9 @@ void publishMedicalAlertIfNeeded(const Telemetry &snapshot, bool offline)
                                    lastMedicalAlertMessage,
                                    lastMedicalAlertSeverity,
                                    lastMedicalAlertPublishMs,
-                                   now)) {
+                                   now,
+                                   ALERT_PUBLISH_INTERVAL_MS,
+                                   ALERT_ESCALATION_COOLDOWN_MS)) {
         return;
     }
 
@@ -671,8 +664,11 @@ void publishFacilityAlertIfNeeded(const FacilityTelemetry &snapshot, bool offlin
     const uint32_t now = millis();
     if (!candidate.active) {
         if (facilityAlertPublished) {
-            facilityAlertPublished = false;
-            facilityNormalPending = true;
+            clearActiveAlertLatch(facilityAlertPublished,
+                                  facilityNormalPending,
+                                  lastFacilityAlertParameter,
+                                  lastFacilityAlertMessage,
+                                  lastFacilityAlertSeverity);
         }
 
         if (!facilityAlertStateKnown || facilityNormalPending) {
@@ -681,9 +677,6 @@ void publishFacilityAlertIfNeeded(const FacilityTelemetry &snapshot, bool offlin
                 lastFacilityAlertPublishMs = now;
                 facilityAlertStateKnown = true;
                 facilityNormalPending = false;
-                lastFacilityAlertParameter = "";
-                lastFacilityAlertMessage = "";
-                lastFacilityAlertSeverity = ALERT_SEVERITY_NORMAL;
             }
         }
         return;
@@ -699,7 +692,9 @@ void publishFacilityAlertIfNeeded(const FacilityTelemetry &snapshot, bool offlin
                                    lastFacilityAlertMessage,
                                    lastFacilityAlertSeverity,
                                    lastFacilityAlertPublishMs,
-                                   now)) {
+                                   now,
+                                   ALERT_PUBLISH_INTERVAL_MS,
+                                   ALERT_ESCALATION_COOLDOWN_MS)) {
         return;
     }
 
@@ -726,7 +721,7 @@ void publishSummaryData(bool offline)
     Telemetry snapshot = getTelemetrySnapshot();
     FacilityTelemetry facilitySnapshot = getFacilitySnapshot();
 
-    if (medicalSummaryStats.sampleCount == 0) {
+    if (medicalSummaryStats.sampleCount == 0 && snapshot.initialVitalsProcessed) {
         medicalSummaryStats.minSpo2 = snapshot.spo2;
     }
 
@@ -795,6 +790,11 @@ void publishSummaryData(bool offline)
         }
     }
 
+    const char *fallbackCompactFacilityStatus =
+        (facilitySummaryStats.sampleCount == 0 && !facilitySnapshot.initialFacilityProcessed)
+            ? "N/A"
+            : nullptr;
+
     auto buildCompactPayload = [&]() {
         return buildCompactHospitalSummaryPayload(
             hrBuf,
@@ -805,7 +805,8 @@ void publishSummaryData(bool offline)
             oxygenBuf,
             facilitySummaryStats.abnormalCount,
             facilitySummaryStats.criticalCount,
-            fallbackCompactMedicalStatus);
+            fallbackCompactMedicalStatus,
+            fallbackCompactFacilityStatus);
     };
 
     String hospitalEventsTopic = getAioFeedTopic(HOSPITAL_EVENTS_FEED);
@@ -870,19 +871,16 @@ void publishSummaryData(bool offline)
 void mqttTask(void *parameter)
 {
     (void)parameter;
-    esp_err_t wdtResult = esp_task_wdt_add(NULL);
-    if (wdtResult != ESP_OK) {
-        Serial.print("[WATCHDOG] MQTT registration failed: ");
-        Serial.println(esp_err_to_name(wdtResult));
-        vTaskDelete(NULL);
+    if (!registerTaskWithWatchdog(TASK_MQTT, "MQTT")) {
         return;
     }
-    Serial.println("[WATCHDOG] MQTT task registered with TWDT");
 
     WiFi.mode(WIFI_STA);
     WiFi.begin(wifiSsid, "");
+    wifiClient.setConnectionTimeout(1500);
+    wifiClient.setWriteTimeoutMs(1500);
     mqttClient.setServer(mqttBroker, mqttPort);
-    mqttClient.setSocketTimeout(3);
+    mqttClient.setSocketTimeout(2);
     configureMqttBuffer();
     uint32_t nextWifiRetryMs = millis() + MQTT_INITIAL_RETRY_DELAY_MS;
     uint32_t wifiRetryDelayMs = MQTT_INITIAL_RETRY_DELAY_MS;
@@ -895,19 +893,27 @@ void mqttTask(void *parameter)
     while (true) {
         const uint32_t now = millis();
         if (simForceWifiOffline) {
-            if (WiFi.status() == WL_CONNECTED) {
+            const wl_status_t wifiStatus = WiFi.status();
+            if (wifiStatus != WL_DISCONNECTED && wifiStatus != WL_NO_SHIELD) {
                 WiFi.disconnect();
                 Serial.println("[MQTT TASK] WiFi disconnected by SIM_OFFLINE WIFI");
             }
             if (mqttClient.connected()) {
                 mqttClient.disconnect();
             }
+            nextWifiRetryMs = now;
+            wifiRetryDelayMs = MQTT_INITIAL_RETRY_DELAY_MS;
+            nextMqttRetryMs = now;
+            mqttRetryDelayMs = MQTT_INITIAL_RETRY_DELAY_MS;
             mqttConnectedFlag = false;
         } else if (simForceMqttOffline) {
             if (mqttClient.connected()) {
                 mqttClient.disconnect();
                 Serial.println("[MQTT TASK] Disconnected by SIM_OFFLINE MQTT; buffering activated");
             }
+            nextWifiRetryMs = now;
+            nextMqttRetryMs = now;
+            mqttRetryDelayMs = MQTT_INITIAL_RETRY_DELAY_MS;
             mqttConnectedFlag = false;
         } else if (WiFi.status() != WL_CONNECTED) {
             if ((int32_t)(now - nextWifiRetryMs) >= 0) {
@@ -956,12 +962,15 @@ void mqttTask(void *parameter)
             updateFacilitySummaryStats(facilitySnapshot);
 
             publishMedicalAlertIfNeeded(snapshot, offline);
+            reportTaskHeartbeat(TASK_MQTT);
             publishFacilityAlertIfNeeded(facilitySnapshot, offline);
+            reportTaskHeartbeat(TASK_MQTT);
 
             if (now - lastSummaryPublishMs >= SUMMARY_INTERVAL_MS) {
                 Serial.println("[MQTT] Summary interval reached");
                 lastSummaryPublishMs = now;
                 publishSummaryData(offline);
+                reportTaskHeartbeat(TASK_MQTT);
             }
 
             static bool syncTurn = false;

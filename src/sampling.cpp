@@ -57,14 +57,9 @@ static const uint32_t STARTUP_CONSERVATIVE_INTERVAL_MS = 5000; ///< Fallback per
 void samplingTask(void *parameter)
 {
     (void)parameter;
-    esp_err_t wdtResult = esp_task_wdt_add(NULL);
-    if (wdtResult != ESP_OK) {
-        Serial.print("[WATCHDOG] SAMPLING registration failed: ");
-        Serial.println(esp_err_to_name(wdtResult));
-        vTaskDelete(NULL);
+    if (!registerTaskWithWatchdog(TASK_SAMPLING, "SAMPLING")) {
         return;
     }
-    Serial.println("[WATCHDOG] SAMPLING task registered with TWDT");
 
     SamplingAutoMode lastAutoMode = SAMPLING_MODE_UNKNOWN;
     AlertSeverity lastSeverity = ALERT_SEVERITY_NORMAL;
