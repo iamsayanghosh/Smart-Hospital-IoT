@@ -344,7 +344,7 @@
     <strong>Key Project Accomplishments:</strong>
     <ul>
       <li><strong>Unified Single-Project Integration:</strong> All 6 assigned internship tasks run simultaneously in one firmware image with zero Arduino <code>delay()</code> calls (FreeRTOS tasks use cooperative <code>vTaskDelay()</code> yielding).</li>
-      <li><strong>Resource Efficiency:</strong> Static RAM utilization measured at <strong>15.1%</strong> (49,576 B of 327,680 B data SRAM budget; 520 KB physical on-chip SRAM) and Flash at <strong>80.4%</strong> (1,053,906 B of 1,310,720 B), leaving healthy runtime dynamic heap for FreeRTOS queues.</li>
+      <li><strong>Resource Efficiency:</strong> Static RAM utilization measured at <strong>15.1%</strong> (49,568 B of 327,680 B data SRAM budget; 520 KB physical on-chip SRAM) and Flash at <strong>80.6%</strong> (1,056,062 B of 1,310,720 B), leaving healthy runtime dynamic heap for FreeRTOS queues.</li>
       <li><strong>Optional Verification Suite:</strong> Beyond the 6 assigned internship tasks, 31 Unity unit test cases (isolated under <code>[env:esp32dev_test]</code> with <code>test_build_src = no</code> so production Flash/RAM and Wokwi binaries remain untouched) are included for verification, covering strict numeric parsers (including hex-float rejection), medication safety, slew-rate mechanics, telemetry validity, sensor-fault transitions, raw/Celsius POR scratchpad guards, queue-retry bookkeeping, default threshold overrides, bed emergency posture latching, alert-latch clearing during active sensor faults, <code>OfflineBannerGate</code> rollover debouncing, and clinical/facility abnormality evaluators. The ESP32 test runner has been build-verified (354,220 B Flash).</li>
       <li><strong>Open Source &amp; Credentials Safety:</strong> Released under the MIT License with complete credential isolation (private keys never committed to Git).</li>
     </ul>
@@ -661,8 +661,8 @@
     <rect x="0" y="545" width="280" height="135" rx="8" fill="#064e3b" stroke="#059669" stroke-width="1"/>
     <text x="15" y="568" fill="#6ee7b7" font-size="12" font-weight="bold">ESP32 DevKit v4 SoC Specs</text>
     <text x="15" y="586" fill="#ecfdf5" font-size="11">&#8226; Dual Tensilica Xtensa LX6 @ 240 MHz</text>
-    <text x="15" y="602" fill="#ecfdf5" font-size="10.5">&#8226; Data SRAM: 49,576 / 327,680 B (15.1% static)</text>
-    <text x="15" y="618" fill="#ecfdf5" font-size="10.5">&#8226; App Flash: 1,053,906 / 1,310,720 B (80.4%)</text>
+    <text x="15" y="602" fill="#ecfdf5" font-size="10.5">&#8226; Data SRAM: 49,568 / 327,680 B (15.1% static)</text>
+    <text x="15" y="618" fill="#ecfdf5" font-size="10.5">&#8226; App Flash: 1,056,062 / 1,310,720 B (80.6%)</text>
     <text x="15" y="634" fill="#ecfdf5" font-size="11">&#8226; Hardware TWDT (8000 ms panic)</text>
     <text x="15" y="650" fill="#ecfdf5" font-size="11">&#8226; 0 ms Arduino delay() &#8226; FreeRTOS Task Yielding</text>
   </g>
@@ -1167,13 +1167,12 @@
   <ul>
     <li><strong>Safety Tiers:</strong> Normal (0.0 - 79.9 mg/hr, Solid Green LED), Warning (80.0 mg/hr, Solid Yellow LED), and Critical (&gt;80.0 mg/hr).</li>
     <li><strong>Rate Limiting:</strong> Maximum upward slew rate clamped to <strong>+5.0 mg/hr per second</strong> (<code>MEDICATION_RATE_LIMIT_STEP_MG_PER_SEC = 5.0f</code>), preventing abrupt dosage spikes.</li>
-    <li><strong>Dual-Channel Physical Bedside Interlock:</strong> Any commanded dosage &gt;80 mg/hr clamps the applied rate at 80.0 mg/hr, flashes the Red LED and 1200 Hz buzzer rapidly at ~3.3 Hz (300 ms period: 150 ms ON / 150 ms OFF), and prompts <code>PRESS BUTTON</code> on the OLED. The applied dosage remains held at 80.0 mg/hr indefinitely until the clinician physically confirms the override by pressing the bedside button on <code>GPIO 13</code> or reduces the target dosage back to &le;80 mg/hr. <em>Range Authorization Policy:</em> Once physically confirmed at bedside for a critical rate, adjustments within the critical band (&gt;80.0 mg/hr) remain authorized without re-prompting; dropping dosage back to &le;80.0 mg/hr automatically clears confirmation and re-arms the interlock.</li>
+    <li><strong>Dual-Channel Physical Bedside Interlock:</strong> Any commanded dosage &gt;80 mg/hr clamps the applied rate at 80.0 mg/hr, flashes the Red LED and 1200 Hz buzzer rapidly at ~3.3 Hz (300 ms period: 150 ms ON / 150 ms OFF), and prompts <code>PRESS BUTTON</code> on the OLED. The applied dosage remains held at 80.0 mg/hr indefinitely until the clinician physically confirms the override by pressing the bedside button on <code>GPIO 13</code> or reduces the target dosage back to &le;80 mg/hr. <em>Range Authorization Policy:</em> Once physically confirmed at bedside for a critical rate, adjustments within the critical band (&gt;80.0 mg/hr) remain authorized without re-prompting; dropping dosage back to &le;80.0 mg/hr automatically clears confirmation and re-arms the interlock (holds, GPIO 13 confirmations, &ge;1 mg/hr steps, and tiers log outside spinlocks).</li>
   </ul>
 
   <h2>Task 4: Intelligent Remote Bed Elevation Control</h2>
   <p>
-    Bed elevation is driven by an SG90 micro-servo on <code>GPIO 18</code> (500 &mu;s to 2400 &mu;s pulse width) with smooth microsecond 
-    pulse interpolation to protect patient comfort. The autonomous controller dynamically maps clinical condition to posture:
+    An SG90 micro-servo on <code>GPIO 18</code> (500-2400 &mu;s PWM) smooths elevation and logs boot (0.0&deg;), &ge;1.0&deg; steps, and arrival angles with pulse widths to Serial. Clinical state maps to:
   </p>
   <ul>
     <li><strong>Sleeping Mode (10&deg;, 1.5&deg;/s):</strong> Nominal resting position when vitals are stable.</li>
@@ -1194,7 +1193,7 @@
 
   <h2>Task 6: Advanced Offline Detection (Fault-Tolerant System)</h2>
   <p>
-    The firmware continuously monitors Wi-Fi and MQTT connectivity to maintain a tri-state health machine (<code>ONLINE</code>, <code>DEGRADED</code>, <code>OFFLINE</code>):
+    Continuously audits Wi-Fi/MQTT links (<code>ONLINE</code>, <code>DEGRADED</code>, <code>OFFLINE</code>) and logs link transitions, <code>SYSTEM_ONLINE</code> recovery, and debounced OLED/buzzer confirmation edges to Serial:
   </p>
   <ul>
     <li><strong>OLED Notification:</strong> Inverted status bar on bottom rows (y: 54..63) displays <strong><code>LOGGING OFFLINE</code></strong> or <strong><code>SYSTEM DEGRADED</code></strong> without obstructing medication data.</li>
@@ -1222,16 +1221,16 @@
     <tbody>
       <tr>
         <td><strong>RAM (SRAM)</strong></td>
-        <td>49,576 Bytes (Static)</td>
+        <td>49,568 Bytes (Static)</td>
         <td>327,680 Bytes (Data SRAM)</td>
         <td><strong>15.1%</strong></td>
-        <td>278,104 Bytes of static headroom remain within the 327,680 B data SRAM budget for FreeRTOS task stacks (13 tasks: 12 &times; 4 KB + 8 KB MQTT), Wi-Fi/lwIP buffers, and the 36,864 B <code>offlineBufferQueue</code> (520 KB physical on-chip SRAM); runtime <code>ESP.getMinFreeHeap()</code> is logged every 30 s by <code>watchdogTask</code> during hardware/Wokwi execution.</td>
+        <td>278,112 Bytes of static headroom remain within the 327,680 B data SRAM budget for FreeRTOS task stacks (13 tasks: 12 &times; 4 KB + 8 KB MQTT), Wi-Fi/lwIP buffers, and the 36,864 B <code>offlineBufferQueue</code> (520 KB physical on-chip SRAM); runtime <code>ESP.getMinFreeHeap()</code> is logged every 30 s by <code>watchdogTask</code> during hardware/Wokwi execution.</td>
       </tr>
       <tr>
         <td><strong>Flash Memory</strong></td>
-        <td>1,053,906 Bytes</td>
+        <td>1,056,062 Bytes</td>
         <td>1,310,720 Bytes</td>
-        <td><strong>80.4%</strong></td>
+        <td><strong>80.6%</strong></td>
         <td>Fits comfortably within default 1.31 MB application partition (app0).</td>
       </tr>
       <tr>
@@ -1358,7 +1357,7 @@
   <ol>
     <li>Navigate to <strong><a href="https://wokwi.com/projects/481914875542568961">wokwi.com/projects/481914875542568961</a></strong>.</li>
     <li>Click the green <strong>Play</strong> button (&blacktriangleright;) to start the simulation.</li>
-    <li>Open the Serial Monitor at 115200 baud to observe task heartbeats, FreeRTOS scheduling, and to input simulation commands.</li>
+    <li>Open the Serial Monitor at 115200 baud to observe sensor telemetry, servo angles, medication interlocks, offline transitions, task heartbeats, and to input simulation commands.</li>
     <li>Interact with the physical hardware:
       <ul>
         <li>Push the <strong>Green Button</strong> (<code>GPIO 13</code>) to confirm critical medication dosages (&gt;80 mg/hr).</li>

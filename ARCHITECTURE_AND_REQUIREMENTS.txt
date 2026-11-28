@@ -338,8 +338,8 @@ channel/timer (channel 1 / timer 1) and is driven exclusively by `offlineTask`.
 8. BUILD & OPTIONAL VERIFICATION SUITE (`platformio.ini`)
 --------------------------------------------------------------------------------
   - Production Firmware (`pio run -e esp32dev`):
-    Measured footprint = 49,576 Bytes static RAM (15.1% of 327,680 B data SRAM),
-    1,053,906 Bytes Flash (80.4% of 1,310,720 B app partition; Unity excluded).
+    Measured footprint = 49,568 Bytes static RAM (15.1% of 327,680 B data SRAM),
+    1,056,062 Bytes Flash (80.6% of 1,310,720 B app partition; Unity excluded).
   - Optional Unit Verification (`test/test_main.cpp`, `[env:esp32dev_test]`,
     `test_build_src = no`):
     Added as optional engineering verification beyond the 6 assigned tasks with

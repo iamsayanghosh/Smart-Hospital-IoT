@@ -99,9 +99,10 @@ graph TD
 * **Dual-Channel Physical Bedside Interlock:** Clinician must physically press the button on `GPIO 13` to unlock dosages above 80 mg/hr. *Range Authorization Policy:* Once confirmed at bedside for a critical rate, adjustments within the critical band (>80.0 mg/hr) remain authorized without re-prompting; dropping dosage back to ≤ 80.0 mg/hr automatically clears confirmation and re-arms the interlock.
 * **Asymmetric Slew Limiter:** Increases are smoothly capped to +5 mg/hr/s across 50 Hz task cycles (with first-step jump elimination and long task interruption recovery) to prevent bolus shock; reductions apply instantaneously.
 * **Permanent OLED Display:** The 128x64 OLED display permanently shows current dosage, status, and confirmation cues online and offline.
+* **Serial Telemetry & Interlock Logging:** `medicationTask` logs critical holds, debounced `GPIO 13` confirmations, applied dosage changes (`>= 1.0 mg/hr` slew steps / target arrival), and LED/buzzer tier transitions over Serial strictly outside spinlock critical sections.
 
 ### Task 4: Intelligent Remote Bed Elevation
-* **Actuation:** SG90 Servo on `GPIO 18` with kinematic ramp smoothing (1.5°/s, 2.0°/s, 5.0°/s). Starts at 0° supine on boot until initial vitals are processed. During boot failure rollback (`failSetup()`), the servo PWM timer is explicitly detached.
+* **Actuation:** SG90 Servo on `GPIO 18` with kinematic ramp smoothing (1.5°/s, 2.0°/s, 5.0°/s). Starts at 0° supine on boot until initial vitals are processed. During boot failure rollback (`failSetup()`), the servo PWM timer is explicitly detached. Reports boot angle (`0.0 deg`), `>= 1.0 deg` slew steps, and target arrival angles with PWM pulse widths to Serial without flooding 115200-baud UART.
 * **Predefined Clinical Modes:**
   * **Sleeping Rest (10°):** Normal baseline physiological status.
   * **Breathing Support (45°):** Semi-Fowler's positioning automatically triggered by hypoxia (SpO2 88%–91%).
@@ -115,7 +116,7 @@ graph TD
 
 ### Task 6: Fault-Tolerant Offline Detection & Buffering
 * **DS18B20 Hot-Plug & Boot Recovery:** Periodic 1-Wire bus re-scan (`begin()`) recovers sensors absent at power-up or hot-swapped at runtime.
-* **Three Health States:** `SYSTEM_ONLINE`, `SYSTEM_DEGRADED` (detected when transport is online but a worker task misses its watchdog heartbeat), and `SYSTEM_OFFLINE` (Wi-Fi or MQTT disconnected).
+* **Three Health States:** `SYSTEM_ONLINE`, `SYSTEM_DEGRADED` (detected when transport is online but a worker task misses its watchdog heartbeat), and `SYSTEM_OFFLINE` (Wi-Fi or MQTT disconnected). All state transitions (including `SYSTEM_OFFLINE` link causes, `SYSTEM_ONLINE` recovery, and debounced OLED banner / buzzer confirmation edges) are logged cleanly to Serial.
 * **Unified Quiet Bootup & Debounce:** An `OfflineBannerGate` suppresses the offline banner and buzzer during the first 10 seconds of power-up and ignores transient network hiccups under 5 seconds (both grace and hold latch across 49.7-day `millis()` rollover).
 * **Non-Clobbering OLED Banner:** Inverted ticker bar on bottom rows (`y = 54..63`) displays `LOGGING OFFLINE` during network drops or `SYSTEM DEGRADED` during task stalls, while medication dosage remains permanently visible.
 * **Acoustic Cadences:** Distinct failure cadences for Wi-Fi failure (rapid double-pip) vs. MQTT broker failure (slow beep). Medication critical alarms take absolute priority over network beeps.
@@ -275,8 +276,8 @@ pio run --target upload
 
 | Metric | Measured Value | Budget / Limit | Utilization |
 | :--- | :--- | :--- | :--- |
-| **Static RAM (SRAM)** | 49,576 Bytes | 327,680 Bytes | **15.1%** |
-| **Flash Memory** | 1,053,906 Bytes | 1,310,720 Bytes | **80.4%** |
+| **Static RAM (SRAM)** | 49,568 Bytes | 327,680 Bytes | **15.1%** |
+| **Flash Memory** | 1,056,062 Bytes | 1,310,720 Bytes | **80.6%** |
 | **FreeRTOS Application Tasks** | 13 tasks (all Core 1) | Dual Core Xtensa | Pinned to Core 1 (with loopTask) |
 | **Watchdog Timeout** | 8000 ms (Hardware TWDT) | 6000 ms (Heartbeat) | 100% monitored |
 | **Task Scheduling Delays** | 0 ms (Zero Arduino `delay()`) | Cooperative yielding | FreeRTOS `vTaskDelay` (peripheral I/O remains synchronous) |
@@ -299,7 +300,7 @@ The build system in `include/adafruit_io_config.h` automatically detects whether
 
 1. Open **[wokwi.com/projects/481914875542568961](https://wokwi.com/projects/481914875542568961)**.
 2. Click the green **Play** button (▶) to start the simulation.
-3. Open the Serial Monitor at 115200 baud to observe task heartbeats, FreeRTOS scheduling, and to input simulation commands (`SET_HR`, `SET_SPO2`, `SIM_OFFLINE`).
+3. Open the Serial Monitor at 115200 baud to observe sensor readings, servo angles, medication interlocks, offline state transitions, task heartbeats, and to input simulation commands (`SET_HR`, `SET_SPO2`, `SIM_OFFLINE`).
 4. Interact with the physical hardware:
    - Push the **Green Button** (`GPIO 13`) to confirm critical medication dosages (> 80 mg/hr).
    - Observe the **SG90 Servo** (`GPIO 18`) elevating smoothly between 10°, 45°, and 90°.
