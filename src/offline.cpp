@@ -145,6 +145,84 @@ size_t getBufferedTelemetryCount() {
     return uxQueueMessagesWaiting(offlineBufferQueue);
 }
 
+struct OfflineLogState {
+    SystemHealthState lastHealth = SYSTEM_ONLINE;
+    OfflineBuzzerMode lastRawBuzzer = BUZZER_MODE_NORMAL;
+    bool lastAlertConfirmed = false;
+    OfflineBuzzerMode lastEffectiveBuzzer = BUZZER_MODE_NORMAL;
+};
+
+/**
+ * @brief Maps an offline buzzer mode enum to a human-readable Serial Monitor description.
+ */
+static const char *buzzerModeLabel(OfflineBuzzerMode mode)
+{
+    switch (mode) {
+        case BUZZER_MODE_WIFI_FAIL:
+            return "WIFI_FAIL (double-pip)";
+        case BUZZER_MODE_MQTT_FAIL:
+            return "MQTT_FAIL (slow single-beep)";
+        default:
+            return "NORMAL (silent)";
+    }
+}
+
+/**
+ * @brief Reports health, network outage, OLED banner, and buzzer cadence transitions to Serial.
+ */
+static void reportOfflineStateChanges(
+    SystemHealthState health,
+    OfflineBuzzerMode rawBuzzer,
+    bool alertConfirmed,
+    OfflineBuzzerMode effectiveBuzzer,
+    OfflineLogState &logState)
+{
+    const bool healthChanged = (health != logState.lastHealth);
+    const bool rawCauseChangedWhileOffline =
+        (health == SYSTEM_OFFLINE && logState.lastHealth == SYSTEM_OFFLINE && rawBuzzer != logState.lastRawBuzzer);
+
+    if (healthChanged || rawCauseChangedWhileOffline) {
+        if (health == SYSTEM_DEGRADED) {
+            Serial.println("[HEALTH] System state transition: SYSTEM_DEGRADED (Worker task watchdog starvation)");
+        } else if (health == SYSTEM_OFFLINE) {
+            if (logState.lastHealth != SYSTEM_OFFLINE) {
+                Serial.print("[OFFLINE] System state: SYSTEM_OFFLINE (");
+                Serial.print(rawBuzzer == BUZZER_MODE_WIFI_FAIL ? "Wi-Fi disconnected" : "Wi-Fi connected, MQTT disconnected");
+                Serial.println("; telemetry buffering active)");
+            } else {
+                Serial.print("[OFFLINE] Link status changed while offline: ");
+                Serial.println(rawBuzzer == BUZZER_MODE_WIFI_FAIL ? "Wi-Fi disconnected" : "Wi-Fi connected, waiting for MQTT broker");
+            }
+        } else if (logState.lastHealth == SYSTEM_DEGRADED) {
+            Serial.println("[HEALTH] System state transition: SYSTEM_ONLINE (All tasks healthy)");
+        } else {
+            Serial.print("[OFFLINE] System state: SYSTEM_ONLINE (Wi-Fi & MQTT connected; queued=");
+            Serial.print(static_cast<unsigned long>(getBufferedTelemetryCount()));
+            Serial.println(")");
+        }
+        logState.lastHealth = health;
+        logState.lastRawBuzzer = rawBuzzer;
+    }
+
+    if (alertConfirmed != logState.lastAlertConfirmed ||
+        (alertConfirmed && effectiveBuzzer != logState.lastEffectiveBuzzer)) {
+        if (alertConfirmed) {
+            if (!logState.lastAlertConfirmed) {
+                Serial.print("[OFFLINE] Offline alert confirmed: OLED banner=ON, buzzer=");
+            } else {
+                Serial.print("[OFFLINE] Offline buzzer cadence changed: ");
+            }
+            Serial.print(buzzerModeLabel(effectiveBuzzer));
+            Serial.print(", buffered=");
+            Serial.println(static_cast<unsigned long>(getBufferedTelemetryCount()));
+        } else {
+            Serial.println("[OFFLINE] Offline alert cleared: OLED banner=OFF, buzzer=NORMAL");
+        }
+        logState.lastAlertConfirmed = alertConfirmed;
+        logState.lastEffectiveBuzzer = effectiveBuzzer;
+    }
+}
+
 /**
  * @brief FreeRTOS task supervising connectivity states and driving offline buzzer cadences.
  *
@@ -165,6 +243,7 @@ void offlineTask(void *parameter) {
     }
 
     OfflineBannerGate buzzerGate(OFFLINE_HOLD_DEBOUNCE_MS, OFFLINE_BOOT_GRACE_MS);
+    OfflineLogState logState;
 
     while (true) {
         bool wifi = (WiFi.status() == WL_CONNECTED) && !isSimulateOfflineWifi();
@@ -173,23 +252,17 @@ void offlineTask(void *parameter) {
         
         updateSystemHealth(wifi, mqtt, healthy);
 
-        static SystemHealthState lastLoggedHealth = SYSTEM_ONLINE;
-        if (currentHealth != lastLoggedHealth) {
-            if (currentHealth == SYSTEM_DEGRADED) {
-                Serial.println("[HEALTH] System state transition: SYSTEM_DEGRADED (Worker task watchdog starvation)");
-            } else if (currentHealth == SYSTEM_ONLINE && lastLoggedHealth == SYSTEM_DEGRADED) {
-                Serial.println("[HEALTH] System state transition: SYSTEM_ONLINE (All tasks healthy)");
-            }
-            lastLoggedHealth = currentHealth;
-        }
-        
         // Dual-layer filter via OfflineBannerGate:
         // 1. Initial boot grace (10s / OFFLINE_BOOT_GRACE_MS) prevents false alarms during Wi-Fi association.
         // 2. Persistent hold debounce (5s / OFFLINE_HOLD_DEBOUNCE_MS) filters out transient transport blips.
-        offlineAlertConfirmed = buzzerGate.update(!wifi || !mqtt, millis());
-        OfflineBuzzerMode effectiveBuzzer = offlineAlertConfirmed ? currentBuzzer : BUZZER_MODE_NORMAL;
+        const bool confirmed = buzzerGate.update(!wifi || !mqtt, millis());
+        offlineAlertConfirmed = confirmed;
+        const SystemHealthState healthSnapshot = currentHealth.load();
+        const OfflineBuzzerMode rawBuzzer = currentBuzzer;
+        OfflineBuzzerMode effectiveBuzzer = confirmed ? rawBuzzer : BUZZER_MODE_NORMAL;
         
         updateOfflineBuzzer(effectiveBuzzer);
+        reportOfflineStateChanges(healthSnapshot, rawBuzzer, confirmed, effectiveBuzzer, logState);
         
         reportTaskHeartbeat(TASK_OFFLINE);
         vTaskDelay(pdMS_TO_TICKS(50));

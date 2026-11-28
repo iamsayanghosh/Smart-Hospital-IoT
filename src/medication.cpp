@@ -63,16 +63,20 @@ static void updateMedicationDosageFromRequest()
         state.criticalConfirmed = false;
     }
 
+    bool cancelledCriticalHold = false;
     if (state.criticalConfirmationPending && targetDosage <= MEDICATION_CRITICAL_DOSAGE_THRESHOLD) {
         state.criticalConfirmationPending = false;
         state.criticalConfirmed = false;
         state.lastRateLimitUpdateMs = now;
+        cancelledCriticalHold = true;
     }
 
+    bool enteredCriticalHold = false;
     if (!state.criticalConfirmationPending && !state.criticalConfirmed && targetDosage > MEDICATION_CRITICAL_DOSAGE_THRESHOLD) {
         state.criticalConfirmationPending = true;
         state.applied = min(state.applied, MEDICATION_CRITICAL_DOSAGE_THRESHOLD);
         state.lastRateLimitUpdateMs = now;
+        enteredCriticalHold = true;
     }
 
     const float goal = state.criticalConfirmationPending ? MEDICATION_CRITICAL_DOSAGE_THRESHOLD : targetDosage;
@@ -86,6 +90,20 @@ static void updateMedicationDosageFromRequest()
     medicationDosageControl.criticalConfirmed = state.criticalConfirmed;
     medicationDosageControl.lastRateLimitUpdateMs = state.lastRateLimitUpdateMs;
     portEXIT_CRITICAL(&telemetryMux);
+
+    if (enteredCriticalHold) {
+        Serial.print("[MEDICATION] CRITICAL hold: requested=");
+        Serial.print(targetDosage, 1);
+        Serial.print(" mg/hr (> ");
+        Serial.print(MEDICATION_CRITICAL_DOSAGE_THRESHOLD, 1);
+        Serial.print("); holding applied=");
+        Serial.print(state.applied, 1);
+        Serial.println(" mg/hr awaiting GPIO 13 button confirmation");
+    } else if (cancelledCriticalHold) {
+        Serial.print("[MEDICATION] Critical hold cancelled: requested=");
+        Serial.print(targetDosage, 1);
+        Serial.println(" mg/hr <= 80.0 mg/hr");
+    }
 }
 
 /**
@@ -108,6 +126,9 @@ static void handleMedicationConfirmationButton()
     portEXIT_CRITICAL(&telemetryMux);
 
     if (rawPressed != previousPressed && (now - lastTransitionMs) >= MEDICATION_BUTTON_DEBOUNCE_MS) {
+        bool confirmedCritical = false;
+        float requestedTarget = 0.0f;
+
         portENTER_CRITICAL(&telemetryMux);
         medicationDosageControl.buttonPressed = rawPressed;
         medicationDosageControl.lastButtonTransitionMs = now;
@@ -115,8 +136,75 @@ static void handleMedicationConfirmationButton()
             medicationDosageControl.criticalConfirmationPending = false;
             medicationDosageControl.criticalConfirmed = true;
             medicationDosageControl.lastRateLimitUpdateMs = now;
+            confirmedCritical = true;
+            requestedTarget = medicationDosageControl.requested;
         }
         portEXIT_CRITICAL(&telemetryMux);
+
+        if (confirmedCritical) {
+            Serial.print("[MEDICATION] GPIO 13 button pressed: CRITICAL dose confirmed -> ramping to ");
+            Serial.print(clampMedicationDosage(requestedTarget), 1);
+            Serial.println(" mg/hr");
+        } else if (rawPressed) {
+            Serial.println("[MEDICATION] GPIO 13 button pressed (no critical hold pending)");
+        }
+    }
+}
+
+enum MedicationOutputMode {
+    MED_OUT_NORMAL,
+    MED_OUT_WARNING,
+    MED_OUT_CRITICAL_CONFIRMED,
+    MED_OUT_CRITICAL_PENDING
+};
+
+struct MedicationReportTracker {
+    bool initialized = false;
+    float lastReportedApplied = 0.0f;
+    MedicationOutputMode lastOutputMode = MED_OUT_NORMAL;
+};
+
+/**
+ * @brief Maps physical medication output tier to a concise Serial Monitor label.
+ */
+static const char *medicationOutputModeLabel(MedicationOutputMode mode)
+{
+    switch (mode) {
+        case MED_OUT_CRITICAL_PENDING:
+            return "CRITICAL_HOLD (LED=RED_BLINK, BUZZER=ACTIVE)";
+        case MED_OUT_CRITICAL_CONFIRMED:
+            return "CRITICAL_CONFIRMED (LED=RED, BUZZER=OFF)";
+        case MED_OUT_WARNING:
+            return "WARNING (LED=YELLOW, BUZZER=OFF)";
+        default:
+            return "NORMAL (LED=GREEN, BUZZER=OFF)";
+    }
+}
+
+/**
+ * @brief Logs medication infusion rate changes (>=1.0 mg/hr or target arrival) and safety tier changes.
+ */
+static void reportMedicationChanges(const MedicationDosageControl &state, MedicationOutputMode outputMode, MedicationReportTracker &tracker)
+{
+    const float targetDosage = clampMedicationDosage(state.requested);
+    const float effectiveGoal = state.criticalConfirmationPending
+                                    ? min(targetDosage, MEDICATION_CRITICAL_DOSAGE_THRESHOLD)
+                                    : targetDosage;
+    const float deltaFromReported = fabsf(state.applied - tracker.lastReportedApplied);
+    const bool reachedGoal = (fabsf(state.applied - effectiveGoal) < 0.001f);
+    const bool modeChanged = (outputMode != tracker.lastOutputMode);
+
+    if (!tracker.initialized || modeChanged || deltaFromReported >= 0.999f || (reachedGoal && deltaFromReported > 0.001f)) {
+        tracker.initialized = true;
+        tracker.lastReportedApplied = state.applied;
+        tracker.lastOutputMode = outputMode;
+        Serial.print("[MEDICATION] Dosage: applied=");
+        Serial.print(state.applied, 1);
+        Serial.print(" mg/hr (target=");
+        Serial.print(targetDosage, 1);
+        Serial.print(" mg/hr, ");
+        Serial.print(medicationOutputModeLabel(outputMode));
+        Serial.println(")");
     }
 }
 
@@ -131,7 +219,7 @@ static void handleMedicationConfirmationButton()
  *
  * NOTE: These outputs are dedicated solely to medication infusion safety and never indicate patient vitals.
  */
-static void updateMedicationSafetyOutputs()
+static void updateMedicationSafetyOutputs(MedicationReportTracker &tracker)
 {
     MedicationDosageControl state = getMedicationDosageSnapshot();
     const uint32_t now = millis();
@@ -142,20 +230,26 @@ static void updateMedicationSafetyOutputs()
     bool yellowLedOn = false;
     bool greenLedOn = false;
     bool desiredBuzzerOn = false;
+    MedicationOutputMode outputMode = MED_OUT_NORMAL;
 
     if (criticalPending) {
         const bool redBlinkOn = ((now / 150U) % 2U) == 0U; // Rapid ~3.3 Hz blink per Task 3 spec
         redLedOn = redBlinkOn;
         desiredBuzzerOn = redBlinkOn;
+        outputMode = MED_OUT_CRITICAL_PENDING;
     } else if (state.criticalConfirmed || getMedicationSafetyLevel(state.applied) == MEDICATION_SAFETY_CRITICAL) {
         redLedOn = true;
+        outputMode = MED_OUT_CRITICAL_CONFIRMED;
     } else if (getMedicationSafetyLevel(state.applied) == MEDICATION_SAFETY_WARNING) {
         yellowLedOn = true;
+        outputMode = MED_OUT_WARNING;
     } else {
         greenLedOn = true;
+        outputMode = MED_OUT_NORMAL;
     }
 
     setSafetyOutputs(redLedOn, yellowLedOn, greenLedOn, desiredBuzzerOn);
+    reportMedicationChanges(state, outputMode, tracker);
 }
 
 /**
@@ -177,10 +271,11 @@ void medicationTask(void *parameter)
         return;
     }
 
+    MedicationReportTracker reportTracker;
     while (true) {
         handleMedicationConfirmationButton();
         updateMedicationDosageFromRequest();
-        updateMedicationSafetyOutputs();
+        updateMedicationSafetyOutputs(reportTracker);
         reportTaskHeartbeat(TASK_MEDICATION);
         vTaskDelay(pdMS_TO_TICKS(20));
     }

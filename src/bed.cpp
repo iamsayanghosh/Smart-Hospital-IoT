@@ -33,6 +33,39 @@ static const float BED_SERVO_MAX_ANGLE = 180.0f; ///< Physical servo full travel
 static Servo bedServo;
 
 /**
+ * @brief Converts a bed elevation angle [0.0, 180.0 deg] into servo PWM pulse width (us).
+ */
+static int angleToPulseUs(float angleDeg)
+{
+    return BED_SERVO_MIN_PULSE +
+           static_cast<int>((angleDeg / BED_SERVO_MAX_ANGLE) * (BED_SERVO_MAX_PULSE - BED_SERVO_MIN_PULSE));
+}
+
+/**
+ * @brief Writes the PWM pulse for the given angle and reports >=1 deg steps or target arrival to Serial.
+ */
+static void applyAndReportBedAngle(float currentAngle, float targetAngle, float &lastReportedAngle, bool forceReport = false)
+{
+    const int pulse = angleToPulseUs(currentAngle);
+    bedServo.writeMicroseconds(pulse);
+
+    const bool reachedTarget = (currentAngle == targetAngle);
+    const float deltaFromReported = fabsf(currentAngle - lastReportedAngle);
+    // Log on >=1.0 deg progress (0.999 handles 0.1 deg float steps cleanly) or exact target arrival
+    // so Serial Monitor tracks every degree of motion without 50 Hz UART flooding.
+    if (forceReport || deltaFromReported >= 0.999f || (reachedTarget && deltaFromReported > 0.001f)) {
+        lastReportedAngle = currentAngle;
+        Serial.print("[BED] Servo angle: ");
+        Serial.print(currentAngle, 1);
+        Serial.print(" deg (target=");
+        Serial.print(targetAngle, 1);
+        Serial.print(" deg, pulse=");
+        Serial.print(pulse);
+        Serial.println(" us)");
+    }
+}
+
+/**
  * @brief Detaches bed servo PWM and drives control line to safe unpowered state.
  */
 void bedDetachServo()
@@ -62,10 +95,11 @@ void bedTask(void *parameter)
 
     // Startup requirement: Servo starts at exactly 0°.
     float currentAngle = 0.0f;
-    bedServo.writeMicroseconds(BED_SERVO_MIN_PULSE + (int)((currentAngle / BED_SERVO_MAX_ANGLE) * (BED_SERVO_MAX_PULSE - BED_SERVO_MIN_PULSE)));
+    float targetAngle = 0.0f;
+    float lastReportedAngle = currentAngle;
+    applyAndReportBedAngle(currentAngle, targetAngle, lastReportedAngle, true);
 
     BedMode lastAutoMode = BED_MODE_SLEEPING;
-    float targetAngle = 0.0f;
     float speedPerSecond = 1.5f;
 
     // Force an initial update to evaluate telemetry and move from 0°
@@ -131,12 +165,10 @@ void bedTask(void *parameter)
             } else {
                 currentAngle -= stepSize;
             }
-            int pulse = BED_SERVO_MIN_PULSE + (int)((currentAngle / BED_SERVO_MAX_ANGLE) * (BED_SERVO_MAX_PULSE - BED_SERVO_MIN_PULSE));
-            bedServo.writeMicroseconds(pulse);
+            applyAndReportBedAngle(currentAngle, targetAngle, lastReportedAngle);
         } else if (currentAngle != targetAngle) {
             currentAngle = targetAngle;
-            int pulse = BED_SERVO_MIN_PULSE + (int)((currentAngle / BED_SERVO_MAX_ANGLE) * (BED_SERVO_MAX_PULSE - BED_SERVO_MIN_PULSE));
-            bedServo.writeMicroseconds(pulse);
+            applyAndReportBedAngle(currentAngle, targetAngle, lastReportedAngle);
         }
 
         reportTaskHeartbeat(TASK_BED);
