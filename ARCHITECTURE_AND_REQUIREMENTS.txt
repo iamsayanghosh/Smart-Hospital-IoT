@@ -6,7 +6,7 @@ INTENDED ARCHITECTURE, WORKFLOW, AND TASK REQUIREMENTS SPECIFICATION
 Target Platform : Espressif ESP32 DevKitC v4 (Dual-Core Xtensa LX6 @ 240 MHz)
 Framework       : Arduino Core for ESP32 v3.3.9 / ESP-IDF FreeRTOS SMP
 Cloud Broker    : Adafruit IO MQTT (io.adafruit.com, Port 1883, 10-Feed Budget)
-Simulation      : Unified Wokwi Project (https://wokwi.com/projects/481027748143740929)
+Simulation      : Unified Wokwi Project (https://wokwi.com/projects/481914875542568961)
 Scope           : Single Integrated Firmware Unifying Internship Tasks 1 through 6
 
 DISCLAIMER: This system is an educational and engineering prototype/simulation.

@@ -3,13 +3,13 @@
 [![ESP32](https://img.shields.io/badge/Hardware-ESP32--DevKit--C--V4-blue.svg)](https://www.espressif.com/)
 [![Framework](https://img.shields.io/badge/Framework-Arduino%20ESP32%20%2F%20FreeRTOS-green.svg)](https://github.com/espressif/arduino-esp32)
 [![PlatformIO](https://img.shields.io/badge/PlatformIO-Build%20Verified-blue.svg)](https://platformio.org/)
-[![Wokwi Simulation](https://img.shields.io/badge/Simulation-Wokwi%20Live-orange.svg)](https://wokwi.com/projects/481027748143740929)
+[![Wokwi Simulation](https://img.shields.io/badge/Simulation-Wokwi%20Live-orange.svg)](https://wokwi.com/projects/481914875542568961)
 [![License](https://img.shields.io/badge/License-MIT-lightgrey.svg)](LICENSE)
 [![Project Report](https://img.shields.io/badge/Report-PDF%20Available-red.svg)](https://github.com/iamsayanghosh/Smart-Hospital-IoT/blob/main/docs/Smart_Hospital_IoT_Project_Report.pdf)
 
 A concurrent medical telemetry and facility management firmware prototype implemented on the ESP32 microcontroller using the Arduino framework and FreeRTOS SMP.
 
-* **Live Wokwi Simulation:** [wokwi.com/projects/481027748143740929](https://wokwi.com/projects/481027748143740929)
+* **Live Wokwi Simulation:** [wokwi.com/projects/481914875542568961](https://wokwi.com/projects/481914875542568961)
 * **GitHub Repository:** [github.com/iamsayanghosh/Smart-Hospital-IoT](https://github.com/iamsayanghosh/Smart-Hospital-IoT)
 * **Target Hardware:** Espressif ESP32 DevKit v4 (Dual-Core Xtensa 240 MHz, 320 KB SRAM)
 * **Project Report (PDF):** [Smart_Hospital_IoT_Project_Report.pdf](https://github.com/iamsayanghosh/Smart-Hospital-IoT/blob/main/docs/Smart_Hospital_IoT_Project_Report.pdf)
@@ -297,7 +297,7 @@ The build system in `include/adafruit_io_config.h` automatically detects whether
 
 ## 10. Running in Browser Wokwi (wokwi.com)
 
-1. Open **[wokwi.com/projects/481027748143740929](https://wokwi.com/projects/481027748143740929)**.
+1. Open **[wokwi.com/projects/481914875542568961](https://wokwi.com/projects/481914875542568961)**.
 2. Click the green **Play** button (▶) to start the simulation.
 3. Open the Serial Monitor at 115200 baud to observe task heartbeats, FreeRTOS scheduling, and to input simulation commands (`SET_HR`, `SET_SPO2`, `SIM_OFFLINE`).
 4. Interact with the physical hardware:
